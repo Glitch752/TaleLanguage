@@ -1,4 +1,4 @@
-function main() > int {
+let main: (fn() > int) = function() > int {
     // Loops from 0 to 19. Ranges are inclusive of the first number and uninclusive of the second.
     // i is actually being assigned to an array here, and let expressions return the assigned value.
     for(let i: int[] = 0..20) {
@@ -8,9 +8,9 @@ function main() > int {
         if(i % 3 == 0 && ((i % 3) == 0)) {
             // Log prints to stdout
             log("FizzBuzz\n");
-        } else if(i % 3 == 0) {
-            log("Fizz\n");
-        } else if(i % 5 == 0) {
+        }
+        else if(i % 3 == 0) log("Fizz\n");
+        else if(i % 5 == 0) {
             log("Buzz\n");
         } else {
             // Not sure how much I like string() as the type cast, but it's the easiest method for now.
@@ -22,3 +22,5 @@ function main() > int {
     // Exit code 0
     return 0;
 }
+
+return main();

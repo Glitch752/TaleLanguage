@@ -82,4 +82,7 @@ pub fn main() !void {
 
         try tokens.append(tokenData);
     }
+
+    const prsr = parser.init(tokens.items, allocator);
+    _ = prsr;
 }

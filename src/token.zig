@@ -35,7 +35,9 @@ pub const TokenType = enum {
     IfKeyword,
     ElseKeyword,
     ForKeyword,
+    // TODO: While
     ReturnKeyword,
+    // TODO: Continue, Break
     LetKeyword,
 
     IntLiteral,
