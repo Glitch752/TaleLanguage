@@ -54,6 +54,8 @@ pub fn main() !void {
             break;
         }
 
+        tokenData.deinit(&allocator);
+
         // try stdout.print("{s}\n", .{token.toString()});
     }
 }

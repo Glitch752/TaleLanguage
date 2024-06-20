@@ -125,6 +125,10 @@ pub const Token = union(TokenType) {
         };
     }
 
+    pub fn toStringWithType(self: Token) []const u8 {
+        return self.toString() ++ " (" ++ @typeName(@TypeOf(self)) ++ ")";
+    }
+
     pub const keyword_map = std.ComptimeStringMap(Token, .{ .{ "function", Token.FunctionKeyword }, .{ "if", Token.IfKeyword }, .{ "else", Token.ElseKeyword }, .{ "for", Token.ForKeyword }, .{ "return", Token.ReturnKeyword }, .{ "let", Token.LetKeyword } });
 };
 
@@ -132,4 +136,12 @@ pub const TokenData = struct {
     token: Token,
     line: u32,
     column: u32,
+
+    pub fn deinit(self: *const TokenData, allocator: *const std.mem.Allocator) void {
+        switch (self.token) {
+            .Identifier => |token| allocator.free(token),
+            .StringLiteral => |token| allocator.free(token),
+            else => {},
+        }
+    }
 };

@@ -61,24 +61,29 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
 
         // Next, keywords
         if (std.ascii.isAlphanumeric(c)) {
-            var keyword = std.ArrayList(u8).init(allocator);
-            defer keyword.deinit();
-
-            try keyword.append(c);
+            var keyword = try allocator.alloc(u8, 1);
+            keyword[0] = c;
+            var i: u16 = 1;
             while (std.ascii.isAlphanumeric(self.buffer[self.position])) {
-                try keyword.append(self.buffer[self.position]);
+                keyword = try allocator.realloc(keyword, i + 1);
+                keyword[i] = self.buffer[self.position];
+                i += 1;
+
                 self.position += 1;
                 self.column = 1;
             }
 
-            // TODO: Figure out how to free this memory
-            const token = Token.keyword_map.get(try keyword.toOwnedSlice());
+            // Print keyword
+            std.debug.print("{s}\n", .{keyword});
+
+            const token = Token.keyword_map.get(keyword);
             if (token != null) {
+                allocator.free(keyword);
                 return .{ .token = token.?, .line = self.line, .column = self.column };
             }
 
             // If it's not a keyword, it's an identifier
-            return .{ .token = Token{ .Identifier = try keyword.toOwnedSlice() }, .line = self.line, .column = self.column };
+            return .{ .token = Token{ .Identifier = keyword }, .line = self.line, .column = self.column };
         }
 
         // Next, numbers
@@ -105,7 +110,9 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
                 }
             }
             self.position += 1;
-            return .{ .token = Token{ .StringLiteral = self.buffer[start..self.position] }, .line = self.line, .column = self.column };
+
+            const allocatedString = try allocator.alloc(u8, self.position - start);
+            return .{ .token = Token{ .StringLiteral = allocatedString }, .line = self.line, .column = self.column };
         }
 
         // Then, temporarily, print the character.
