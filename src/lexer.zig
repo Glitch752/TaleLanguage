@@ -73,9 +73,6 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
                 self.column = 1;
             }
 
-            // Print keyword
-            std.debug.print("{s}\n", .{keyword});
-
             const token = Token.keyword_map.get(keyword);
             if (token != null) {
                 allocator.free(keyword);
@@ -103,7 +100,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
             const start = self.position;
             while (self.buffer[self.position] != c) {
                 self.position += 1;
-                self.column = 1;
+                self.column += 1;
                 if (self.buffer[self.position] == '\n') {
                     self.line += 1;
                     self.column = 1;
@@ -116,7 +113,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
         }
 
         // Then, temporarily, print the character.
-        std.debug.print("{u}", .{c});
+        // std.debug.print("{u}", .{c});
     }
 
     return .{ .token = Token.EOF, .line = self.line, .column = self.column };

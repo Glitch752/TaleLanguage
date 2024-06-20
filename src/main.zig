@@ -54,8 +54,10 @@ pub fn main() !void {
             break;
         }
 
-        tokenData.deinit(&allocator);
+        const tokenString = try tokenData.token.toStringWithType(allocator);
+        try stdout.print("{s}", .{tokenString});
+        allocator.free(tokenString);
 
-        // try stdout.print("{s}\n", .{token.toString()});
+        tokenData.deinit(&allocator);
     }
 }

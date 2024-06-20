@@ -125,8 +125,55 @@ pub const Token = union(TokenType) {
         };
     }
 
-    pub fn toStringWithType(self: Token) []const u8 {
-        return self.toString() ++ " (" ++ @typeName(@TypeOf(self)) ++ ")";
+    pub fn typeNameString(self: Token) []const u8 {
+        return switch (self) {
+            .Identifier => return "Identifier",
+            .OpenParen => return "OpenParen",
+            .CloseParen => return "CloseParen",
+            .OpenSquare => return "OpenSquare",
+            .CloseSquare => return "CloseSquare",
+            .OpenCurly => return "OpenCurly",
+            .CloseCurly => return "CloseCurly",
+            .SemiColon => return "SemiColon",
+            .LessThan => return "LessThan",
+            .LessThanEqual => return "LessThanEqual",
+            .GreaterThan => return "GreaterThan",
+            .GreaterThanEqual => return "GreaterThanEqual",
+            .Equal => return "Equal",
+            .Plus => return "Plus",
+            .Minus => return "Minus",
+            .Star => return "Star",
+            .Slash => return "Slash",
+            .Percent => return "Percent",
+            .FunctionKeyword => return "FunctionKeyword",
+            .IfKeyword => return "IfKeyword",
+            .ElseKeyword => return "ElseKeyword",
+            .ForKeyword => return "ForKeyword",
+            .ReturnKeyword => return "ReturnKeyword",
+            .LetKeyword => return "LetKeyword",
+            .IntLiteral => return "IntLiteral",
+            .StringLiteral => return "StringLiteral",
+            .Range => return "Range",
+            .Comma => return "Comma",
+            .Dot => return "Dot",
+            .EOF => return "EOF",
+        };
+    }
+
+    pub fn toStringWithType(self: Token, allocator: std.mem.Allocator) ![]const u8 {
+        const tokenString = self.toString();
+        const typeName = self.typeNameString();
+        const buffer = try allocator.alloc(u8, tokenString.len + typeName.len + 3);
+        for (typeName, 0..) |c, i| {
+            buffer[i] = c;
+        }
+        buffer[typeName.len] = '(';
+        for (tokenString, 0..) |c, i| {
+            buffer[typeName.len + 1 + i] = c;
+        }
+        buffer[tokenString.len + 1 + typeName.len] = ')';
+        buffer[tokenString.len + 2 + typeName.len] = ' ';
+        return buffer;
     }
 
     pub const keyword_map = std.ComptimeStringMap(Token, .{ .{ "function", Token.FunctionKeyword }, .{ "if", Token.IfKeyword }, .{ "else", Token.ElseKeyword }, .{ "for", Token.ForKeyword }, .{ "return", Token.ReturnKeyword }, .{ "let", Token.LetKeyword } });
