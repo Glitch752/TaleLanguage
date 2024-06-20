@@ -113,9 +113,9 @@ pub const Token = union(TokenType) {
             .ReturnKeyword => return "return",
             .LetKeyword => return "let",
             .IntLiteral => |token| {
-                const buf = [_]u8{0} ** 20;
-                std.fmt.formatIntBuf(&buf, token, 10, .lower, .{});
-                return buf;
+                var buf: [21]u8 = undefined;
+                _ = std.fmt.formatIntBuf(buf[0..], token, 10, .lower, .{});
+                return buf[0..];
             },
             .StringLiteral => |token| token,
             .Range => return "..",

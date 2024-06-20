@@ -54,6 +54,6 @@ pub fn main() !void {
             break;
         }
 
-        try stdout.print("{s}\n", .{token.toString()});
+        // try stdout.print("{s}\n", .{token.toString()});
     }
 }

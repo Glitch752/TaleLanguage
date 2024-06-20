@@ -22,8 +22,10 @@ pub fn getNext(self: *Tokenizer) Token {
     const c = self.buffer[self.position];
     self.position += 1;
 
-    _ = c;
+    // Print the character
+    const stdout = io.getStdOut().writer();
+    stdout.print("{u}", .{c}) catch unreachable;
 
     // TODO
-    return Token.EOF;
+    return Token.OpenParen;
 }
