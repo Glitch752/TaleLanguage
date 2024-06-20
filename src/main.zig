@@ -1,6 +1,20 @@
 const std = @import("std");
 const lexer = @import("lexer.zig");
+const parser = @import("parser.zig");
+const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
+const TokenData = @import("token.zig").TokenData;
+
+pub fn pretty_error(message: []const u8) !void {
+    const stderr_file = std.io.getStdErr().writer();
+    var bw_err = std.io.bufferedWriter(stderr_file);
+    const stderr = bw_err.writer();
+    defer bw_err.flush() catch |err| {
+        std.debug.panic("Failed to flush stderr: {any}\n", .{err});
+    };
+
+    try stderr.print("\x1b[1;31m Error: {s} \x1b[0m\n", .{message});
+}
 
 pub fn main() !void {
     // A general purpose allocator -- needed for nearly everything requiring memory allocation
@@ -16,29 +30,12 @@ pub fn main() !void {
         std.debug.panic("Failed to flush stdout: {any}\n", .{err});
     };
 
-    const stderr_file = std.io.getStdErr().writer();
-    var bw_err = std.io.bufferedWriter(stderr_file);
-    const stderr = bw_err.writer();
-    defer bw_err.flush() catch |err| {
-        std.debug.panic("Failed to flush stderr: {any}\n", .{err});
-    };
-
     // Print the process arguments
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
-
-    // // Temporary: print the arguments to the program
-    // for (args) |arg| {
-    //     try stdout.print("{s} ", .{arg});
-    // }
-
-    if (args.len < 2) {
-        try stdout.print("Usage: {s} <file>\n", .{ .name_string = args[0] });
-        return;
-    }
+    const args = try args_parser.parse(allocator);
+    defer args.deinit();
 
     // Open the file in the arguments of the program
-    const file_path = args[1];
+    const file_path = args.file_path;
     const file = std.fs.cwd().openFile(file_path, .{ .mode = .read_only }) catch |err|
         switch (err) {
         error.FileNotFound => {
@@ -55,20 +52,34 @@ pub fn main() !void {
 
     var lxr = lexer.init(buffer);
 
+    var tokens = std.ArrayList(TokenData).init(allocator);
+    defer {
+        for (tokens.items) |tokenData| {
+            tokenData.deinit(&allocator);
+        }
+        tokens.deinit();
+    }
+
+    if (args.flags.debug_tokens) {
+        try stdout.print("Tokens:\n", .{});
+    }
+
     while (true) {
         const tokenData = try lxr.getNext(allocator);
-        defer tokenData.deinit(&allocator);
 
         if (tokenData.token == Token.EOF) {
             break;
         }
         if (tokenData.token == Token.Error) {
-            try stderr.print("\x1b[1;31m Error: {d}:{d} - {s} \x1b[0m\n", .{ tokenData.line, tokenData.column, tokenData.token.Error });
-            break;
+            return try pretty_error(try std.fmt.allocPrint(allocator, "\x1b[1;31m Error: {d}:{d} - {s} \x1b[0m\n", .{ tokenData.line, tokenData.column, tokenData.token.Error }));
         }
 
-        const tokenString = try tokenData.token.toStringWithType(allocator);
-        defer allocator.free(tokenString);
-        try stdout.print("{s}", .{tokenString});
+        if (args.flags.debug_tokens) {
+            const tokenString = try tokenData.token.toStringWithType(allocator);
+            defer allocator.free(tokenString);
+            try stdout.print("{s}", .{tokenString});
+        }
+
+        try tokens.append(tokenData);
     }
 }
