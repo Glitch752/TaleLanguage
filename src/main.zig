@@ -1,4 +1,6 @@
 const std = @import("std");
+const lexer = @import("lexer.zig");
+const Token = @import("token.zig").Token;
 
 pub fn main() !void {
     // A general purpose allocator -- needed for nearly everything requiring memory allocation
@@ -41,15 +43,17 @@ pub fn main() !void {
 
     defer file.close();
 
-    var buf_reader = std.io.bufferedReader(file.reader());
-    var in_stream = buf_reader.reader();
+    const buffer = try file.readToEndAllocOptions(allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
+    defer allocator.free(buffer);
 
-    // Read the file and print it to stdout
-    var line = try in_stream.readUntilDelimiterOrEofAlloc(allocator, '\n', 10000000);
+    var lxr = lexer.init(buffer);
 
-    while (line != null) {
-        try stdout.print("{s}\n", .{line.?});
-        allocator.free(line.?);
-        line = try in_stream.readUntilDelimiterOrEofAlloc(allocator, '\n', 10000000);
+    while (true) {
+        const token = lxr.getNext();
+        if (token == Token.EOF) {
+            break;
+        }
+
+        try stdout.print("{s}\n", .{token.toString()});
     }
 }
