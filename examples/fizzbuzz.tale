@@ -1,0 +1,15 @@
+function main() > int {
+    for const i = 0..20 {
+        if(i % 3 == 0 && i % 3 == 0) {
+            log("FizzBuzz\n");
+        } else if(i % 3 == 0) {
+            log("Fizz\n");
+        } else if(i % 5 == 0) {
+            log("Buzz\n");
+        } else {
+            log(string(i) + "\n");
+        }
+    }
+    
+    return 0;
+}

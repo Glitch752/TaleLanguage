@@ -9,13 +9,13 @@ A work-in-progress programming language interpreter/compiler written in Zig.
   - [ ] Bytecode interpreter
 - [ ] Implement a compiler
 
-# FAQ (Nobody asked these except me)
+# FAQ (Questions to myself)
 
 ## Where does the name come from?
-A random noun generator.
+A random noun generator. I needed a name and I couldn't think of one ¯\\\_(ツ)_/¯
 
 ## Why did you make this?
-Because I wanted to learn Zig and I'm interested in compiler design.
+I'm making this language because I wanted to learn Zig and I'm interested in compiler design.
 
 ## What's the goal of this project?
 To make a programming language that is relatively fast, easy-to-use (ish), and compiles to various targets.

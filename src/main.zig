@@ -10,6 +10,9 @@ pub fn main() !void {
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
+    defer bw.flush() catch |err| {
+        std.debug.panic("Failed to flush stdout: {any}\n", .{err});
+    };
 
     // Print the process arguments
     const args = try std.process.argsAlloc(allocator);
@@ -22,15 +25,14 @@ pub fn main() !void {
 
     if (args.len < 2) {
         try stdout.print("Usage: {s} <file>\n", .{ .name_string = args[0] });
-        try bw.flush();
         return;
     }
 
     // Open the file in the arguments of the program
     const file_path = args[1];
-    const file = try std.fs.cwd().openFile(file_path, .{ .mode = .read_only }) catch |err|
+    const file = std.fs.cwd().openFile(file_path, .{ .mode = .read_only }) catch |err|
         switch (err) {
-        .fileNotFound => {
+        error.FileNotFound => {
             try stdout.print("File not found: {s}\n", .{ .name_string = file_path });
             return;
         },
@@ -43,12 +45,11 @@ pub fn main() !void {
     var in_stream = buf_reader.reader();
 
     // Read the file and print it to stdout
-    var line = try in_stream.readLine(allocator);
+    var line = try in_stream.readUntilDelimiterOrEofAlloc(allocator, '\n', 10000000);
 
     while (line != null) {
-        try stdout.print("{s}\n", .{line});
-        line = try in_stream.readLine(allocator);
+        try stdout.print("{s}\n", .{line.?});
+        allocator.free(line.?);
+        line = try in_stream.readUntilDelimiterOrEofAlloc(allocator, '\n', 10000000);
     }
-
-    try bw.flush();
 }
