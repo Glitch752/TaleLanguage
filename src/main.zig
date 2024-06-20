@@ -49,8 +49,8 @@ pub fn main() !void {
     var lxr = lexer.init(buffer);
 
     while (true) {
-        const token = lxr.getNext();
-        if (token == Token.EOF) {
+        const tokenData = try lxr.getNext(allocator);
+        if (tokenData.token == Token.EOF) {
             break;
         }
 

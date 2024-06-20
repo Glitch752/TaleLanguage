@@ -124,4 +124,12 @@ pub const Token = union(TokenType) {
             .EOF => return "EOF",
         };
     }
+
+    pub const keyword_map = std.ComptimeStringMap(Token, .{ .{ "function", Token.FunctionKeyword }, .{ "if", Token.IfKeyword }, .{ "else", Token.ElseKeyword }, .{ "for", Token.ForKeyword }, .{ "return", Token.ReturnKeyword }, .{ "let", Token.LetKeyword } });
+};
+
+pub const TokenData = struct {
+    token: Token,
+    line: u32,
+    column: u32,
 };
