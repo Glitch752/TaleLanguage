@@ -1,7 +1,12 @@
 const std = @import("std");
 const pretty_error = @import("main.zig").pretty_error;
 
-const ArgsFlags = struct { debug_tokens: bool };
+const ArgsFlags = struct {
+    /// If the tokens should be printed to stdout
+    debug_tokens: bool,
+    /// If the AST should be printed to stdout
+    debug_ast: bool,
+};
 const Args = struct {
     file_path: []const u8,
     flags: ArgsFlags,
@@ -19,12 +24,14 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
     defer std.process.argsFree(allocator, args);
 
     var file_path: ?[]u8 = null;
-    var flags = ArgsFlags{ .debug_tokens = false };
+    var flags = ArgsFlags{ .debug_tokens = false, .debug_ast = false };
 
     // Skip the first argument, which is the program name
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--debug-tokens")) {
             flags.debug_tokens = true;
+        } else if (std.mem.eql(u8, arg, "--debug-ast")) {
+            flags.debug_ast = true;
         } else {
             if (file_path != null) {
                 try pretty_error("Multiple file paths provided\n");

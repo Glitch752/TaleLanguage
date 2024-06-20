@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const NodeType = enum { Assignment, ForLoop, Range, Function, FunctionCall, Return, If, Literal, Block, Identifier, ArithmeticOperation, ComparisonOperation, BooleanOperation, Type };
 
 pub const LiteralType = enum { IntLiteral, StringLiteral };
@@ -44,9 +46,7 @@ pub const NodeData = union(NodeType) {
         IntLiteral: u64,
         StringLiteral: []const u8,
     },
-    Block: struct {
-        nodes: []*NodeData,
-    },
+    Block: BlockNodeData,
     Identifier: struct {
         identifier: []const u8,
     },
@@ -69,10 +69,143 @@ pub const NodeData = union(NodeType) {
         // TODO: Proper types
         identifier: []const u8,
     },
+
+    pub fn print(self: NodeData, writer: anytype, indent: usize) !void {
+        switch (self) {
+            .Assignment => {
+                try writer.print("{s} = ", .{self.Assignment.identifier});
+                try self.Assignment.value.print(writer, indent);
+            },
+            .ForLoop => {
+                try writer.print("for ", .{});
+                try self.ForLoop.expression.print(writer, indent);
+                try writer.print(" ", .{});
+                try self.ForLoop.block.print(writer, indent);
+            },
+            .Range => {
+                try self.Range.startValue.print(writer, indent);
+                try writer.print("..<", .{});
+                try self.Range.endValue.print(writer, indent);
+            },
+            .Function => {
+                try writer.print("fn(", .{});
+                for (self.Function.parameters) |parameter| {
+                    try writer.print("{s}: ", .{parameter.identifier});
+                    try parameter.type.print(writer, indent);
+                    try writer.print(", ", .{});
+                }
+                try writer.print(") ", .{});
+                try self.Function.block.print(writer, indent);
+            },
+            .FunctionCall => {
+                try writer.print("{s}(", .{self.FunctionCall.identifier});
+                for (self.FunctionCall.arguments) |argument| {
+                    try argument.print(writer, indent);
+                    try writer.print(", ", .{});
+                }
+                try writer.print(")", .{});
+            },
+            .Return => {
+                try writer.print("return ", .{});
+                try self.Return.value.print(writer, indent);
+            },
+            .If => {
+                try writer.print("if ", .{});
+                try self.If.condition.print(writer, indent);
+                try writer.print(" ", .{});
+                try self.If.block.print(writer, indent);
+                try writer.print(" ", .{});
+                try self.If.elseBlock.print(writer, indent);
+            },
+            .Literal => {
+                switch (self.Literal) {
+                    .IntLiteral => try writer.print("{d}", .{self.Literal.IntLiteral}),
+                    .StringLiteral => try writer.print("{s}", .{self.Literal.StringLiteral}),
+                }
+            },
+            .Block => {
+                try writer.print("{{", .{});
+                for (self.Block.statements.*) |statement| {
+                    try statement.print(writer, indent + 1);
+                    try writer.print("\n", .{});
+                }
+                try writer.print("}}", .{});
+            },
+            .Identifier => try writer.print("{s}", .{self.Identifier.identifier}),
+            .ArithmeticOperation => {
+                try self.ArithmeticOperation.left.print(writer, indent);
+                switch (self.ArithmeticOperation.operation) {
+                    .Add => try writer.print(" + ", .{}),
+                    .Subtract => try writer.print(" - ", .{}),
+                    .Multiply => try writer.print(" * ", .{}),
+                    .Divide => try writer.print(" / ", .{}),
+                    .Modulus => try writer.print(" % ", .{}),
+                }
+                try self.ArithmeticOperation.right.print(writer, indent);
+            },
+            .ComparisonOperation => {
+                try self.ComparisonOperation.left.print(writer, indent);
+                switch (self.ComparisonOperation.operation) {
+                    .LessThan => try writer.print(" < ", .{}),
+                    .LessThanEqual => try writer.print(" <= ", .{}),
+                    .GreaterThan => try writer.print(" > ", .{}),
+                    .GreaterThanEqual => try writer.print(" >= ", .{}),
+                    .Equal => try writer.print(" == ", .{}),
+                    .NotEqual => try writer.print(" != ", .{}),
+                }
+                try self.ComparisonOperation.right.print(writer, indent);
+            },
+            .BooleanOperation => {
+                try self.BooleanOperation.left.print(writer, indent);
+                switch (self.BooleanOperation.operation) {
+                    .And => try writer.print(" && ", .{}),
+                    .Or => try writer.print(" || ", .{}),
+                    .Not => try writer.print(" ! ", .{}),
+                }
+                try self.BooleanOperation.right.print(writer, indent);
+            },
+            .Type => try writer.print("{s}", .{self.Type.identifier}),
+        }
+    }
+};
+
+fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
+    const repeated = try allocator.alloc(u8, s.len * times);
+
+    var i: usize = 0;
+    while (i < s.len * times) : (i += 1) {
+        repeated[i] = s[i % 2];
+    }
+
+    return repeated;
+}
+
+pub const BlockNodeData = struct {
+    statements: *[]NodeData,
+
+    pub fn print(self: BlockNodeData, writer: anytype, indent: usize) !void {
+        for (self.statements.*) |statement| {
+            const allocator = std.heap.page_allocator;
+            const repeated = try repeat("    ", indent, allocator);
+            defer allocator.free(repeated);
+
+            try writer.print("{s}", .{repeated});
+            try statement.print(writer, indent);
+            try writer.print("\n", .{});
+        }
+    }
 };
 
 pub const Node = struct {
     node: NodeData,
     line: u32,
     column: u32,
+};
+
+pub const AST = struct {
+    root: BlockNodeData,
+
+    pub fn print(self: AST, writer: anytype, indent: usize) !void {
+        try self.root.print(writer, indent);
+    }
 };

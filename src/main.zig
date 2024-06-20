@@ -83,6 +83,24 @@ pub fn main() !void {
         try tokens.append(tokenData);
     }
 
-    const prsr = parser.init(tokens.items, allocator);
-    _ = prsr;
+    var prsr = parser.init(tokens.items, allocator, file_path);
+    const ast = prsr.parse() catch |err| {
+        switch (err) {
+            parser.ParseError.ExpectedIdentifier => {
+                return try pretty_error("Expected an identifier\n");
+            },
+            parser.ParseError.ExpectedAssignment => {
+                return try pretty_error("Expected an assignment\n");
+            },
+            parser.ParseError.ExpectedExpression => {
+                return try pretty_error("Expected an expression\n");
+            },
+            else => return err,
+        }
+    };
+
+    if (args.flags.debug_ast) {
+        try stdout.print("AST:\n", .{});
+        try ast.print(stdout, 0);
+    }
 }
