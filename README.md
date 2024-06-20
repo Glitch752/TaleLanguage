@@ -4,7 +4,7 @@ A work-in-progress programming language interpreter/compiler written in Zig.
 Testing using `zig run .\src\main.zig -freference-trace -- ./examples/fizzbuzz.tale`, but I'll figure out how to use Zig's build system sooner or later.
 
 # TODO
-- [ ] Implement a lexer
+- [x] Implement a lexer
 - [ ] Implement a parser
 - [ ] Implement an interpreter
   - [ ] Tree-walking interpreter

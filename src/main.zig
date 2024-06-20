@@ -16,6 +16,13 @@ pub fn main() !void {
         std.debug.panic("Failed to flush stdout: {any}\n", .{err});
     };
 
+    const stderr_file = std.io.getStdErr().writer();
+    var bw_err = std.io.bufferedWriter(stderr_file);
+    const stderr = bw_err.writer();
+    defer bw_err.flush() catch |err| {
+        std.debug.panic("Failed to flush stderr: {any}\n", .{err});
+    };
+
     // Print the process arguments
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
@@ -50,14 +57,18 @@ pub fn main() !void {
 
     while (true) {
         const tokenData = try lxr.getNext(allocator);
+        defer tokenData.deinit(&allocator);
+
         if (tokenData.token == Token.EOF) {
+            break;
+        }
+        if (tokenData.token == Token.Error) {
+            try stderr.print("\x1b[1;31m Error: {d}:{d} - {s} \x1b[0m\n", .{ tokenData.line, tokenData.column, tokenData.token.Error });
             break;
         }
 
         const tokenString = try tokenData.token.toStringWithType(allocator);
+        defer allocator.free(tokenString);
         try stdout.print("{s}", .{tokenString});
-        allocator.free(tokenString);
-
-        tokenData.deinit(&allocator);
     }
 }
