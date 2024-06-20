@@ -21,12 +21,12 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
 }
 
 pub fn parse(self: *Parser) !AST {
-    return AST{ .root = try self.parseBlock() };
+    const ast = AST{ .root = try self.parseBlock() };
+    return ast;
 }
 
 fn parseBlock(self: *Parser) !BlockNodeData {
     var statements = std.ArrayList(NodeData).init(self.allocator);
-    defer statements.deinit();
     errdefer {
         for (statements.items) |statement| {
             statement.deinit(self.allocator);
@@ -43,13 +43,16 @@ fn parseBlock(self: *Parser) !BlockNodeData {
         try statements.append(statement);
     }
 
-    return .{ .statements = &statements.items };
+    return .{ .statements = try statements.toOwnedSlice() };
 }
 
 fn parseStatement(self: *Parser) !NodeData {
     const token = self.tokens[self.position].token;
     return switch (token) {
-        .LetKeyword => return try self.parseVariableDeclaration(),
+        .LetKeyword => {
+            const declaration = try self.parseVariableDeclaration();
+            return declaration;
+        },
         // .ReturnKeyword => return try self.parseReturnStatement(),
         // .IfKeyword => return try self.parseIfStatement(),
         // .ForKeyword => return try self.parseForStatement(),
@@ -60,7 +63,7 @@ fn parseStatement(self: *Parser) !NodeData {
             // TODO
             self.position += 1;
             return .{
-                .Block = .{ .statements = undefined },
+                .Literal = .{ .IntLiteral = 10 },
             };
         },
     };
@@ -124,7 +127,12 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     var expression = try self.parseExpression();
     errdefer expression.deinit(self.allocator);
 
-    return .{ .Assignment = .{ .identifier = identifier.token.Identifier, .value = &expression, .type = &varType } };
+    std.debug.print("Identifier: {s}\n", .{identifier.token.Identifier});
+    std.debug.print("Type: {s}\n", .{varType.Type.identifier});
+    std.debug.print("Expression: {d}\n", .{expression.Literal.IntLiteral});
+
+    const node = NodeData{ .Assignment = .{ .identifier = identifier.token.Identifier, .value = &expression, .type = &varType } };
+    return node;
 }
 
 fn programPosition(self: *Parser) ![]const u8 {
@@ -143,11 +151,9 @@ fn programPosition(self: *Parser) ![]const u8 {
 }
 
 fn parseExpression(self: *Parser) !NodeData {
-    // TODO
     _ = self;
-    return .{
-        .Block = .{ .statements = undefined },
-    };
+    // TODO
+    return .{ .Literal = .{ .IntLiteral = 10 } };
 }
 
 fn parseType(self: *Parser) !NodeData {

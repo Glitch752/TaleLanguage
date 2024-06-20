@@ -83,6 +83,10 @@ pub fn main() !void {
         try tokens.append(tokenData);
     }
 
+    if (args.flags.debug_tokens) {
+        try stdout.print("\n\n", .{});
+    }
+
     var prsr = parser.init(tokens.items, allocator, file_path);
     const ast = prsr.parse() catch {
         return try pretty_error("Unexpected error parsing the AST\n");
@@ -91,6 +95,7 @@ pub fn main() !void {
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});
-        try ast.print(stdout, 0);
+        try ast.print(&stdout.any(), 0);
+        std.debug.print("\n", .{});
     }
 }

@@ -71,7 +71,7 @@ pub const NodeData = union(NodeType) {
         identifier: []const u8,
     },
 
-    pub fn print(self: NodeData, writer: anytype, indent: usize) !void {
+    pub fn print(self: NodeData, writer: *const std.io.AnyWriter, indent: usize) !void {
         switch (self) {
             .Assignment => {
                 try writer.print("{s} = ", .{self.Assignment.identifier});
@@ -128,7 +128,7 @@ pub const NodeData = union(NodeType) {
             },
             .Block => {
                 try writer.print("{{", .{});
-                for (self.Block.statements.*) |statement| {
+                for (self.Block.statements) |statement| {
                     try statement.print(writer, indent + 1);
                     try writer.print("\n", .{});
                 }
@@ -163,17 +163,20 @@ pub const NodeData = union(NodeType) {
                 switch (self.BooleanOperation.operation) {
                     .And => try writer.print(" && ", .{}),
                     .Or => try writer.print(" || ", .{}),
-                    .Not => try writer.print(" ! ", .{}),
+                    .Not => try writer.print(" !", .{}),
                 }
                 try self.BooleanOperation.right.print(writer, indent);
             },
-            .Type => try writer.print("{s}", .{self.Type.identifier}),
+            .Type => {
+                try writer.print("{s}", .{self.Type.identifier});
+            },
         }
     }
 
     pub fn deinit(self: NodeData, allocator: std.mem.Allocator) void {
         switch (self) {
             .Assignment => |node| {
+                std.debug.print("\n\n\n\nDeinit Assignment {any}\n\n\n", .{node.value});
                 node.value.deinit(allocator);
                 node.type.deinit(allocator);
             },
@@ -248,29 +251,26 @@ fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
 }
 
 pub const BlockNodeData = struct {
-    statements: *[]NodeData,
+    statements: []NodeData,
 
-    pub fn print(self: BlockNodeData, writer: anytype, indent: usize) !void {
-        std.debug.print("{d}", .{self.statements.len});
-        _ = indent;
-        for (self.statements.*) |statement| {
-            // const allocator = std.heap.page_allocator;
-            // std.debug.print("{d}", .{indent});
-            // const repeated = try repeat("    ", indent, allocator);
-            // defer allocator.free(repeated);
+    pub fn print(self: BlockNodeData, writer: *const std.io.AnyWriter, indent: usize) !void {
+        std.debug.print("{d}\n", .{self.statements.len});
+        for (self.statements) |statement| {
+            const allocator = std.heap.page_allocator;
+            const repeated = try repeat("    ", indent, allocator);
+            defer allocator.free(repeated);
 
-            // try writer.print("{s}", .{repeated});
-            // // try statement.print(writer, indent);
-            _ = statement;
-            // try writer.print("\n", .{});
+            try writer.print("{s}", .{repeated});
+            try statement.print(writer, indent);
+            try writer.print("\n", .{});
         }
-        _ = writer;
     }
 
     pub fn deinit(self: BlockNodeData, allocator: std.mem.Allocator) void {
-        for (self.statements.*) |statement| {
+        for (self.statements) |statement| {
             statement.deinit(allocator);
         }
+        allocator.free(self.statements);
     }
 };
 
@@ -283,7 +283,7 @@ pub const Node = struct {
 pub const AST = struct {
     root: BlockNodeData,
 
-    pub fn print(self: AST, writer: anytype, indent: usize) !void {
+    pub fn print(self: AST, writer: *const std.io.AnyWriter, indent: usize) !void {
         try self.root.print(writer, indent);
     }
 
