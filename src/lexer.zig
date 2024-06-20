@@ -2,7 +2,6 @@ const std = @import("std");
 const io = @import("std").io;
 const TokenData = @import("token.zig").TokenData;
 const Token = @import("token.zig").Token;
-const TokenType = @import("token.zig").TokenType;
 
 const Tokenizer = @This();
 

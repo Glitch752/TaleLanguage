@@ -84,20 +84,10 @@ pub fn main() !void {
     }
 
     var prsr = parser.init(tokens.items, allocator, file_path);
-    const ast = prsr.parse() catch |err| {
-        switch (err) {
-            parser.ParseError.ExpectedIdentifier => {
-                return try pretty_error("Expected an identifier\n");
-            },
-            parser.ParseError.ExpectedAssignment => {
-                return try pretty_error("Expected an assignment\n");
-            },
-            parser.ParseError.ExpectedExpression => {
-                return try pretty_error("Expected an expression\n");
-            },
-            else => return err,
-        }
+    const ast = prsr.parse() catch {
+        return try pretty_error("Unexpected error parsing the AST\n");
     };
+    defer ast.deinit(allocator);
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});

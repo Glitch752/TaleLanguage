@@ -53,58 +53,110 @@ pub const TokenType = enum {
 
     EOF,
     Error,
+
+    pub fn typeNameString(self: TokenType) []const u8 {
+        return switch (self) {
+            .Identifier => return "Identifier",
+
+            .OpenParen => return "OpenParen",
+            .CloseParen => return "CloseParen",
+            .OpenSquare => return "OpenSquare",
+            .CloseSquare => return "CloseSquare",
+            .OpenCurly => return "OpenCurly",
+            .CloseCurly => return "CloseCurly",
+
+            .SemiColon => return "SemiColon",
+
+            .LessThan => return "LessThan",
+            .LessThanEqual => return "LessThanEqual",
+            .GreaterThan => return "GreaterThan",
+            .GreaterThanEqual => return "GreaterThanEqual",
+            .Equal => return "Equal",
+            .NotEqual => return "NotEqual",
+
+            .And => return "And",
+            .Or => return "Or",
+
+            .Plus => return "Plus",
+            .Minus => return "Minus",
+            .Star => return "Star",
+            .Slash => return "Slash",
+            .Percent => return "Percent",
+            .Negate => return "Negate",
+
+            .FunctionKeyword => return "FunctionKeyword",
+            .IfKeyword => return "IfKeyword",
+            .ElseKeyword => return "ElseKeyword",
+            .ForKeyword => return "ForKeyword",
+            .ReturnKeyword => return "ReturnKeyword",
+            .LetKeyword => return "LetKeyword",
+
+            .IntLiteral => return "IntLiteral",
+            .StringLiteral => return "StringLiteral",
+
+            .Range => return "Range",
+            .Comma => return "Comma",
+            .Colon => return "Colon",
+            .Assign => return "Assign",
+            .Dot => return "Dot",
+
+            .EOF => return "EOF",
+            .Error => return "Error",
+        };
+    }
 };
 
 pub const Token = union(TokenType) {
     Identifier: []const u8,
 
-    OpenParen: void,
-    CloseParen: void,
+    // Void is implicit when there's no type
+    OpenParen,
+    CloseParen,
 
-    OpenSquare: void,
-    CloseSquare: void,
+    OpenSquare,
+    CloseSquare,
 
-    OpenCurly: void,
-    CloseCurly: void,
+    OpenCurly,
+    CloseCurly,
 
-    SemiColon: void,
+    SemiColon,
 
-    LessThan: void,
-    LessThanEqual: void,
-    GreaterThan: void,
-    GreaterThanEqual: void,
-    Equal: void,
-    NotEqual: void,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+    Equal,
+    NotEqual,
 
-    And: void,
-    Or: void,
+    And,
+    Or,
 
-    Plus: void,
-    Minus: void,
-    Star: void,
-    Slash: void,
-    Percent: void,
-    Negate: void,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Percent,
+    Negate,
 
-    FunctionKeyword: void,
-    IfKeyword: void,
-    ElseKeyword: void,
-    ForKeyword: void,
-    ReturnKeyword: void,
-    LetKeyword: void,
+    FunctionKeyword,
+    IfKeyword,
+    ElseKeyword,
+    ForKeyword,
+    ReturnKeyword,
+    LetKeyword,
 
     IntLiteral: u64,
     StringLiteral: []const u8,
 
-    Range: void,
-    Comma: void,
-    Colon: void,
-    Dot: void,
+    Range,
+    Comma,
+    Colon,
+    Dot,
 
-    Assign: void,
+    Assign,
 
     // Special tokens
-    EOF: void,
+    EOF,
     Error: []const u8,
 
     pub fn toString(self: Token) []const u8 {
@@ -163,54 +215,7 @@ pub const Token = union(TokenType) {
     }
 
     pub fn typeNameString(self: Token) []const u8 {
-        return switch (self) {
-            .Identifier => return "Identifier",
-
-            .OpenParen => return "OpenParen",
-            .CloseParen => return "CloseParen",
-            .OpenSquare => return "OpenSquare",
-            .CloseSquare => return "CloseSquare",
-            .OpenCurly => return "OpenCurly",
-            .CloseCurly => return "CloseCurly",
-
-            .SemiColon => return "SemiColon",
-
-            .LessThan => return "LessThan",
-            .LessThanEqual => return "LessThanEqual",
-            .GreaterThan => return "GreaterThan",
-            .GreaterThanEqual => return "GreaterThanEqual",
-            .Equal => return "Equal",
-            .NotEqual => return "NotEqual",
-
-            .And => return "And",
-            .Or => return "Or",
-
-            .Plus => return "Plus",
-            .Minus => return "Minus",
-            .Star => return "Star",
-            .Slash => return "Slash",
-            .Percent => return "Percent",
-            .Negate => return "Negate",
-
-            .FunctionKeyword => return "FunctionKeyword",
-            .IfKeyword => return "IfKeyword",
-            .ElseKeyword => return "ElseKeyword",
-            .ForKeyword => return "ForKeyword",
-            .ReturnKeyword => return "ReturnKeyword",
-            .LetKeyword => return "LetKeyword",
-
-            .IntLiteral => return "IntLiteral",
-            .StringLiteral => return "StringLiteral",
-
-            .Range => return "Range",
-            .Comma => return "Comma",
-            .Colon => return "Colon",
-            .Assign => return "Assign",
-            .Dot => return "Dot",
-
-            .EOF => return "EOF",
-            .Error => return "Error",
-        };
+        return TokenType.typeNameString(self);
     }
 
     pub fn toStringWithType(self: Token, allocator: std.mem.Allocator) ![]const u8 {
