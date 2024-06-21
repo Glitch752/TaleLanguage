@@ -2,42 +2,22 @@ const TokenData = @import("token.zig").TokenData;
 const std = @import("std");
 const AST = @import("ast.zig").AST;
 const NodeData = @import("ast.zig").NodeData;
-const BlockNodeData = @import("ast.zig").BlockNodeData;
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
 const pretty_error = @import("main.zig").pretty_error;
 
 const Parser = @This();
 
-pub const NodeDataList = struct {
-    nodes: std.ArrayList(NodeData),
-
-    pub fn init(allocator: std.mem.Allocator) NodeDataList {
-        return .{ .nodes = std.ArrayList(NodeData).init(allocator) };
-    }
-
-    pub fn deinit(self: NodeDataList, allocator: std.mem.Allocator) void {
-        for (self.nodes.items) |node| {
-            node.deinit(allocator);
-        }
-    }
-
-    pub fn append(self: *NodeDataList, node: NodeData) !void {
-        try self.nodes.append(node);
-    }
-};
-
 tokens: []TokenData,
 allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
-nodeDataList: NodeDataList,
 ast: ?*AST,
 
 pub const ParseError = error{ ExpectedIdentifier, ExpectedAssignment, ExpectedExpression };
 
 pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []const u8) Parser {
-    return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .nodeDataList = NodeDataList.init(allocator), .ast = null };
+    return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
 pub fn parse(self: *Parser) !AST {
@@ -47,31 +27,36 @@ pub fn parse(self: *Parser) !AST {
 }
 
 pub fn deinit(self: *Parser) void {
+    std.debug.print("Deinit parser\n", .{});
     if (self.ast != null) {
         self.ast.?.*.deinit(self.allocator);
     }
-    self.nodeDataList.deinit(self.allocator);
 }
 
-fn parseBlock(self: *Parser) !BlockNodeData {
-    var statements = std.ArrayList(NodeData).init(self.allocator);
-    errdefer {
-        for (statements.items) |statement| {
-            statement.deinit(self.allocator);
-        }
-    }
+fn parseBlock(self: *Parser) !*NodeData {
+    var blockPointer = try self.allocator.create(NodeData);
+    errdefer blockPointer.deinit(self.allocator);
 
-    while (self.position < self.tokens.len) {
-        const token = self.tokens[self.position].token;
-        if (token == Token.EOF) {
-            break;
-        }
+    // var statements = std.ArrayList(NodeData).init(self.allocator);
+    // errdefer {
+    //     for (statements.items) |statement| {
+    //         statement.deinit(self.allocator);
+    //     }
+    // }
 
-        const statement = try self.parseStatement();
-        try statements.append(statement);
-    }
+    // while (self.position < self.tokens.len) {
+    //     const token = self.tokens[self.position].token;
+    //     if (token == Token.EOF) {
+    //         break;
+    //     }
 
-    return .{ .statements = try statements.toOwnedSlice() };
+    //     const statement = try self.parseStatement();
+    //     try statements.append(statement);
+    // }
+
+    // blockPointer.* = .{ .Block = .{ .statements = try statements.toOwnedSlice() } };
+    blockPointer.* = .{ .Block = .{ .statements = &[_]NodeData{} } };
+    return blockPointer;
 }
 
 fn parseStatement(self: *Parser) !NodeData {
@@ -147,8 +132,8 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     self.position += 1;
     try self.ensurePositionInBounds();
 
-    var varType = try self.parseType();
-    errdefer varType.deinit(self.allocator);
+    var typePointer = try self.parseType();
+    errdefer typePointer.deinit(self.allocator);
 
     const assign = self.tokens[self.position];
     try self.expectTokenType(assign, TokenType.Assign);
@@ -156,12 +141,10 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     self.position += 1;
     try self.ensurePositionInBounds();
 
-    var expression = try self.parseExpression();
-    errdefer expression.deinit(self.allocator);
+    const expressionPointer = try self.parseExpression();
+    errdefer expressionPointer.deinit(self.allocator);
 
-    try self.nodeDataList.append(expression);
-
-    const node = NodeData{ .Assignment = .{ .identifier = identifierString, .value = &expression, .type = &varType } };
+    const node = NodeData{ .Assignment = .{ .identifier = identifierString, .value = expressionPointer, .type = typePointer } };
     return node;
 }
 
@@ -180,13 +163,18 @@ fn programPosition(self: *Parser) ![]const u8 {
     return try std.fmt.allocPrint(self.allocator, "{s}:{s}:{s}", .{ file_name, line_string, column_string });
 }
 
-fn parseExpression(self: *Parser) !NodeData {
-    _ = self;
-    // TODO
-    return .{ .Literal = .{ .IntLiteral = 10 } };
+fn parseExpression(self: *Parser) !*NodeData {
+    var expressionPointer = try self.allocator.create(NodeData);
+    errdefer expressionPointer.deinit(self.allocator);
+
+    expressionPointer.* = .{ .Literal = .{ .IntLiteral = 10 } };
+    return expressionPointer;
 }
 
-fn parseType(self: *Parser) !NodeData {
+fn parseType(self: *Parser) !*NodeData {
+    var typePointer = try self.allocator.create(NodeData);
+    errdefer typePointer.deinit(self.allocator);
+
     // TODO: real types
     // For now, just store everything in the parentheses
     var parentheses: usize = 0;
@@ -225,5 +213,6 @@ fn parseType(self: *Parser) !NodeData {
     self.position += 1;
     try self.ensurePositionInBounds();
 
-    return .{ .Type = .{ .identifier = string } };
+    typePointer.* = .{ .Type = .{ .identifier = string } };
+    return typePointer;
 }

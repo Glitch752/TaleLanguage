@@ -88,15 +88,19 @@ pub fn main() !void {
     }
 
     var prsr = parser.init(tokens.items, allocator, file_path);
-    defer prsr.deinit();
 
     const ast = prsr.parse() catch {
         return try pretty_error("Unexpected error parsing the AST\n");
     };
+    defer {
+        std.debug.print("AST root: {any}\n", .{prsr.ast.?.root});
+        prsr.deinit();
+    }
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});
         try ast.print(&stdout.any(), 0);
+        std.debug.print("Printed AST\n", .{});
         std.debug.print("\n", .{});
     }
 }
