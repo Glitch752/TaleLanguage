@@ -2,6 +2,7 @@ const TokenData = @import("token.zig").TokenData;
 const std = @import("std");
 const AST = @import("ast.zig").AST;
 const NodeData = @import("ast.zig").NodeData;
+const FunctionParameter = @import("ast.zig").FunctionParameter;
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
 const pretty_error = @import("main.zig").pretty_error;
@@ -32,7 +33,7 @@ pub fn deinit(self: *Parser) void {
     }
 }
 
-fn parseBlock(self: *Parser) !*NodeData {
+fn parseBlock(self: *Parser) anyerror!*NodeData {
     var blockPointer = try self.allocator.create(NodeData);
     errdefer blockPointer.deinit(self.allocator);
 
@@ -50,7 +51,10 @@ fn parseBlock(self: *Parser) !*NodeData {
         }
 
         const statement = try self.parseStatement();
-        try statements.append(statement);
+        if (statement == null) {
+            break;
+        }
+        try statements.append(statement.?);
     }
 
     blockPointer.* = .{ .Block = .{ .statements = try statements.toOwnedSlice() } };
@@ -58,27 +62,32 @@ fn parseBlock(self: *Parser) !*NodeData {
     return blockPointer;
 }
 
-fn parseStatement(self: *Parser) !NodeData {
+fn parseStatement(self: *Parser) !?NodeData {
     const token = self.tokens[self.position].token;
-    return switch (token) {
+    const statement = switch (token) {
         .LetKeyword => {
             const declaration = try self.parseVariableDeclaration();
             return declaration;
         },
-        // .ReturnKeyword => return try self.parseReturnStatement(),
+        .ReturnKeyword => return try self.parseReturnStatement(),
         // .IfKeyword => return try self.parseIfStatement(),
         // .ForKeyword => return try self.parseForStatement(),
-        // .FunctionKeyword => return try self.parseFunctionDeclaration(),
+        .FunctionKeyword => return try self.parseFunctionDeclaration(),
         // else => return try self.parseExpression(),
         // TODO
         else => {
-            // TODO
-            self.position += 1;
-            return .{
-                .Literal = .{ .IntLiteral = 10 },
-            };
+            return null;
         },
     };
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be a semicolon
+    const semicolon = self.tokens[self.position];
+    try self.expectTokenType(semicolon, TokenType.Semicolon);
+
+    return statement;
 }
 
 fn ensurePositionInBounds(self: *Parser) !void {
@@ -145,6 +154,98 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
 
     const node = NodeData{ .Assignment = .{ .identifier = identifierString, .value = expressionPointer, .type = typePointer } };
     return node;
+}
+
+fn parseReturnStatement(self: *Parser) !NodeData {
+    // return expression;
+    // First token is the return keyword
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const expressionPointer = try self.parseExpression();
+    errdefer expressionPointer.deinit(self.allocator);
+
+    const node = NodeData{ .Return = .{ .value = expressionPointer } };
+    return node;
+}
+
+fn parseFunctionDeclaration(self: *Parser) !NodeData {
+    // function() { block } (type is handled by the variable being assigned)
+    // First token is the function keyword
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be an open parenthesis
+    const openParen = self.tokens[self.position];
+    try self.expectTokenType(openParen, TokenType.OpenParen);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next is parameters
+    var parameters = std.ArrayList(FunctionParameter).init(self.allocator);
+    errdefer {
+        for (parameters.items) |parameter| {
+            parameter.deinit(self.allocator);
+        }
+    }
+
+    while (self.tokens[self.position].token != Token.CloseParen) {
+        const parameter = try self.parseParameter();
+        try parameters.append(parameter);
+    }
+
+    // Next token should be a close parenthesis
+    const closeParen = self.tokens[self.position];
+    try self.expectTokenType(closeParen, TokenType.CloseParen);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be an open curly brace
+    const openCurly = self.tokens[self.position];
+    try self.expectTokenType(openCurly, TokenType.OpenCurly);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next is the block
+    const block = try self.parseBlock();
+
+    // Next token should be a close curly brace
+    const closeCurly = self.tokens[self.position];
+    try self.expectTokenType(closeCurly, TokenType.CloseCurly);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const node = NodeData{ .Function = .{ .parameters = try parameters.toOwnedSlice(), .block = block } };
+    return node;
+}
+
+fn parseParameter(self: *Parser) !FunctionParameter {
+    // identifier: type
+    const identifier = self.tokens[self.position];
+    try self.expectTokenType(identifier, TokenType.Identifier);
+
+    const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
+    for (identifier.token.Identifier, 0..) |c, i| {
+        identifierString[i] = c;
+    }
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const colon = self.tokens[self.position];
+    try self.expectTokenType(colon, TokenType.Colon);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    var typePointer = try self.parseType();
+    errdefer typePointer.deinit(self.allocator);
+
+    return FunctionParameter{ .identifier = identifierString, .type = typePointer };
 }
 
 fn programPosition(self: *Parser) ![]const u8 {

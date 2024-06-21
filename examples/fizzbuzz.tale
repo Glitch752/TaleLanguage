@@ -21,6 +21,6 @@ let main: (fn() > int) = function() {
 
     // Exit code 0
     return 0;
-}
+};
 
 return main();

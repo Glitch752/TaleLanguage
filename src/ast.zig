@@ -8,6 +8,23 @@ pub const AirthmeticOperationType = enum { Add, Subtract, Multiply, Divide, Modu
 pub const ComparisonOperationType = enum { LessThan, LessThanEqual, GreaterThan, GreaterThanEqual, Equal, NotEqual };
 pub const BooleanOperationType = enum { And, Or, Not };
 
+pub const FunctionParameter = struct {
+    identifier: []const u8,
+    type: *NodeData,
+
+    pub fn deinit(self: FunctionParameter, allocator: std.mem.Allocator) void {
+        allocator.free(self.identifier);
+        self.type.deinit(allocator);
+        allocator.destroy(self.type);
+    }
+
+    pub fn write(self: FunctionParameter, writer: *const std.io.AnyWriter, indent: usize) anyerror!void {
+        try writer.print("{s}: ", .{self.identifier});
+        try self.type.print(writer, indent);
+        try writer.print(", ", .{});
+    }
+};
+
 pub const NodeData = union(NodeType) {
     Null: void,
     Assignment: struct {
@@ -26,10 +43,7 @@ pub const NodeData = union(NodeType) {
         endValue: *NodeData,
     },
     Function: struct {
-        parameters: []struct {
-            identifier: []const u8,
-            type: *NodeData,
-        },
+        parameters: []FunctionParameter,
         block: *NodeData,
     },
     FunctionCall: struct {
@@ -102,9 +116,7 @@ pub const NodeData = union(NodeType) {
             .Function => |node| {
                 try writer.print("function(", .{});
                 for (node.parameters) |parameter| {
-                    try writer.print("{s}: ", .{parameter.identifier});
-                    try parameter.type.print(writer, indent);
-                    try writer.print(", ", .{});
+                    try parameter.write(writer, indent);
                 }
                 try writer.print(") ", .{});
                 try node.block.print(writer, indent);
@@ -118,8 +130,9 @@ pub const NodeData = union(NodeType) {
                 try writer.print(")", .{});
             },
             .Return => |node| {
-                try writer.print("return ", .{});
+                try writer.print("{s}return ", .{indentSpaces});
                 try node.value.print(writer, indent);
+                try writer.print(";", .{});
             },
             .If => |node| {
                 try writer.print("if ", .{});
@@ -211,8 +224,7 @@ pub const NodeData = union(NodeType) {
             },
             .Function => |node| {
                 for (node.parameters) |parameter| {
-                    parameter.type.deinit(allocator);
-                    allocator.free(parameter.identifier);
+                    parameter.deinit(allocator);
                 }
                 node.block.deinit(allocator);
                 allocator.free(node.parameters);
