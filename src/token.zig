@@ -55,54 +55,7 @@ pub const TokenType = enum {
     Error,
 
     pub fn typeNameString(self: TokenType) []const u8 {
-        return switch (self) {
-            .Identifier => return "Identifier",
-
-            .OpenParen => return "OpenParen",
-            .CloseParen => return "CloseParen",
-            .OpenSquare => return "OpenSquare",
-            .CloseSquare => return "CloseSquare",
-            .OpenCurly => return "OpenCurly",
-            .CloseCurly => return "CloseCurly",
-
-            .SemiColon => return "SemiColon",
-
-            .LessThan => return "LessThan",
-            .LessThanEqual => return "LessThanEqual",
-            .GreaterThan => return "GreaterThan",
-            .GreaterThanEqual => return "GreaterThanEqual",
-            .Equal => return "Equal",
-            .NotEqual => return "NotEqual",
-
-            .And => return "And",
-            .Or => return "Or",
-
-            .Plus => return "Plus",
-            .Minus => return "Minus",
-            .Star => return "Star",
-            .Slash => return "Slash",
-            .Percent => return "Percent",
-            .Negate => return "Negate",
-
-            .FunctionKeyword => return "FunctionKeyword",
-            .IfKeyword => return "IfKeyword",
-            .ElseKeyword => return "ElseKeyword",
-            .ForKeyword => return "ForKeyword",
-            .ReturnKeyword => return "ReturnKeyword",
-            .LetKeyword => return "LetKeyword",
-
-            .IntLiteral => return "IntLiteral",
-            .StringLiteral => return "StringLiteral",
-
-            .Range => return "Range",
-            .Comma => return "Comma",
-            .Colon => return "Colon",
-            .Assign => return "Assign",
-            .Dot => return "Dot",
-
-            .EOF => return "EOF",
-            .Error => return "Error",
-        };
+        return @tagName(self);
     }
 };
 

@@ -98,13 +98,14 @@ pub fn main() !void {
 
     const ast = prsr.parse() catch {
         return try pretty_error("Unexpected error parsing the AST");
+    } orelse {
+        return try pretty_error("Unexpected error parsing the AST -- no AST generated");
     };
-    _ = ast;
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});
         // TODO
-        // try ast.print(&stdout.any(), 0);
+        try ast.print(ast.*, &stdout.any(), 1, allocator);
         std.debug.print("\n", .{});
     }
 }

@@ -19,9 +19,14 @@ pub fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
     return repeated;
 }
 
-// fn passSingleASTForward(self: *GrammarPattern, tokens: []TokenType, allocator: std.mem.Allocator) ?*AST {
-//     return self.elements[0].Pattern.getAST(self.elements[0].Pattern, tokens, allocator);
-// }
+fn passSingleASTForward(childASTs: []*AST, allocator: std.mem.Allocator) anyerror!?*AST {
+    if (childASTs.len != 1) {
+        return std.debug.panic("Expected exactly one AST, got {d}", .{childASTs.len});
+    }
+    _ = allocator;
+
+    return childASTs[0];
+}
 
 // const expression = GrammarPattern.create(
 
@@ -35,7 +40,7 @@ const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternEle
     // .{ .Pattern = TokenType.ForKeyword },
     // .{ .Pattern = TokenType.ReturnKeyword },
     // .{ .Pattern = TokenType.LetKeyword },
-    .{ .Token = TokenType.LetKeyword }, // Testing
+    .{ .type = .{ .Token = TokenType.LetKeyword }, .getAST = passSingleASTForward }, // Testing
 }, createStatementAST);
 fn createStatementAST(self: GrammarPattern, childASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
@@ -107,12 +112,12 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
 // }
 
 pub const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
-    .{ .Pattern = &statement },
+    .{ .type = .{ .Pattern = &statement }, .getAST = passSingleASTForward },
 }, createGrammarAST);
 fn createGrammarAST(self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
 
-    _ = patternASTs;
+    std.log.debug("Pattern ASTs: {any}", .{patternASTs});
 
     allocation.* = AST{
         .column = 0,

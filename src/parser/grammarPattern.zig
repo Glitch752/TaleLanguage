@@ -11,37 +11,38 @@ pub const PatternType = enum {
     AtLeastOne,
 };
 
-pub const GrammarPatternElement = union(enum) {
-    Token: TokenType,
-    Pattern: *const GrammarPattern,
-    getAST: fn (childASTs: []*AST, allocator: std.mem.Allocator) ?*AST,
+pub const GrammarPatternElement = struct {
+    type: union(enum) {
+        Token: TokenType,
+        Pattern: *const GrammarPattern,
+    },
+    getAST: *const fn (childASTs: []*AST, allocator: std.mem.Allocator) anyerror!?*AST,
 
     pub fn check(self: GrammarPatternElement, remainingTokens: []TokenType) u32 {
-        switch (self) {
-            GrammarPatternElement.Token => |token| {
+        switch (self.type) {
+            .Token => |token| {
                 if (token != remainingTokens[0]) {
                     return 0;
                 }
                 return 1;
             },
-            GrammarPatternElement.Pattern => |pattern| {
+            .Pattern => |pattern| {
                 return pattern.check(remainingTokens);
             },
         }
     }
 
-    pub fn consumeIfExist(self: GrammarPatternElement, remainingTokens: []TokenType, allocator: std.mem.Allocator) ?ConsumeResult {
-        switch (self) {
-            GrammarPatternElement.Token => |token| {
-                if (token != remainingTokens[0]) {
+    pub fn consumeIfExist(self: GrammarPatternElement, remainingTokens: []TokenData, allocator: std.mem.Allocator) !?ConsumeResult {
+        switch (self.type) {
+            .Token => |token| {
+                if (@tagName(token) != @tagName(remainingTokens[0].token)) {
                     return null;
                 }
                 return .{ .consumed = 1, .asts = null };
             },
-            GrammarPatternElement.Pattern => |pattern| {
-                const result = pattern.consumeIfExist(remainingTokens, allocator);
-                if (result == null) return null;
-                return .{ .consumed = result.consumed, .ast = self.getAST(result.asts, allocator) };
+            .Pattern => |pattern| {
+                const result = try pattern.consumeIfExist(remainingTokens, allocator) orelse return null;
+                return .{ .consumed = result.consumed, .asts = try self.getAST(result.asts, allocator) };
             },
         }
     }
@@ -54,13 +55,13 @@ pub const ConsumeResult = struct {
 
 elements: []const GrammarPatternElement,
 patternType: PatternType,
-getAST: fn (self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*AST,
+getAST: *const fn (self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*AST,
 
 pub fn create(comptime patternType: PatternType, comptime elements: []const GrammarPatternElement, comptime getAST: fn (self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*AST) GrammarPattern {
     return .{ .elements = elements, .patternType = patternType, .getAST = getAST };
 }
 
-pub fn check(self: *GrammarPattern, remainingTokens: []TokenData) bool {
+pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) bool {
     var tokenIndex: usize = 0;
     for (self.elements) |element| {
         const consumed = element.check(remainingTokens[tokenIndex..]);
@@ -70,15 +71,23 @@ pub fn check(self: *GrammarPattern, remainingTokens: []TokenData) bool {
     return true;
 }
 
-pub fn consumeIfExist(self: *GrammarPattern, remainingTokens: []TokenData) *ConsumeResult {
+pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData, allocator: std.mem.Allocator) !?*ConsumeResult {
     if (!self.check(remainingTokens)) {
-        return 0;
+        return null;
     }
 
     var consumed: usize = 0;
+    var asts = std.ArrayList(AST).init(allocator);
     for (self.elements) |element| {
-        const result = element.consumeIfExist(remainingTokens[consumed..]);
+        const result = try element.consumeIfExist(remainingTokens[consumed..], allocator) orelse return null;
         consumed += result.consumed;
+        if (result.asts != null) {
+            for (result.asts) |ast| {
+                try asts.append(ast);
+            }
+        }
     }
-    return .{ .consumed = consumed, .ast = self.getAST(remainingTokens[0..consumed]) };
+
+    const astSlice = try asts.toOwnedSlice();
+    return .{ .consumed = consumed, .ast = self.getAST(astSlice, remainingTokens[0..consumed], allocator) };
 }

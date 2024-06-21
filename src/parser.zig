@@ -23,7 +23,7 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
 }
 
 pub fn parse(self: *Parser) anyerror!?*AST {
-    const ast = try grammar.getAST(grammar, &[_]*AST{}, self.tokens, self.allocator);
+    const ast = try grammar.consumeIfExist(self.tokens, self.allocator);
     self.ast = ast;
     return ast;
 }
