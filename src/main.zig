@@ -24,11 +24,13 @@ pub fn main() !void {
 
     // Get the standard output file
     const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-    defer bw.flush() catch |err| {
-        std.debug.panic("Failed to flush stdout: {any}\n", .{err});
-    };
+    // Temporary: Don't buffer the output
+    // var bw = std.io.bufferedWriter(stdout_file);
+    // const stdout = bw.writer();
+    const stdout = stdout_file;
+    // defer bw.flush() catch |err| {
+    //     std.debug.panic("Failed to flush stdout: {any}\n", .{err});
+    // };
 
     // Print the process arguments
     const args = try args_parser.parse(allocator);
@@ -93,14 +95,14 @@ pub fn main() !void {
         return try pretty_error("Unexpected error parsing the AST\n");
     };
     defer {
-        std.debug.print("AST root: {any}\n", .{prsr.ast.?.root});
+        std.debug.print("AST root: {any}\n", .{ast});
         prsr.deinit();
     }
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});
         try ast.print(&stdout.any(), 0);
-        std.debug.print("Printed AST\n", .{});
         std.debug.print("\n", .{});
+        std.debug.print("Printed AST\n", .{});
     }
 }

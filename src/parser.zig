@@ -12,7 +12,7 @@ tokens: []TokenData,
 allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
-ast: ?*AST,
+ast: ?AST,
 
 pub const ParseError = error{ ExpectedIdentifier, ExpectedAssignment, ExpectedExpression };
 
@@ -20,16 +20,15 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
     return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
-pub fn parse(self: *Parser) !AST {
-    var ast = AST{ .root = try self.parseBlock() };
-    self.ast = &ast;
-    return ast;
+pub fn parse(self: *Parser) !*AST {
+    const ast = AST{ .root = try self.parseBlock() };
+    self.ast = ast;
+    return &self.ast.?;
 }
 
 pub fn deinit(self: *Parser) void {
-    std.debug.print("Deinit parser\n", .{});
     if (self.ast != null) {
-        self.ast.?.*.deinit(self.allocator);
+        self.ast.?.deinit(self.allocator);
     }
 }
 
@@ -37,25 +36,25 @@ fn parseBlock(self: *Parser) !*NodeData {
     var blockPointer = try self.allocator.create(NodeData);
     errdefer blockPointer.deinit(self.allocator);
 
-    // var statements = std.ArrayList(NodeData).init(self.allocator);
-    // errdefer {
-    //     for (statements.items) |statement| {
-    //         statement.deinit(self.allocator);
-    //     }
-    // }
+    var statements = std.ArrayList(NodeData).init(self.allocator);
+    errdefer {
+        for (statements.items) |statement| {
+            statement.deinit(self.allocator);
+        }
+    }
 
-    // while (self.position < self.tokens.len) {
-    //     const token = self.tokens[self.position].token;
-    //     if (token == Token.EOF) {
-    //         break;
-    //     }
+    while (self.position < self.tokens.len) {
+        const token = self.tokens[self.position].token;
+        if (token == Token.EOF) {
+            break;
+        }
 
-    //     const statement = try self.parseStatement();
-    //     try statements.append(statement);
-    // }
+        const statement = try self.parseStatement();
+        try statements.append(statement);
+    }
 
-    // blockPointer.* = .{ .Block = .{ .statements = try statements.toOwnedSlice() } };
-    blockPointer.* = .{ .Block = .{ .statements = &[_]NodeData{} } };
+    blockPointer.* = .{ .Block = .{ .statements = try statements.toOwnedSlice() } };
+    // blockPointer.* = .{ .Block = .{ .statements = &[_]NodeData{} } };
     return blockPointer;
 }
 

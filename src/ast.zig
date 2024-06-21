@@ -183,75 +183,95 @@ pub const NodeData = union(NodeType) {
     }
 
     pub fn deinit(self: NodeData, allocator: std.mem.Allocator) void {
-        // switch (self) {
-        //     .Assignment => |node| {
-        //         std.debug.print("identifierString: {s}\n", .{node.identifier});
-        //         std.debug.print("Deinit {any}\n", .{self});
-        //         // std.debug.print("\n\nDeinit Assignment {any}\n", .{node.value});
-        //         allocator.free(node.identifier);
-        //         node.value.deinit(allocator);
-        //         node.type.deinit(allocator);
-        //     },
-        //     .ForLoop => |node| {
-        //         node.expression.deinit(allocator);
-        //         node.block.deinit(allocator);
-        //     },
-        //     .Range => |node| {
-        //         node.startValue.deinit(allocator);
-        //         node.endValue.deinit(allocator);
-        //     },
-        //     .Function => |node| {
-        //         for (node.parameters) |parameter| {
-        //             parameter.type.deinit(allocator);
-        //         }
-        //         node.block.deinit(allocator);
-        //     },
-        //     .FunctionCall => |node| {
-        //         for (node.arguments) |argument| {
-        //             argument.deinit(allocator);
-        //         }
-        //     },
-        //     .Return => |node| {
-        //         node.value.deinit(allocator);
-        //     },
-        //     .If => |node| {
-        //         node.condition.deinit(allocator);
-        //         node.block.deinit(allocator);
-        //         if (node.elseBlock != null) {
-        //             node.elseBlock.?.deinit(allocator);
-        //         }
-        //     },
-        //     .Literal => |node| {
-        //         // Nothing to deinit
-        //         _ = node;
-        //     },
-        //     .Block => |node| {
-        //         for (node.statements) |statement| {
-        //             statement.deinit(allocator);
-        //         }
-        //         allocator.free(node.statements);
-        //     },
-        //     .Identifier => |node| {
-        //         allocator.free(node.identifier);
-        //     },
-        //     .ArithmeticOperation => |node| {
-        //         node.left.deinit(allocator);
-        //         node.right.deinit(allocator);
-        //     },
-        //     .ComparisonOperation => |node| {
-        //         node.left.deinit(allocator);
-        //         node.right.deinit(allocator);
-        //     },
-        //     .BooleanOperation => |node| {
-        //         node.left.deinit(allocator);
-        //         node.right.deinit(allocator);
-        //     },
-        //     .Type => |node| {
-        //         allocator.free(node.identifier);
-        //     },
-        // }
-
-        allocator.destroy(&self);
+        switch (self) {
+            .Null => |node| {
+                _ = node;
+            },
+            .Assignment => |node| {
+                std.debug.print("identifierString: {s}\n", .{node.identifier});
+                std.debug.print("Deinit {any}\n", .{self});
+                allocator.free(node.identifier);
+                node.value.deinit(allocator);
+                allocator.destroy(node.value);
+                node.type.deinit(allocator);
+                allocator.destroy(node.type);
+            },
+            .ForLoop => |node| {
+                node.expression.deinit(allocator);
+                allocator.destroy(node.expression);
+                node.block.deinit(allocator);
+                allocator.destroy(node.block);
+            },
+            .Range => |node| {
+                node.startValue.deinit(allocator);
+                allocator.destroy(node.startValue);
+                node.endValue.deinit(allocator);
+                allocator.destroy(node.endValue);
+            },
+            .Function => |node| {
+                for (node.parameters) |parameter| {
+                    parameter.type.deinit(allocator);
+                    allocator.free(parameter.identifier);
+                }
+                node.block.deinit(allocator);
+                allocator.free(node.parameters);
+            },
+            .FunctionCall => |node| {
+                for (node.arguments) |argument| {
+                    argument.deinit(allocator);
+                    allocator.destroy(argument);
+                }
+                allocator.free(node.arguments);
+            },
+            .Return => |node| {
+                node.value.deinit(allocator);
+                allocator.destroy(node.value);
+            },
+            .If => |node| {
+                node.condition.deinit(allocator);
+                allocator.destroy(node.condition);
+                node.block.deinit(allocator);
+                allocator.destroy(node.block);
+                if (node.elseBlock != null) {
+                    node.elseBlock.?.deinit(allocator);
+                    allocator.destroy(node.elseBlock.?);
+                }
+            },
+            .Literal => |node| {
+                // Nothing to deinit
+                _ = node;
+            },
+            .Block => |node| {
+                for (node.statements) |statement| {
+                    statement.deinit(allocator);
+                }
+                allocator.free(node.statements);
+            },
+            .Identifier => |node| {
+                allocator.free(node.identifier);
+            },
+            .ArithmeticOperation => |node| {
+                node.left.deinit(allocator);
+                node.right.deinit(allocator);
+                allocator.destroy(node.left);
+                allocator.destroy(node.right);
+            },
+            .ComparisonOperation => |node| {
+                node.left.deinit(allocator);
+                node.right.deinit(allocator);
+                allocator.destroy(node.left);
+                allocator.destroy(node.right);
+            },
+            .BooleanOperation => |node| {
+                node.left.deinit(allocator);
+                node.right.deinit(allocator);
+                allocator.destroy(node.left);
+                allocator.destroy(node.right);
+            },
+            .Type => |node| {
+                allocator.free(node.identifier);
+            },
+        }
     }
 };
 
@@ -280,7 +300,7 @@ pub const AST = struct {
     }
 
     pub fn deinit(self: AST, allocator: std.mem.Allocator) void {
-        // self.root.deinit(allocator);
-        allocator.free(self.root.Block.statements);
+        self.root.deinit(allocator);
+        allocator.destroy(self.root);
     }
 };
