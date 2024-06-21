@@ -73,13 +73,20 @@ pub const NodeData = union(NodeType) {
     },
 
     pub fn print(self: NodeData, writer: *const std.io.AnyWriter, indent: usize) !void {
+        const allocator = std.heap.page_allocator;
+        const indentSpaces = try repeat("    ", indent, allocator);
+        defer allocator.free(indentSpaces);
+
         switch (self) {
             .Null => |node| {
                 _ = node;
             },
             .Assignment => |node| {
-                try writer.print("{s} = ", .{node.identifier});
+                try writer.print("{s}let {s}: ", .{ indentSpaces, node.identifier });
+                try node.type.print(writer, indent);
+                try writer.print(" = ", .{});
                 try node.value.print(writer, indent);
+                try writer.print(";", .{});
             },
             .ForLoop => |node| {
                 try writer.print("for ", .{});
@@ -93,7 +100,7 @@ pub const NodeData = union(NodeType) {
                 try node.endValue.print(writer, indent);
             },
             .Function => |node| {
-                try writer.print("fn(", .{});
+                try writer.print("function(", .{});
                 for (node.parameters) |parameter| {
                     try writer.print("{s}: ", .{parameter.identifier});
                     try parameter.type.print(writer, indent);
@@ -131,14 +138,10 @@ pub const NodeData = union(NodeType) {
                 }
             },
             .Block => |node| {
-                try writer.print("{{", .{});
+                try writer.print("{{\n", .{});
                 for (node.statements) |statement| {
-                    const allocator = std.heap.page_allocator;
-                    const repeated = try repeat("    ", indent, allocator);
-                    defer allocator.free(repeated);
-
-                    try writer.print("{s}", .{repeated});
-                    try statement.print(writer, indent);
+                    try writer.print("{s}", .{indentSpaces});
+                    try statement.print(writer, indent + 1);
                     try writer.print("\n", .{});
                 }
                 try writer.print("}}", .{});
@@ -188,8 +191,6 @@ pub const NodeData = union(NodeType) {
                 _ = node;
             },
             .Assignment => |node| {
-                std.debug.print("identifierString: {s}\n", .{node.identifier});
-                std.debug.print("Deinit {any}\n", .{self});
                 allocator.free(node.identifier);
                 node.value.deinit(allocator);
                 allocator.destroy(node.value);

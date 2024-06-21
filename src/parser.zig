@@ -197,16 +197,17 @@ fn parseType(self: *Parser) !*NodeData {
         } else if (self.tokens[self.position].token == Token.OpenParen) {
             parentheses += 1;
         }
-        if (parentheses <= 0) break;
-
-        self.position += 1;
-        try self.ensurePositionInBounds();
 
         const tokenString = self.tokens[self.position].token.toString();
         string = try self.allocator.realloc(string, string.len + tokenString.len);
         for (tokenString, 0..) |c, i| {
             string[string.len - tokenString.len + i] = c;
         }
+
+        if (parentheses <= 0) break;
+
+        self.position += 1;
+        try self.ensurePositionInBounds();
     }
 
     self.position += 1;
