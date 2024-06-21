@@ -14,18 +14,27 @@ tokens: []TokenData,
 allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
-ast: ?*AST,
+ast: ?*const AST,
 
-pub const ParseError = error{ ExpectedIdentifier, ExpectedAssignment, ExpectedExpression };
+pub const ParseError = error{Unknown};
 
 pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []const u8) Parser {
     return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
-pub fn parse(self: *Parser) anyerror!?*AST {
-    const ast = try grammar.consumeIfExist(self.tokens, self.allocator);
-    self.ast = ast;
-    return ast;
+pub fn parse(self: *Parser) anyerror!?*const AST {
+    const result = try grammar.consumeIfExist(self.tokens, self.allocator);
+    if (result == null) {
+        try pretty_error("Failed to parse grammar -- No AST consumed initially");
+        return ParseError.Unknown;
+    }
+    if (result.?.asts == null) {
+        try pretty_error("Failed to parse grammar -- No ASTs consumed");
+        return ParseError.Unknown;
+    }
+
+    self.ast = result.?.asts.?[0];
+    return self.ast;
 }
 
 pub fn deinit(self: *Parser) void {

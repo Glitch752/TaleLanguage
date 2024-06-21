@@ -19,7 +19,7 @@ pub fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
     return repeated;
 }
 
-fn passSingleASTForward(childASTs: []*AST, allocator: std.mem.Allocator) anyerror!?*AST {
+fn passSingleASTForward(childASTs: []*const AST, allocator: std.mem.Allocator) anyerror!?*const AST {
     if (childASTs.len != 1) {
         return std.debug.panic("Expected exactly one AST, got {d}", .{childASTs.len});
     }
@@ -42,7 +42,7 @@ const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternEle
     // .{ .Pattern = TokenType.LetKeyword },
     .{ .type = .{ .Token = TokenType.LetKeyword }, .getAST = passSingleASTForward }, // Testing
 }, createStatementAST);
-fn createStatementAST(self: GrammarPattern, childASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
+fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
 
     _ = childASTs;
@@ -61,11 +61,11 @@ fn createStatementAST(self: GrammarPattern, childASTs: []*AST, tokens: []TokenDa
 
     return allocation;
 }
-fn deinitStatement(self: *AST, allocator: std.mem.Allocator) void {
+fn deinitStatement(self: *const AST, allocator: std.mem.Allocator) void {
     allocator.destroy(self);
 }
 fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
-    const indentString = repeat("  ", indent, allocator);
+    const indentString = try repeat("  ", indent, allocator);
     defer allocator.free(indentString);
 
     try writer.print("{s}STATEMENT:\n", .{indentString});
@@ -114,7 +114,7 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
 pub const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
     .{ .type = .{ .Pattern = &statement }, .getAST = passSingleASTForward },
 }, createGrammarAST);
-fn createGrammarAST(self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
+fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
 
     std.log.debug("Pattern ASTs: {any}", .{patternASTs});
@@ -122,7 +122,7 @@ fn createGrammarAST(self: GrammarPattern, patternASTs: []*AST, tokens: []TokenDa
     allocation.* = AST{
         .column = 0,
         .line = 0,
-        .node = .{ .Block = .{ .statements = &[_]*AST{} } }, // TODO: Statements
+        .node = .{ .Block = .{ .statements = &[_]*const AST{} } }, // TODO: Statements
 
         .deinit = deinitGrammar,
         .print = printGrammar,
@@ -133,7 +133,7 @@ fn createGrammarAST(self: GrammarPattern, patternASTs: []*AST, tokens: []TokenDa
 
     return allocation;
 }
-fn deinitGrammar(self: *AST, allocator: std.mem.Allocator) void {
+fn deinitGrammar(self: *const AST, allocator: std.mem.Allocator) void {
     allocator.free(self.node.Block.statements);
     allocator.destroy(self);
 }
