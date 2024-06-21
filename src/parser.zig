@@ -5,6 +5,8 @@ const FunctionParameter = @import("ast.zig").FunctionParameter;
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
 const pretty_error = @import("main.zig").pretty_error;
+const grammar = @import("parser/grammar.zig").grammar;
+const repeat = @import("parser/grammar.zig").repeat;
 
 const Parser = @This();
 
@@ -20,21 +22,8 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
     return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
-fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
-    const repeated = try allocator.alloc(u8, s.len * times);
-
-    var i: usize = 0;
-    while (i < s.len * times) : (i += 1) {
-        repeated[i] = s[i % 2];
-    }
-
-    return repeated;
-}
-
 pub fn parse(self: *Parser) anyerror!*AST {
-    // TODO
-    _ = self;
-    return ParseError.ExpectedIdentifier;
+    return grammar.getAST(grammar, self.tokens, self.allocator);
 }
 
 pub fn deinit(self: *Parser) void {
