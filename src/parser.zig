@@ -9,20 +9,48 @@ const pretty_error = @import("main.zig").pretty_error;
 
 const Parser = @This();
 
+pub const NodeDataList = struct {
+    nodes: std.ArrayList(NodeData),
+
+    pub fn init(allocator: std.mem.Allocator) NodeDataList {
+        return .{ .nodes = std.ArrayList(NodeData).init(allocator) };
+    }
+
+    pub fn deinit(self: NodeDataList, allocator: std.mem.Allocator) void {
+        for (self.nodes.items) |node| {
+            node.deinit(allocator);
+        }
+    }
+
+    pub fn append(self: *NodeDataList, node: NodeData) !void {
+        try self.nodes.append(node);
+    }
+};
+
 tokens: []TokenData,
 allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
+nodeDataList: NodeDataList,
+ast: ?*AST,
 
 pub const ParseError = error{ ExpectedIdentifier, ExpectedAssignment, ExpectedExpression };
 
 pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []const u8) Parser {
-    return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name };
+    return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .nodeDataList = NodeDataList.init(allocator), .ast = null };
 }
 
 pub fn parse(self: *Parser) !AST {
-    const ast = AST{ .root = try self.parseBlock() };
+    var ast = AST{ .root = try self.parseBlock() };
+    self.ast = &ast;
     return ast;
+}
+
+pub fn deinit(self: *Parser) void {
+    if (self.ast != null) {
+        self.ast.?.*.deinit(self.allocator);
+    }
+    self.nodeDataList.deinit(self.allocator);
 }
 
 fn parseBlock(self: *Parser) !BlockNodeData {
@@ -105,6 +133,10 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
 
     const identifier = self.tokens[self.position];
     try self.expectTokenType(identifier, TokenType.Identifier);
+    const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
+    for (identifier.token.Identifier, 0..) |c, i| {
+        identifierString[i] = c;
+    }
 
     self.position += 1;
     try self.ensurePositionInBounds();
@@ -127,11 +159,9 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     var expression = try self.parseExpression();
     errdefer expression.deinit(self.allocator);
 
-    std.debug.print("Identifier: {s}\n", .{identifier.token.Identifier});
-    std.debug.print("Type: {s}\n", .{varType.Type.identifier});
-    std.debug.print("Expression: {d}\n", .{expression.Literal.IntLiteral});
+    try self.nodeDataList.append(expression);
 
-    const node = NodeData{ .Assignment = .{ .identifier = identifier.token.Identifier, .value = &expression, .type = &varType } };
+    const node = NodeData{ .Assignment = .{ .identifier = identifierString, .value = &expression, .type = &varType } };
     return node;
 }
 

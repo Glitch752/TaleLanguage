@@ -73,82 +73,82 @@ pub const NodeData = union(NodeType) {
 
     pub fn print(self: NodeData, writer: *const std.io.AnyWriter, indent: usize) !void {
         switch (self) {
-            .Assignment => {
-                try writer.print("{s} = ", .{self.Assignment.identifier});
-                try self.Assignment.value.print(writer, indent);
+            .Assignment => |node| {
+                try writer.print("{s} = ", .{node.identifier});
+                try node.value.print(writer, indent);
             },
-            .ForLoop => {
+            .ForLoop => |node| {
                 try writer.print("for ", .{});
-                try self.ForLoop.expression.print(writer, indent);
+                try node.expression.print(writer, indent);
                 try writer.print(" ", .{});
-                try self.ForLoop.block.print(writer, indent);
+                try node.block.print(writer, indent);
             },
-            .Range => {
-                try self.Range.startValue.print(writer, indent);
+            .Range => |node| {
+                try node.startValue.print(writer, indent);
                 try writer.print("..<", .{});
-                try self.Range.endValue.print(writer, indent);
+                try node.endValue.print(writer, indent);
             },
-            .Function => {
+            .Function => |node| {
                 try writer.print("fn(", .{});
-                for (self.Function.parameters) |parameter| {
+                for (node.parameters) |parameter| {
                     try writer.print("{s}: ", .{parameter.identifier});
                     try parameter.type.print(writer, indent);
                     try writer.print(", ", .{});
                 }
                 try writer.print(") ", .{});
-                try self.Function.block.print(writer, indent);
+                try node.block.print(writer, indent);
             },
-            .FunctionCall => {
-                try writer.print("{s}(", .{self.FunctionCall.identifier});
-                for (self.FunctionCall.arguments) |argument| {
+            .FunctionCall => |node| {
+                try writer.print("{s}(", .{node.identifier});
+                for (node.arguments) |argument| {
                     try argument.print(writer, indent);
                     try writer.print(", ", .{});
                 }
                 try writer.print(")", .{});
             },
-            .Return => {
+            .Return => |node| {
                 try writer.print("return ", .{});
-                try self.Return.value.print(writer, indent);
+                try node.value.print(writer, indent);
             },
-            .If => {
+            .If => |node| {
                 try writer.print("if ", .{});
-                try self.If.condition.print(writer, indent);
+                try node.condition.print(writer, indent);
                 try writer.print(" ", .{});
-                try self.If.block.print(writer, indent);
-                if (self.If.elseBlock != null) {
+                try node.block.print(writer, indent);
+                if (node.elseBlock != null) {
                     try writer.print(" else ", .{});
-                    try self.If.elseBlock.?.*.print(writer, indent);
+                    try node.elseBlock.?.*.print(writer, indent);
                 }
             },
-            .Literal => {
-                switch (self.Literal) {
-                    .IntLiteral => try writer.print("{d}", .{self.Literal.IntLiteral}),
-                    .StringLiteral => try writer.print("{s}", .{self.Literal.StringLiteral}),
+            .Literal => |node| {
+                switch (node) {
+                    .IntLiteral => |val| try writer.print("{d}", .{val}),
+                    .StringLiteral => |val| try writer.print("{s}", .{val}),
                 }
             },
-            .Block => {
+            .Block => |node| {
                 try writer.print("{{", .{});
-                for (self.Block.statements) |statement| {
+                for (node.statements) |statement| {
                     try statement.print(writer, indent + 1);
                     try writer.print("\n", .{});
                 }
                 try writer.print("}}", .{});
             },
-            .Identifier => try writer.print("{s}", .{self.Identifier.identifier}),
-            .ArithmeticOperation => {
-                try self.ArithmeticOperation.left.print(writer, indent);
-                switch (self.ArithmeticOperation.operation) {
+            .Identifier => |node| try writer.print("{s}", .{node.identifier}),
+            .ArithmeticOperation => |node| {
+                try node.left.print(writer, indent);
+                switch (node.operation) {
                     .Add => try writer.print(" + ", .{}),
                     .Subtract => try writer.print(" - ", .{}),
                     .Multiply => try writer.print(" * ", .{}),
                     .Divide => try writer.print(" / ", .{}),
                     .Modulus => try writer.print(" % ", .{}),
                 }
-                try self.ArithmeticOperation.right.print(writer, indent);
+                try node.right.print(writer, indent);
             },
-            .ComparisonOperation => {
-                try self.ComparisonOperation.left.print(writer, indent);
-                switch (self.ComparisonOperation.operation) {
+            .ComparisonOperation => |node| {
+                try node.left.print(writer, indent);
+                switch (node.operation) {
                     .LessThan => try writer.print(" < ", .{}),
                     .LessThanEqual => try writer.print(" <= ", .{}),
                     .GreaterThan => try writer.print(" > ", .{}),
@@ -156,24 +156,25 @@ pub const NodeData = union(NodeType) {
                     .Equal => try writer.print(" == ", .{}),
                     .NotEqual => try writer.print(" != ", .{}),
                 }
-                try self.ComparisonOperation.right.print(writer, indent);
+                try node.right.print(writer, indent);
             },
-            .BooleanOperation => {
-                try self.BooleanOperation.left.print(writer, indent);
-                switch (self.BooleanOperation.operation) {
+            .BooleanOperation => |node| {
+                try node.left.print(writer, indent);
+                switch (node.operation) {
                     .And => try writer.print(" && ", .{}),
                     .Or => try writer.print(" || ", .{}),
                     .Not => try writer.print(" !", .{}),
                 }
-                try self.BooleanOperation.right.print(writer, indent);
+                try node.right.print(writer, indent);
             },
-            .Type => {
-                try writer.print("{s}", .{self.Type.identifier});
+            .Type => |node| {
+                try writer.print("{s}", .{node.identifier});
             },
         }
     }
 
     pub fn deinit(self: NodeData, allocator: std.mem.Allocator) void {
+        std.debug.print("\n\n\n\nDeinit statement inner\n\n\n", .{});
         switch (self) {
             .Assignment => |node| {
                 std.debug.print("\n\n\n\nDeinit Assignment {any}\n\n\n", .{node.value});
@@ -217,8 +218,7 @@ pub const NodeData = union(NodeType) {
                 node.deinit(allocator);
             },
             .Identifier => |node| {
-                // Nothing to deinit
-                _ = node;
+                allocator.free(node.identifier);
             },
             .ArithmeticOperation => |node| {
                 node.left.deinit(allocator);
@@ -267,7 +267,9 @@ pub const BlockNodeData = struct {
     }
 
     pub fn deinit(self: BlockNodeData, allocator: std.mem.Allocator) void {
+        std.debug.print("\n\n\n\nStatements: {d}\n\n\n", .{self.statements.len});
         for (self.statements) |statement| {
+            std.debug.print("\n\n\n\nDeinit statement\n\n\n", .{});
             statement.deinit(allocator);
         }
         allocator.free(self.statements);
