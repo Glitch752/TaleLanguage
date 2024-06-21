@@ -32,12 +32,14 @@ fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
 }
 
 pub fn parse(self: *Parser) anyerror!*AST {
-
+    // TODO
+    _ = self;
+    return ParseError.ExpectedIdentifier;
 }
 
 pub fn deinit(self: *Parser) void {
     if (self.ast != null) {
-        self.ast.?.deinit(self.allocator);
+        self.ast.?.deinit(&(self.ast.?), self.allocator);
     }
 }
 
@@ -84,26 +86,26 @@ fn parseType(self: *Parser) !*AST {
     self.position += 1;
     try self.ensurePositionInBounds("Type declaration - close parenthesis");
 
-    const deinit = *fn(self: *AST, allocator: std.mem.Allocator) void {
-        self.allocator.free(string);
-    };
-
     typePointer.* = .{
         .line = self.tokens[self.position].line,
         .column = self.tokens[self.position].column,
-        .node = .{
-            .Type = .{
-                .identifier = string,
-            }
-        },
+        .node = .{ .Type = .{
+            .identifier = string,
+        } },
 
-        .deinit = *deinit,
-        .print = *fn(self, writer, indent) anyerror!void {
-            const repeated = try repeat("  ", indent, self.allocator);
-            defer self.allocator.free(repeated);
-            try writer.print("{s}", .{ repeated });
-            try writer.print("Type: {s}\n", .{ self.node.Type.identifier });
-        },
-    }
+        .deinit = *deinitType,
+        .print = *printType,
+    };
     return typePointer;
+}
+
+fn deinitType(self: *AST, allocator: std.mem.Allocator) void {
+    allocator.free(self.node.Type.identifier);
+    allocator.destroy(self);
+}
+
+fn printType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+    try writer.print("{s}{s}\n", .{ indentString, self.node.Type.identifier });
 }

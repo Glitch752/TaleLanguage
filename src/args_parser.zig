@@ -38,7 +38,7 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
             flags.stop_after_tokens = true;
         } else {
             if (file_path != null) {
-                try pretty_error("Multiple file paths provided\n", "Argument parsing");
+                try pretty_error("Multiple file paths provided\n");
                 return ArgParseError.MultiplePathsProvided;
             }
 
@@ -47,7 +47,7 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
     }
 
     if (file_path == null) {
-        try pretty_error(try std.fmt.allocPrint(allocator, "Usage: {s} <file>\n", .{ .name_string = args[0] }), "Argument parsing");
+        try pretty_error(try std.fmt.allocPrint(allocator, "Usage: {s} <file>\n", .{ .name_string = args[0] }));
         return ArgParseError.NoFileProvided;
     }
 
