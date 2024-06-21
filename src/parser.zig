@@ -14,7 +14,7 @@ tokens: []TokenData,
 allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
-ast: ?AST,
+ast: ?*AST,
 
 pub const ParseError = error{ ExpectedIdentifier, ExpectedAssignment, ExpectedExpression };
 
@@ -23,12 +23,14 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
 }
 
 pub fn parse(self: *Parser) anyerror!?*AST {
-    return try grammar.getAST(grammar, &[_]*AST{}, self.tokens, self.allocator);
+    const ast = try grammar.getAST(grammar, &[_]*AST{}, self.tokens, self.allocator);
+    self.ast = ast;
+    return ast;
 }
 
 pub fn deinit(self: *Parser) void {
     if (self.ast != null) {
-        self.ast.?.deinit(&(self.ast.?), self.allocator);
+        self.ast.?.*.deinit(self.ast.?, self.allocator);
     }
 }
 

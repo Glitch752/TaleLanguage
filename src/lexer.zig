@@ -72,7 +72,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
             var keyword = try allocator.alloc(u8, 1);
             keyword[0] = c;
             var i: u16 = 1;
-            while (std.ascii.isAlphanumeric(self.buffer[self.position])) {
+            while (self.position < self.buffer.len and std.ascii.isAlphanumeric(self.buffer[self.position])) {
                 keyword = try allocator.realloc(keyword, i + 1);
                 keyword[i] = self.buffer[self.position];
                 i += 1;
