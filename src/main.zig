@@ -89,6 +89,10 @@ pub fn main() !void {
         try stdout.print("\n\n", .{});
     }
 
+    if (args.flags.stop_after_tokens) {
+        return;
+    }
+
     var prsr = parser.init(tokens.items, allocator, file_path);
     defer prsr.deinit();
 

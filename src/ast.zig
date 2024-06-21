@@ -156,7 +156,7 @@ pub const NodeData = union(NodeType) {
                     try statement.print(writer, indent + 1);
                     try writer.print("\n", .{});
                 }
-                try writer.print("}}", .{});
+                try writer.print("{s}}}", .{indentSpaces});
             },
             .Identifier => |node| try writer.print("{s}", .{node.identifier}),
             .ArithmeticOperation => |node| {

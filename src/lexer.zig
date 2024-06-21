@@ -68,7 +68,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
         }
 
         // Next, keywords
-        if (std.ascii.isAlphanumeric(c)) {
+        if (std.ascii.isAlphabetic(c)) {
             var keyword = try allocator.alloc(u8, 1);
             keyword[0] = c;
             var i: u16 = 1;
@@ -94,10 +94,11 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
         // Next, numbers
         if (std.ascii.isDigit(c)) {
             var number: u64 = 0;
+            self.position -= 1;
             while (std.ascii.isDigit(self.buffer[self.position])) {
                 number = number * 10 + (self.buffer[self.position] - '0');
                 self.position += 1;
-                self.column = 1;
+                self.column += 1;
             }
 
             return .{ .token = Token{ .IntLiteral = number }, .line = self.line, .column = self.column };

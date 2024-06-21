@@ -162,7 +162,10 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     try self.ensurePositionInBounds("Variable declaration - assignment");
 
     const expressionPointer = try self.parseExpression();
-    errdefer expressionPointer.deinit(self.allocator);
+    errdefer {
+        expressionPointer.deinit(self.allocator);
+        self.allocator.destroy(expressionPointer);
+    }
 
     const node = NodeData{ .Assignment = .{ .identifier = identifierString, .value = expressionPointer, .type = typePointer } };
     return node;
@@ -175,7 +178,10 @@ fn parseReturnStatement(self: *Parser) !NodeData {
     try self.ensurePositionInBounds("Return statement - return");
 
     const expressionPointer = try self.parseExpression();
-    errdefer expressionPointer.deinit(self.allocator);
+    errdefer {
+        expressionPointer.deinit(self.allocator);
+        self.allocator.destroy(expressionPointer);
+    }
 
     const node = NodeData{ .Return = .{ .value = expressionPointer } };
     return node;
@@ -232,7 +238,11 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
 
     // Next token should be a close curly brace
     const closeCurly = self.tokens[self.position];
-    try self.expectTokenType(closeCurly, TokenType.CloseCurly, "Function declaration - close curly brace");
+    self.expectTokenType(closeCurly, TokenType.CloseCurly, "Function declaration - close curly brace") catch {
+        // This also segfaults if we return an error here for some reason... I don't know why.
+        // Ugh Zig errors are so unreliable
+        return NodeData{ .Function = .{ .parameters = &[_]FunctionParameter{}, .block = block } };
+    };
 
     self.position += 1;
     try self.ensurePositionInBounds("Function declaration - close curly brace");
@@ -360,6 +370,7 @@ fn programPosition(self: *Parser) ![]const u8 {
 }
 
 fn parseExpression(self: *Parser) !*NodeData {
+    std.log.debug("Parsing expression, tokens: {any}\n", .{self.tokens[self.position .. self.position + 5]});
     var expressionPointer = try self.allocator.create(NodeData);
     errdefer expressionPointer.deinit(self.allocator);
 
@@ -371,6 +382,56 @@ fn parseExpression(self: *Parser) !*NodeData {
         return expressionPointer;
     }
 
+    // If it's an int literal:
+    if (token.token == Token.IntLiteral) {
+        // If the next character is a range operator, it's a range. Otherwise, it's a literal.
+        // TODO: Make ranges support expressions
+        const nextToken = self.tokens[self.position + 1];
+        if (nextToken.token == Token.Range) {
+            self.position += 2;
+            try self.ensurePositionInBounds("Expression - range");
+
+            const toValue = self.tokens[self.position];
+            try self.expectTokenType(toValue, TokenType.IntLiteral, "Expression - range end");
+
+            const range = try self.allocator.create(NodeData);
+            errdefer {
+                range.deinit(self.allocator);
+                self.allocator.destroy(range);
+            }
+
+            const startNode = try self.allocator.create(NodeData);
+            errdefer {
+                startNode.deinit(self.allocator);
+                self.allocator.destroy(startNode);
+            }
+
+            startNode.* = .{ .Literal = .{ .IntLiteral = token.token.IntLiteral } };
+
+            const endNode = try self.allocator.create(NodeData);
+            errdefer {
+                endNode.deinit(self.allocator);
+                self.allocator.destroy(endNode);
+            }
+
+            endNode.* = .{ .Literal = .{ .IntLiteral = toValue.token.IntLiteral } };
+
+            range.* = .{ .Range = .{ .startValue = startNode, .endValue = endNode } };
+            return expressionPointer;
+        } else {
+            // Just a literal
+            expressionPointer.* = .{ .Literal = .{ .IntLiteral = token.token.IntLiteral } };
+            return expressionPointer;
+        }
+    }
+
+    // If it's a string literal:
+    if (token.token == Token.StringLiteral) {
+        expressionPointer.* = .{ .Literal = .{ .StringLiteral = token.token.StringLiteral } };
+        return expressionPointer;
+    }
+
+    expressionPointer.* = .{ .Literal = .{ .IntLiteral = 0 } };
     return expressionPointer;
 }
 
