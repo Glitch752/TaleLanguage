@@ -17,16 +17,21 @@ pub fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
     return repeated;
 }
 
+const letPattern = GrammarPattern.create(&[_]GrammarPatternElement{ .{ .Token = TokenType.LetKeyword }, .{ .Token = TokenType.Identifier }, .{ .Token = TokenType.Assign }, .{ .Pattern = expression } }, getLetPatternAST);
+fn getLetPatternAST(self: *GrammarPattern, tokens: []TokenType, allocator: std.mem.Allocator) ?*AST {
+    return self.elements[3].Pattern.getAST(self.elements[3].Pattern, tokens, allocator);
+}
+
 const statement = GrammarPattern.create(&[_]GrammarPatternElement{
     oneOf(&[_]GrammarPatternElement{
-        // TODO: Add more statements
-        // .{ .Pattern = TokenType.FunctionKeyword },
-        // .{ .Pattern = TokenType.IfKeyword },
-        // .{ .Pattern = TokenType.ElseKeyword },
-        // .{ .Pattern = TokenType.ForKeyword },
-        // .{ .Pattern = TokenType.ReturnKeyword },
-        .{ .Pattern = TokenType.LetKeyword },
-    }),
+    // TODO: Add more statements
+    // .{ .Pattern = TokenType.FunctionKeyword },
+    // .{ .Pattern = TokenType.IfKeyword },
+    // .{ .Pattern = TokenType.ElseKeyword },
+    // .{ .Pattern = TokenType.ForKeyword },
+    // .{ .Pattern = TokenType.ReturnKeyword },
+    // .{ .Pattern = TokenType.LetKeyword },
+    letPattern}),
 }, createStatementAST);
 fn createStatementAST(self: *GrammarPattern, tokens: []TokenType, allocator: std.mem.Allocator) ?*AST {
     return self.elements[0].Pattern.getAST(self.elements[0].Pattern, tokens, allocator);
