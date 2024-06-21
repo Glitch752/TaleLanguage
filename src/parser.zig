@@ -81,7 +81,6 @@ fn parseStatement(self: *Parser) !?NodeData {
         .ReturnKeyword => return try self.parseReturnStatement(),
         // .IfKeyword => return try self.parseIfStatement(),
         .ForKeyword => return try self.parseForStatement(),
-        .FunctionKeyword => return try self.parseFunctionDeclaration(),
         // else => return try self.parseExpression(),
         // TODO
         else => {
@@ -90,37 +89,37 @@ fn parseStatement(self: *Parser) !?NodeData {
     };
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Statement");
 
     // Next token should be a semicolon
     const semicolon = self.tokens[self.position];
-    try self.expectTokenType(semicolon, TokenType.Semicolon);
+    try self.expectTokenType(semicolon, TokenType.Semicolon, "Statement - semicolon");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Statement - semicolon");
 
     return statement;
 }
 
-fn ensurePositionInBounds(self: *Parser) !void {
+fn ensurePositionInBounds(self: *Parser, source: []const u8) !void {
     if (self.position >= self.tokens.len) {
         const position = try self.programPosition();
         defer self.allocator.free(position);
 
         const message = try std.fmt.allocPrint(self.allocator, "Unexpected end of file - {s}", .{position});
         defer self.allocator.free(message);
-        try pretty_error(message);
+        try pretty_error(message, source);
     }
 }
 
-fn expectTokenType(self: *Parser, token: TokenData, expected: TokenType) !void {
+fn expectTokenType(self: *Parser, token: TokenData, expected: TokenType, source: []const u8) !void {
     if (token.token != expected) {
         const position = try self.programPosition();
         defer self.allocator.free(position);
 
         const message = try std.fmt.allocPrint(self.allocator, "Expected {s}, found {s} | {s}", .{ expected.typeNameString(), token.token.typeNameString(), position });
         defer self.allocator.free(message);
-        try pretty_error(message);
+        try pretty_error(message, source);
 
         return switch (expected) {
             TokenType.Identifier => return ParseError.ExpectedIdentifier,
@@ -134,10 +133,10 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     // let identifier = expression;
     // First token is the let keyword
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Variable declaration");
 
     const identifier = self.tokens[self.position];
-    try self.expectTokenType(identifier, TokenType.Identifier);
+    try self.expectTokenType(identifier, TokenType.Identifier, "Variable declaration - identifier");
     const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
     errdefer self.allocator.free(identifierString);
     for (identifier.token.Identifier, 0..) |c, i| {
@@ -145,22 +144,22 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     }
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Variable declaration - identifier");
 
     const colon = self.tokens[self.position];
-    try self.expectTokenType(colon, TokenType.Colon);
+    try self.expectTokenType(colon, TokenType.Colon, "Variable declaration - colon");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Variable declaration - colon");
 
     var typePointer = try self.parseType();
     errdefer typePointer.deinit(self.allocator);
 
     const assign = self.tokens[self.position];
-    try self.expectTokenType(assign, TokenType.Assign);
+    try self.expectTokenType(assign, TokenType.Assign, "Variable declaration - assignment");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Variable declaration - assignment");
 
     const expressionPointer = try self.parseExpression();
     errdefer expressionPointer.deinit(self.allocator);
@@ -173,7 +172,7 @@ fn parseReturnStatement(self: *Parser) !NodeData {
     // return expression;
     // First token is the return keyword
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Return statement - return");
 
     const expressionPointer = try self.parseExpression();
     errdefer expressionPointer.deinit(self.allocator);
@@ -186,14 +185,14 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
     // function() { block } (type is handled by the variable being assigned)
     // First token is the function keyword
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function declaration - function");
 
     // Next token should be an open parenthesis
     const openParen = self.tokens[self.position];
-    try self.expectTokenType(openParen, TokenType.OpenParen);
+    try self.expectTokenType(openParen, TokenType.OpenParen, "Function declaration - open parenthesis");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function declaration - open parenthesis");
 
     // Next is parameters
     var parameters = std.ArrayList(FunctionParameter).init(self.allocator);
@@ -212,17 +211,17 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
 
     // Next token should be a close parenthesis
     const closeParen = self.tokens[self.position];
-    try self.expectTokenType(closeParen, TokenType.CloseParen);
+    try self.expectTokenType(closeParen, TokenType.CloseParen, "Function declaration - close parenthesis");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function declaration - close parenthesis");
 
     // Next token should be an open curly brace
     const openCurly = self.tokens[self.position];
-    try self.expectTokenType(openCurly, TokenType.OpenCurly);
+    try self.expectTokenType(openCurly, TokenType.OpenCurly, "Function declaration - open curly brace");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function declaration - open curly brace");
 
     // Next is the block
     const block = try self.parseBlock();
@@ -233,10 +232,10 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
 
     // Next token should be a close curly brace
     const closeCurly = self.tokens[self.position];
-    try self.expectTokenType(closeCurly, TokenType.CloseCurly);
+    try self.expectTokenType(closeCurly, TokenType.CloseCurly, "Function declaration - close curly brace");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function declaration - close curly brace");
 
     const node = NodeData{ .Function = .{ .parameters = try parameters.toOwnedSlice(), .block = block } };
     return node;
@@ -245,7 +244,7 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
 fn parseParameter(self: *Parser) !FunctionParameter {
     // identifier: type
     const identifier = self.tokens[self.position];
-    try self.expectTokenType(identifier, TokenType.Identifier);
+    try self.expectTokenType(identifier, TokenType.Identifier, "Function parameter - identifier");
 
     const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
     for (identifier.token.Identifier, 0..) |c, i| {
@@ -253,13 +252,13 @@ fn parseParameter(self: *Parser) !FunctionParameter {
     }
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function parameter - identifier");
 
     const colon = self.tokens[self.position];
-    try self.expectTokenType(colon, TokenType.Colon);
+    try self.expectTokenType(colon, TokenType.Colon, "Function parameter - colon");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Function parameter - colon");
 
     var typePointer = try self.parseType();
     errdefer typePointer.deinit(self.allocator);
@@ -273,18 +272,18 @@ fn parseForStatement(self: *Parser) !NodeData {
 
     // First token is the for keyword
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - for");
 
     // Next token should be an open parenthesis
     const openParen = self.tokens[self.position];
-    try self.expectTokenType(openParen, TokenType.OpenParen);
+    try self.expectTokenType(openParen, TokenType.OpenParen, "For loop - open parenthesis");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - open parenthesis");
 
     // Next is the identifier
     const identifier = self.tokens[self.position];
-    try self.expectTokenType(identifier, TokenType.Identifier);
+    try self.expectTokenType(identifier, TokenType.Identifier, "For loop - identifier");
 
     const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
     errdefer self.allocator.free(identifierString);
@@ -293,16 +292,16 @@ fn parseForStatement(self: *Parser) !NodeData {
     }
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - identifier");
 
     const colon = self.tokens[self.position];
-    try self.expectTokenType(colon, TokenType.Colon);
+    try self.expectTokenType(colon, TokenType.Colon, "For loop - colon");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - colon");
 
     const listIdentifier = self.tokens[self.position];
-    try self.expectTokenType(listIdentifier, TokenType.Identifier);
+    try self.expectTokenType(listIdentifier, TokenType.Identifier, "For loop - list identifier");
 
     const listIdentifierString = try self.allocator.alloc(u8, listIdentifier.token.Identifier.len);
     errdefer self.allocator.free(listIdentifierString);
@@ -311,21 +310,21 @@ fn parseForStatement(self: *Parser) !NodeData {
     }
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - list identifier");
 
     // Next token should be a close parenthesis
     const closeParen = self.tokens[self.position];
-    try self.expectTokenType(closeParen, TokenType.CloseParen);
+    try self.expectTokenType(closeParen, TokenType.CloseParen, "For loop - close parenthesis");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - close parenthesis");
 
     // Next token should be an open curly brace
     const openCurly = self.tokens[self.position];
-    try self.expectTokenType(openCurly, TokenType.OpenCurly);
+    try self.expectTokenType(openCurly, TokenType.OpenCurly, "For loop - open curly brace");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - open curly brace");
 
     // Next is the block
     const block = try self.parseBlock();
@@ -336,10 +335,10 @@ fn parseForStatement(self: *Parser) !NodeData {
 
     // Next token should be a close curly brace
     const closeCurly = self.tokens[self.position];
-    try self.expectTokenType(closeCurly, TokenType.CloseCurly);
+    try self.expectTokenType(closeCurly, TokenType.CloseCurly, "For loop - close curly brace");
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("For loop - close curly brace");
 
     const node = NodeData{ .ForLoop = .{ .iteratorIdentifier = identifierString, .listIdentifier = listIdentifierString, .block = block } };
     return node;
@@ -364,7 +363,14 @@ fn parseExpression(self: *Parser) !*NodeData {
     var expressionPointer = try self.allocator.create(NodeData);
     errdefer expressionPointer.deinit(self.allocator);
 
-    expressionPointer.* = .{ .Literal = .{ .IntLiteral = 10 } };
+    // Expressions can be many things. First, functions:
+    const token = self.tokens[self.position];
+    if (token.token == Token.FunctionKeyword) {
+        const function = try self.parseFunctionDeclaration();
+        expressionPointer.* = function;
+        return expressionPointer;
+    }
+
     return expressionPointer;
 }
 
@@ -384,7 +390,7 @@ fn parseType(self: *Parser) !*NodeData {
     while (self.tokens[self.position].token == Token.OpenParen and self.position < self.tokens.len) {
         parentheses += 1;
         self.position += 1;
-        try self.ensurePositionInBounds();
+        try self.ensurePositionInBounds("Type declaration - open parenthesis");
 
         string = try self.allocator.realloc(string, parentheses);
         string[parentheses - 1] = '(';
@@ -405,11 +411,11 @@ fn parseType(self: *Parser) !*NodeData {
         if (parentheses <= 0) break;
 
         self.position += 1;
-        try self.ensurePositionInBounds();
+        try self.ensurePositionInBounds("Type declaration - parentheses");
     }
 
     self.position += 1;
-    try self.ensurePositionInBounds();
+    try self.ensurePositionInBounds("Type declaration - close parenthesis");
 
     typePointer.* = .{ .Type = .{ .identifier = string } };
     return typePointer;

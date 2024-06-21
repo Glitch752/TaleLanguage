@@ -5,7 +5,7 @@ const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
 const TokenData = @import("token.zig").TokenData;
 
-pub fn pretty_error(message: []const u8) !void {
+pub fn pretty_error(message: []const u8, source: []const u8) !void {
     const stderr_file = std.io.getStdErr().writer();
     var bw_err = std.io.bufferedWriter(stderr_file);
     const stderr = bw_err.writer();
@@ -13,7 +13,7 @@ pub fn pretty_error(message: []const u8) !void {
         std.debug.panic("Failed to flush stderr: {any}\n", .{err});
     };
 
-    try stderr.print("\x1b[1;31m Error: {s} \x1b[0m\n", .{message});
+    try stderr.print("\x1b[1;31m Error: {s} (from: {s}) \x1b[0m\n", .{ message, source });
 }
 
 pub fn main() !void {
@@ -73,7 +73,7 @@ pub fn main() !void {
             break;
         }
         if (tokenData.token == Token.Error) {
-            return try pretty_error(try std.fmt.allocPrint(allocator, "\x1b[1;31m Error: {d}:{d} - {s} \x1b[0m\n", .{ tokenData.line, tokenData.column, tokenData.token.Error }));
+            return try pretty_error(try std.fmt.allocPrint(allocator, "\x1b[1;31m Error: {d}:{d} - {s} \x1b[0m\n", .{ tokenData.line, tokenData.column, tokenData.token.Error }), "Lexing step");
         }
 
         if (args.flags.debug_tokens) {
@@ -93,7 +93,7 @@ pub fn main() !void {
     defer prsr.deinit();
 
     const ast = prsr.parse() catch {
-        return try pretty_error("Unexpected error parsing the AST\n");
+        return try pretty_error("Unexpected error parsing the AST\n", "Parsing step");
     };
 
     if (args.flags.debug_ast) {
