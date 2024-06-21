@@ -32,6 +32,7 @@ pub fn parse(self: *Parser) anyerror!?*const AST {
         try pretty_error("Failed to parse grammar -- No ASTs consumed");
         return ParseError.Unknown;
     }
+    defer self.allocator.free(result.?.asts.?);
 
     self.ast = result.?.asts.?[0];
     return self.ast;

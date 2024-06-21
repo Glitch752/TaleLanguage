@@ -122,7 +122,7 @@ fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []T
     allocation.* = AST{
         .column = 0,
         .line = 0,
-        .node = .{ .Block = .{ .statements = &[_]*const AST{} } }, // TODO: Statements
+        .node = .{ .Block = .{ .statements = patternASTs } }, // TODO: Statements
 
         .deinit = deinitGrammar,
         .print = printGrammar,
@@ -134,6 +134,9 @@ fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []T
     return allocation;
 }
 fn deinitGrammar(self: *const AST, allocator: std.mem.Allocator) void {
+    for (self.node.Block.statements) |stmt| {
+        stmt.deinit(stmt, allocator);
+    }
     allocator.free(self.node.Block.statements);
     allocator.destroy(self);
 }

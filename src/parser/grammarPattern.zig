@@ -42,6 +42,7 @@ pub const GrammarPatternElement = struct {
             },
             .Pattern => |pattern| {
                 const result = try pattern.consumeIfExist(remainingTokens, allocator) orelse return null;
+                defer allocator.free(result.asts.?);
                 // Empty array if no ASTs
                 var childASTs: []*const AST = undefined;
                 if (result.asts != null) {
@@ -100,6 +101,7 @@ pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData,
             for (result.asts.?) |ast| {
                 try asts.append(ast);
             }
+            allocator.free(result.asts.?);
         }
     }
 
