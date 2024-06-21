@@ -1,12 +1,11 @@
 const TokenType = @import("../token.zig").TokenType;
+const TokenData = @import("../token.zig").TokenData;
 const AST = @import("../ast.zig").AST;
 const std = @import("std");
-const Closure = @import("./closure.zig").Closure;
-const closure = @import("./closure.zig").closure;
 
 pub const GrammarPattern = @This();
 
-const GrammarPatternType = enum {
+pub const PatternType = enum {
     All,
     OneOf,
     AtLeastOne,
@@ -14,7 +13,7 @@ const GrammarPatternType = enum {
 
 pub const GrammarPatternElement = union(enum) {
     Token: TokenType,
-    Pattern: *GrammarPattern,
+    Pattern: *const GrammarPattern,
     getAST: fn (childASTs: []*AST, allocator: std.mem.Allocator) ?*AST,
 
     pub fn check(self: GrammarPatternElement, remainingTokens: []TokenType) u32 {
@@ -53,15 +52,15 @@ pub const ConsumeResult = struct {
     asts: ?[]*AST,
 };
 
-elements: []GrammarPatternElement,
-getAST: fn (*GrammarPattern, []TokenType, allocator: std.mem.Allocator) ?*AST,
-patternType: GrammarPatternType,
+elements: []const GrammarPatternElement,
+patternType: PatternType,
+getAST: fn (self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*AST,
 
-pub fn create(patternType: GrammarPatternType, elements: []GrammarPatternElement, getAST: (fn (*GrammarPattern, []TokenType, allocator: std.mem.Allocator) ?*AST)) GrammarPattern {
-    return .{ .elements = elements, .getAST = getAST, .patternType = patternType };
+pub fn create(comptime patternType: PatternType, comptime elements: []const GrammarPatternElement, comptime getAST: fn (self: GrammarPattern, patternASTs: []*AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*AST) GrammarPattern {
+    return .{ .elements = elements, .patternType = patternType, .getAST = getAST };
 }
 
-pub fn check(self: *GrammarPattern, remainingTokens: []TokenType) bool {
+pub fn check(self: *GrammarPattern, remainingTokens: []TokenData) bool {
     var tokenIndex: usize = 0;
     for (self.elements) |element| {
         const consumed = element.check(remainingTokens[tokenIndex..]);
@@ -71,7 +70,7 @@ pub fn check(self: *GrammarPattern, remainingTokens: []TokenType) bool {
     return true;
 }
 
-pub fn consumeIfExist(self: *GrammarPattern, remainingTokens: []TokenType) *ConsumeResult {
+pub fn consumeIfExist(self: *GrammarPattern, remainingTokens: []TokenData) *ConsumeResult {
     if (!self.check(remainingTokens)) {
         return 0;
     }

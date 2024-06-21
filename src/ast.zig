@@ -95,8 +95,8 @@ pub const AST = struct {
     node: ASTNode,
 
     // Set when node is created
-    deinit: *fn (self: *AST, allocator: std.mem.Allocator) void,
+    deinit: *const fn (self: *AST, allocator: std.mem.Allocator) void,
 
     // Set when node is created
-    print: *fn (self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void,
+    print: *const fn (self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void,
 };

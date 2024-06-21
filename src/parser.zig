@@ -22,8 +22,8 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
     return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
-pub fn parse(self: *Parser) anyerror!*AST {
-    return grammar.getAST(grammar, self.tokens, self.allocator);
+pub fn parse(self: *Parser) anyerror!?*AST {
+    return try grammar.getAST(grammar, &[_]*AST{}, self.tokens, self.allocator);
 }
 
 pub fn deinit(self: *Parser) void {
