@@ -1,7 +1,7 @@
 let main: (fn() > int) = function() {
     // Loops from 0 to 19. Ranges are inclusive of the first number and uninclusive of the second.
-    // i is actually being assigned to an array here, and let expressions return the assigned value.
-    for(let i: (int[]) = 0..20) {
+    let array = 0..20;
+    for(i : array) {
         /*
          Comments can also span multiple lines.
         */

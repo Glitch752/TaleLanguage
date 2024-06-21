@@ -33,7 +33,8 @@ pub const NodeData = union(NodeType) {
         type: *NodeData,
     },
     ForLoop: struct {
-        expression: *NodeData,
+        iteratorIdentifier: []const u8,
+        listIdentifier: []const u8,
         block: *NodeData,
     },
     Range: struct {
@@ -103,9 +104,7 @@ pub const NodeData = union(NodeType) {
                 try writer.print(";", .{});
             },
             .ForLoop => |node| {
-                try writer.print("for ", .{});
-                try node.expression.print(writer, indent);
-                try writer.print(" ", .{});
+                try writer.print("for({s} : {s}) ", .{ node.iteratorIdentifier, node.listIdentifier });
                 try node.block.print(writer, indent);
             },
             .Range => |node| {
@@ -211,8 +210,8 @@ pub const NodeData = union(NodeType) {
                 allocator.destroy(node.type);
             },
             .ForLoop => |node| {
-                node.expression.deinit(allocator);
-                allocator.destroy(node.expression);
+                allocator.free(node.iteratorIdentifier);
+                allocator.free(node.listIdentifier);
                 node.block.deinit(allocator);
                 allocator.destroy(node.block);
             },

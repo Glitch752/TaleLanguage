@@ -80,7 +80,7 @@ fn parseStatement(self: *Parser) !?NodeData {
         },
         .ReturnKeyword => return try self.parseReturnStatement(),
         // .IfKeyword => return try self.parseIfStatement(),
-        // .ForKeyword => return try self.parseForStatement(),
+        .ForKeyword => return try self.parseForStatement(),
         .FunctionKeyword => return try self.parseFunctionDeclaration(),
         // else => return try self.parseExpression(),
         // TODO
@@ -139,6 +139,7 @@ fn parseVariableDeclaration(self: *Parser) !NodeData {
     const identifier = self.tokens[self.position];
     try self.expectTokenType(identifier, TokenType.Identifier);
     const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
+    errdefer self.allocator.free(identifierString);
     for (identifier.token.Identifier, 0..) |c, i| {
         identifierString[i] = c;
     }
@@ -264,6 +265,84 @@ fn parseParameter(self: *Parser) !FunctionParameter {
     errdefer typePointer.deinit(self.allocator);
 
     return FunctionParameter{ .identifier = identifierString, .type = typePointer };
+}
+
+fn parseForStatement(self: *Parser) !NodeData {
+    // TODO: Make listIdentifier an actual expression
+    // for(identifier : listIdentifier) { block }
+
+    // First token is the for keyword
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be an open parenthesis
+    const openParen = self.tokens[self.position];
+    try self.expectTokenType(openParen, TokenType.OpenParen);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next is the identifier
+    const identifier = self.tokens[self.position];
+    try self.expectTokenType(identifier, TokenType.Identifier);
+
+    const identifierString = try self.allocator.alloc(u8, identifier.token.Identifier.len);
+    errdefer self.allocator.free(identifierString);
+    for (identifier.token.Identifier, 0..) |c, i| {
+        identifierString[i] = c;
+    }
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const colon = self.tokens[self.position];
+    try self.expectTokenType(colon, TokenType.Colon);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const listIdentifier = self.tokens[self.position];
+    try self.expectTokenType(listIdentifier, TokenType.Identifier);
+
+    const listIdentifierString = try self.allocator.alloc(u8, listIdentifier.token.Identifier.len);
+    errdefer self.allocator.free(listIdentifierString);
+    for (listIdentifier.token.Identifier, 0..) |c, i| {
+        listIdentifierString[i] = c;
+    }
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be a close parenthesis
+    const closeParen = self.tokens[self.position];
+    try self.expectTokenType(closeParen, TokenType.CloseParen);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next token should be an open curly brace
+    const openCurly = self.tokens[self.position];
+    try self.expectTokenType(openCurly, TokenType.OpenCurly);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    // Next is the block
+    const block = try self.parseBlock();
+    errdefer {
+        block.deinit(self.allocator);
+        self.allocator.destroy(block);
+    }
+
+    // Next token should be a close curly brace
+    const closeCurly = self.tokens[self.position];
+    try self.expectTokenType(closeCurly, TokenType.CloseCurly);
+
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
+    const node = NodeData{ .ForLoop = .{ .iteratorIdentifier = identifierString, .listIdentifier = listIdentifierString, .block = block } };
+    return node;
 }
 
 fn programPosition(self: *Parser) ![]const u8 {

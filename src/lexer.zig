@@ -53,7 +53,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
                 continue;
             } else if (self.buffer[self.position] == '*') {
                 // Skip to the end of the block comment
-                while (self.buffer[self.position] != '*' and self.buffer[self.position + 1] != '/') {
+                while (self.buffer[self.position] != '*' or self.buffer[self.position + 1] != '/') {
                     if (self.buffer[self.position] == '\n') {
                         self.line += 1;
                         self.column = 1;
