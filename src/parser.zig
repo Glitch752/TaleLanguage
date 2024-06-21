@@ -21,8 +21,9 @@ pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []cons
     return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
-pub fn parse(self: *Parser) !*AST {
-    const ast = AST{ .root = try self.parseBlock() };
+pub fn parse(self: *Parser) anyerror!*AST {
+    const block = try self.parseBlock();
+    const ast = AST{ .root = block };
     self.ast = ast;
     return &self.ast.?;
 }
@@ -35,13 +36,18 @@ pub fn deinit(self: *Parser) void {
 
 fn parseBlock(self: *Parser) anyerror!*NodeData {
     var blockPointer = try self.allocator.create(NodeData);
-    errdefer blockPointer.deinit(self.allocator);
+    errdefer {
+        blockPointer.deinit(self.allocator);
+        self.allocator.destroy(blockPointer);
+    }
 
     var statements = std.ArrayList(NodeData).init(self.allocator);
     errdefer {
         for (statements.items) |statement| {
             statement.deinit(self.allocator);
+            self.allocator.destroy(&statement);
         }
+        statements.deinit();
     }
 
     while (self.position < self.tokens.len) {
@@ -50,11 +56,14 @@ fn parseBlock(self: *Parser) anyerror!*NodeData {
             break;
         }
 
-        const statement = try self.parseStatement();
-        if (statement == null) {
+        const statement = self.parseStatement() catch {
+            self.position += 1;
+            // This segfaults if we return an error here for some reason... I don't know why.
+            continue;
+        } orelse {
             break;
-        }
-        try statements.append(statement.?);
+        };
+        try statements.append(statement);
     }
 
     blockPointer.* = .{ .Block = .{ .statements = try statements.toOwnedSlice() } };
@@ -87,6 +96,9 @@ fn parseStatement(self: *Parser) !?NodeData {
     const semicolon = self.tokens[self.position];
     try self.expectTokenType(semicolon, TokenType.Semicolon);
 
+    self.position += 1;
+    try self.ensurePositionInBounds();
+
     return statement;
 }
 
@@ -110,11 +122,11 @@ fn expectTokenType(self: *Parser, token: TokenData, expected: TokenType) !void {
         defer self.allocator.free(message);
         try pretty_error(message);
 
-        switch (expected) {
+        return switch (expected) {
             TokenType.Identifier => return ParseError.ExpectedIdentifier,
             TokenType.Assign => return ParseError.ExpectedAssignment,
             else => return ParseError.ExpectedExpression,
-        }
+        };
     }
 }
 
@@ -187,10 +199,12 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
     errdefer {
         for (parameters.items) |parameter| {
             parameter.deinit(self.allocator);
+            self.allocator.destroy(&parameter);
         }
+        parameters.deinit();
     }
 
-    while (self.tokens[self.position].token != Token.CloseParen) {
+    while (self.tokens[self.position].token != Token.CloseParen and self.position < self.tokens.len) {
         const parameter = try self.parseParameter();
         try parameters.append(parameter);
     }
@@ -211,6 +225,10 @@ fn parseFunctionDeclaration(self: *Parser) !NodeData {
 
     // Next is the block
     const block = try self.parseBlock();
+    errdefer {
+        block.deinit(self.allocator);
+        self.allocator.destroy(block);
+    }
 
     // Next token should be a close curly brace
     const closeCurly = self.tokens[self.position];
@@ -284,7 +302,7 @@ fn parseType(self: *Parser) !*NodeData {
         self.allocator.free(string);
     }
 
-    while (self.tokens[self.position].token == Token.OpenParen) {
+    while (self.tokens[self.position].token == Token.OpenParen and self.position < self.tokens.len) {
         parentheses += 1;
         self.position += 1;
         try self.ensurePositionInBounds();
@@ -292,7 +310,7 @@ fn parseType(self: *Parser) !*NodeData {
         string = try self.allocator.realloc(string, parentheses);
         string[parentheses - 1] = '(';
     }
-    while (parentheses > 0) {
+    while (parentheses > 0 and self.position < self.tokens.len) {
         if (self.tokens[self.position].token == Token.CloseParen) {
             parentheses -= 1;
         } else if (self.tokens[self.position].token == Token.OpenParen) {
