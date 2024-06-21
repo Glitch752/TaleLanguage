@@ -99,10 +99,12 @@ pub fn main() !void {
     const ast = prsr.parse() catch {
         return try pretty_error("Unexpected error parsing the AST\n", "Parsing step");
     };
+    _ = ast;
 
     if (args.flags.debug_ast) {
         try stdout.print("AST:\n", .{});
-        try ast.print(&stdout.any(), 0);
+        // TODO
+        // try ast.print(&stdout.any(), 0);
         std.debug.print("\n", .{});
     }
 }
