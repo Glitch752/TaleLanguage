@@ -69,7 +69,7 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
     defer allocator.free(indentString);
 
     try writer.print("{s}STATEMENT:\n", .{indentString});
-    _ = self;
+    try self.node.print(writer, indent + 1, allocator);
 }
 
 // /// Contains the definition of the language's grammar
@@ -145,5 +145,7 @@ fn printGrammar(self: AST, writer: *const std.io.AnyWriter, indent: usize, alloc
     defer allocator.free(indentString);
 
     try writer.print("{s}GRAMMAR:\n", .{indentString});
-    _ = self;
+    for (self.node.Block.statements) |stmt| {
+        try stmt.print(stmt.*, writer, indent + 1, allocator);
+    }
 }
