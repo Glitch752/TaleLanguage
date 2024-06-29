@@ -28,6 +28,39 @@ fn passSingleASTForward(childASTs: []*const AST, allocator: std.mem.Allocator) a
     return childASTs[0];
 }
 
+fn turnASTsIntoBlock(childASTs: []*const AST, allocator: std.mem.Allocator) anyerror!?*const AST {
+    const allocation = try allocator.create(AST);
+
+    allocation.* = AST{
+        .column = 0,
+        .line = 0,
+        .node = .{ .Block = .{ .statements = childASTs } },
+
+        .deinit = deinitBlock,
+        .print = printBlock,
+    };
+
+    return allocation;
+}
+
+fn deinitBlock(self: *const AST, allocator: std.mem.Allocator) void {
+    for (self.node.Block.statements) |stmt| {
+        stmt.deinit(stmt, allocator);
+    }
+    allocator.free(self.node.Block.statements);
+    allocator.destroy(self);
+}
+
+fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+
+    try writer.print("{s}BLOCK:\n", .{indentString});
+    for (self.node.Block.statements) |stmt| {
+        try stmt.print(stmt.*, writer, indent + 1, allocator);
+    }
+}
+
 // const expression = GrammarPattern.create(
 
 // const letPattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{ .{ .Token = TokenType.LetKeyword }, .{ .Token = TokenType.Identifier }, .{ .Token = TokenType.Assign }, .{ .Pattern = expression } });
@@ -40,7 +73,7 @@ const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternEle
     // .{ .Pattern = TokenType.ForKeyword },
     // .{ .Pattern = TokenType.ReturnKeyword },
     // .{ .Pattern = TokenType.LetKeyword },
-    .{ .type = .{ .Token = TokenType.LetKeyword }, .getAST = passSingleASTForward }, // Testing
+    .{ .type = .{ .Token = TokenType.LetKeyword }, .getAST = passSingleASTForward, .debugName = "Let statement" }, // Testing
 }, createStatementAST);
 fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
@@ -72,47 +105,8 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
     try self.node.print(writer, indent + 1, allocator);
 }
 
-// /// Contains the definition of the language's grammar
-// const block = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
-//     .{ .Token = TokenType.OpenCurly },
-//     .{ .Pattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
-//         .{ .Pattern = statement },
-//     }, passSingleASTForward), .getAST = createBlockAST },
-//     .{ .Token = TokenType.CloseCurly },
-// });
-// fn createBlockAST(self: *GrammarPattern, tokens: []TokenType, allocator: std.mem.Allocator) ?*AST {
-//     // First and last tokens can be skipped
-//     const allocation = try allocator.create(AST);
-
-//     allocation.* = AST{
-//         .column = 0,
-//         .line = 0,
-//         .node = .{ .Block = .{ .statements = null } }, // TODO: Statements
-
-//         .deinit = deinitBlock,
-//         .print = printBlock,
-//     };
-
-//     _ = self;
-//     _ = tokens;
-
-//     return allocation;
-// }
-// fn deinitBlock(self: *AST, allocator: std.mem.Allocator) void {
-//     allocator.free(self.node.Block.statements);
-//     allocator.destroy(self);
-// }
-// fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
-//     const indentString = repeat("  ", indent, allocator);
-//     defer allocator.free(indentString);
-
-//     try writer.print("{s}BLOCK:\n", .{indentString});
-//     // TODO: Print statements
-//     _ = self;
-// }
-
 pub const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
-    .{ .type = .{ .Pattern = &statement }, .getAST = passSingleASTForward },
+    .{ .type = .{ .Pattern = &statement }, .getAST = turnASTsIntoBlock, .debugName = "Statement" },
 }, createGrammarAST);
 fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
