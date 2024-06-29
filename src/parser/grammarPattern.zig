@@ -13,11 +13,7 @@ pub const PatternType = enum {
 };
 
 pub const GrammarPatternElement = struct {
-    type: union(enum) {
-        Token: TokenType,
-        Pattern: *const GrammarPattern,
-    },
-    getAST: *const fn (childASTs: []*const AST, allocator: std.mem.Allocator) anyerror!?*const AST,
+    type: union(enum) { Token: TokenType, Pattern: *const GrammarPattern },
 
     debugName: []const u8,
 
@@ -44,26 +40,7 @@ pub const GrammarPatternElement = struct {
                 return .{ .consumed = 1, .asts = null };
             },
             .Pattern => |pattern| {
-                const result = try pattern.consumeIfExist(flags, remainingTokens, allocator) orelse return null;
-
-                // Empty array if no ASTs
-                var childASTs: []*const AST = undefined;
-                if (result.asts != null) {
-                    defer allocator.free(result.asts.?);
-                    childASTs = result.asts.?;
-                } else {
-                    childASTs = &[_]*const AST{};
-                    if (flags.verbose) std.debug.print("No ASTs consumed in grammar pattern {s}\n", .{self.debugName});
-                }
-
-                const selfASTs = try allocator.alloc(*const AST, result.consumed);
-                const ast = try self.getAST(childASTs, allocator);
-                if (ast == null) {
-                    allocator.free(selfASTs);
-                    return .{ .consumed = result.consumed, .asts = &[_]*AST{} };
-                }
-                selfASTs[0] = ast.?;
-                return .{ .consumed = result.consumed, .asts = selfASTs };
+                return try pattern.consumeIfExist(flags, remainingTokens, allocator) orelse return null;
             },
         }
     }
