@@ -1,13 +1,15 @@
 const std = @import("std");
 const pretty_error = @import("main.zig").pretty_error;
 
-const ArgsFlags = struct {
+pub const ArgsFlags = struct {
     /// If the tokens should be printed to stdout
     debug_tokens: bool,
     /// If the AST should be printed to stdout
     debug_ast: bool,
     /// If we should avoid parsing the tokens to an AST
     stop_after_tokens: bool,
+    /// If the parser should print debug information
+    verbose: bool = false,
 };
 const Args = struct {
     file_path: []const u8,
@@ -36,6 +38,8 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
             flags.debug_ast = true;
         } else if (std.mem.eql(u8, arg, "--stop-after-tokens")) {
             flags.stop_after_tokens = true;
+        } else if (std.mem.eql(u8, arg, "--verbose")) {
+            flags.verbose = true;
         } else {
             if (file_path != null) {
                 try pretty_error("Multiple file paths provided\n");

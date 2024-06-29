@@ -61,10 +61,6 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
     }
 }
 
-// const expression = GrammarPattern.create(
-
-// const letPattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{ .{ .Token = TokenType.LetKeyword }, .{ .Token = TokenType.Identifier }, .{ .Token = TokenType.Assign }, .{ .Pattern = expression } });
-
 const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
     // TODO: Add more statements
     // .{ .Pattern = TokenType.FunctionKeyword },
@@ -74,7 +70,7 @@ const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternEle
     // .{ .Pattern = TokenType.ReturnKeyword },
     // .{ .Pattern = TokenType.LetKeyword },
     .{ .type = .{ .Token = TokenType.LetKeyword }, .getAST = passSingleASTForward, .debugName = "Let statement" }, // Testing
-}, createStatementAST);
+}, createStatementAST, "Statement pattern");
 fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
 
@@ -106,8 +102,8 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
 }
 
 pub const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
-    .{ .type = .{ .Pattern = &statement }, .getAST = turnASTsIntoBlock, .debugName = "Statement" },
-}, createGrammarAST);
+    .{ .type = .{ .Pattern = &statement }, .getAST = passSingleASTForward, .debugName = "Statement" },
+}, createGrammarAST, "Root grammar pattern");
 fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
 

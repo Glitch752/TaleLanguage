@@ -2,6 +2,7 @@ const TokenType = @import("../token.zig").TokenType;
 const TokenData = @import("../token.zig").TokenData;
 const AST = @import("../ast.zig").AST;
 const std = @import("std");
+const ArgsFlags = @import("../args_parser.zig").ArgsFlags;
 
 pub const GrammarPattern = @This();
 
@@ -34,7 +35,7 @@ pub const GrammarPatternElement = struct {
         }
     }
 
-    pub fn consumeIfExist(self: GrammarPatternElement, remainingTokens: []TokenData, allocator: std.mem.Allocator) anyerror!?ConsumeResult {
+    pub fn consumeIfExist(self: GrammarPatternElement, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator) anyerror!?ConsumeResult {
         switch (self.type) {
             .Token => |token| {
                 if (!std.mem.eql(u8, @tagName(token), @tagName(remainingTokens[0].token))) {
@@ -43,18 +44,16 @@ pub const GrammarPatternElement = struct {
                 return .{ .consumed = 1, .asts = null };
             },
             .Pattern => |pattern| {
-                const result = try pattern.consumeIfExist(remainingTokens, allocator) orelse return null;
-                if (result.asts == null) {
-                    std.debug.panic("No ASTs consumed in grammar pattern {s}\n", .{self.debugName});
-                }
+                const result = try pattern.consumeIfExist(flags, remainingTokens, allocator) orelse return null;
 
-                defer allocator.free(result.asts.?);
                 // Empty array if no ASTs
                 var childASTs: []*const AST = undefined;
                 if (result.asts != null) {
+                    defer allocator.free(result.asts.?);
                     childASTs = result.asts.?;
                 } else {
                     childASTs = &[_]*const AST{};
+                    if (flags.verbose) std.debug.print("No ASTs consumed in grammar pattern {s}\n", .{self.debugName});
                 }
 
                 const selfASTs = try allocator.alloc(*const AST, result.consumed);
@@ -78,9 +77,10 @@ pub const ConsumeResult = struct {
 elements: []const GrammarPatternElement,
 patternType: PatternType,
 getAST: *const fn (self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*const AST,
+debugName: []const u8,
 
-pub fn create(comptime patternType: PatternType, comptime elements: []const GrammarPatternElement, comptime getAST: fn (self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*const AST) GrammarPattern {
-    return .{ .elements = elements, .patternType = patternType, .getAST = getAST };
+pub fn create(comptime patternType: PatternType, comptime elements: []const GrammarPatternElement, comptime getAST: fn (self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*const AST, comptime debugName: []const u8) GrammarPattern {
+    return .{ .elements = elements, .patternType = patternType, .getAST = getAST, .debugName = debugName };
 }
 
 pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
@@ -118,7 +118,7 @@ pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
     }
 }
 
-pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData, allocator: std.mem.Allocator) !?ConsumeResult {
+pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator) !?ConsumeResult {
     if (self.check(remainingTokens) == 0) {
         return null;
     }
@@ -128,7 +128,7 @@ pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData,
             var consumed: usize = 0;
             var asts = std.ArrayList(*const AST).init(allocator);
             for (self.elements) |element| {
-                const result = try element.consumeIfExist(remainingTokens[consumed..], allocator) orelse return null;
+                const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator) orelse return null;
                 consumed += result.consumed;
                 if (result.asts != null) {
                     for (result.asts.?) |ast| {
@@ -151,14 +151,14 @@ pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData,
             var consumed: usize = 0;
             var asts = std.ArrayList(*const AST).init(allocator);
 
-            std.debug.print("Consuming at least one pattern {s}\n", .{self.elements[0].debugName});
+            if (flags.verbose) std.debug.print("Consuming at least one pattern {s}\n", .{self.elements[0].debugName});
             while (consumed < remainingTokens.len) {
-                std.debug.print("Consuming at least one pattern {s} at index {d}\n", .{ self.elements[0].debugName, consumed });
+                if (flags.verbose) std.debug.print("Consuming at least one pattern {s} at index {d}\n", .{ self.elements[0].debugName, consumed });
 
                 var elementConsumed: usize = 0;
                 for (self.elements) |element| {
-                    const result = try element.consumeIfExist(remainingTokens[consumed..], allocator) orelse continue;
-                    std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ result.consumed, element.debugName });
+                    const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator) orelse continue;
+                    if (flags.verbose) std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ result.consumed, element.debugName });
                     elementConsumed += result.consumed;
                     if (result.asts != null) {
                         for (result.asts.?) |ast| {
@@ -172,11 +172,11 @@ pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData,
             }
 
             const astSlice = try asts.toOwnedSlice();
-            std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ consumed, self.elements[0].debugName });
+            if (flags.verbose) std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ consumed, self.elements[0].debugName });
 
             const selfAST = try self.getAST(self.*, astSlice, remainingTokens[0..consumed], allocator);
             if (selfAST == null) {
-                std.debug.print("Failed to get AST for pattern {s}\n", .{self.elements[0].debugName});
+                if (flags.verbose) std.debug.print("Failed to get AST for pattern {s}\n", .{self.elements[0].debugName});
                 return .{ .consumed = consumed, .asts = &[_]*AST{} };
             }
             const resultASTs = try allocator.alloc(*const AST, 1);
@@ -184,19 +184,23 @@ pub fn consumeIfExist(self: *const GrammarPattern, remainingTokens: []TokenData,
             return .{ .consumed = consumed, .asts = resultASTs };
         },
         PatternType.OneOf => {
-            std.debug.print("Consuming one of patterns:", .{});
-            for (self.elements) |element| {
-                std.debug.print(" {s},", .{element.debugName});
+            if (flags.verbose) {
+                std.debug.print("Consuming one of patterns:", .{});
+                for (self.elements) |element| {
+                    std.debug.print(" {s},", .{element.debugName});
+                }
+                std.debug.print("\n", .{});
             }
-            std.debug.print("\n", .{});
 
             for (self.elements) |element| {
-                std.debug.print("When consuming {s} | remaining tokens: {d}\n", .{ element.debugName, remainingTokens.len });
-                const result = try element.consumeIfExist(remainingTokens, allocator);
+                if (flags.verbose) std.debug.print("When consuming {s} | remaining tokens: {d}\n", .{ element.debugName, remainingTokens.len });
+                const result = try element.consumeIfExist(flags, remainingTokens, allocator);
                 if (result != null) {
+                    if (flags.verbose) std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ result.?.consumed, element.debugName });
                     return result;
                 }
             }
+            if (flags.verbose) std.debug.print("Failed to consume any patterns\n", .{});
             return null;
         },
     }

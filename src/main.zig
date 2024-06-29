@@ -93,7 +93,7 @@ pub fn main() !void {
         return;
     }
 
-    var prsr = parser.init(tokens.items, allocator, file_path);
+    var prsr = parser.init(tokens.items, args.flags, allocator, file_path);
     defer prsr.deinit();
 
     const ast = prsr.parse() catch {

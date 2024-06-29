@@ -7,6 +7,7 @@ const TokenType = @import("token.zig").TokenType;
 const pretty_error = @import("main.zig").pretty_error;
 const grammar = @import("parser/grammar.zig").grammar;
 const repeat = @import("parser/grammar.zig").repeat;
+const ArgsFlags = @import("args_parser.zig").ArgsFlags;
 
 const Parser = @This();
 
@@ -15,15 +16,16 @@ allocator: std.mem.Allocator,
 position: usize,
 file_name: []const u8,
 ast: ?*const AST,
+flags: ArgsFlags,
 
 pub const ParseError = error{Unknown};
 
-pub fn init(tokens: []TokenData, allocator: std.mem.Allocator, file_name: []const u8) Parser {
-    return .{ .tokens = tokens, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
+pub fn init(tokens: []TokenData, flags: ArgsFlags, allocator: std.mem.Allocator, file_name: []const u8) Parser {
+    return .{ .tokens = tokens, .flags = flags, .allocator = allocator, .position = 0, .file_name = file_name, .ast = null };
 }
 
 pub fn parse(self: *Parser) anyerror!?*const AST {
-    const result = try grammar.consumeIfExist(self.tokens, self.allocator);
+    const result = try grammar.consumeIfExist(self.flags, self.tokens, self.allocator);
     if (result == null) {
         try pretty_error("Failed to parse grammar -- No AST consumed initially");
         return ParseError.Unknown;
