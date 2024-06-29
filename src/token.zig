@@ -12,7 +12,7 @@ pub const TokenType = enum {
     OpenCurly, // {
     CloseCurly, // }
 
-    SemiColon,
+    Semicolon,
 
     LessThan,
     LessThanEqual,
@@ -72,7 +72,7 @@ pub const Token = union(TokenType) {
     OpenCurly,
     CloseCurly,
 
-    SemiColon,
+    Semicolon,
 
     LessThan,
     LessThanEqual,
@@ -123,7 +123,7 @@ pub const Token = union(TokenType) {
             .OpenCurly => return "{",
             .CloseCurly => return "}",
 
-            .SemiColon => return ";",
+            .Semicolon => return ";",
 
             .LessThan => return "<",
             .LessThanEqual => return "<=",
@@ -188,7 +188,7 @@ pub const Token = union(TokenType) {
     }
 
     pub const keyword_map = std.ComptimeStringMap(Token, .{ .{ "function", Token.FunctionKeyword }, .{ "if", Token.IfKeyword }, .{ "else", Token.ElseKeyword }, .{ "for", Token.ForKeyword }, .{ "return", Token.ReturnKeyword }, .{ "let", Token.LetKeyword } });
-    pub const symbol_map = std.ComptimeStringMap(Token, .{ .{ "(", Token.OpenParen }, .{ ")", Token.CloseParen }, .{ "[", Token.OpenSquare }, .{ "]", Token.CloseSquare }, .{ "{", Token.OpenCurly }, .{ "}", Token.CloseCurly }, .{ ";", Token.SemiColon }, .{ "<", Token.LessThan }, .{ "<=", Token.LessThanEqual }, .{ ">", Token.GreaterThan }, .{ ">=", Token.GreaterThanEqual }, .{ "=", Token.Assign }, .{ "!=", Token.NotEqual }, .{ "==", Token.Equal }, .{ "+", Token.Plus }, .{ "-", Token.Minus }, .{ "*", Token.Star }, .{ "/", Token.Slash }, .{ "%", Token.Percent }, .{ "&&", Token.And }, .{ "||", Token.Or }, .{ "!", Token.Negate }, .{ "..", Token.Range }, .{ ",", Token.Comma }, .{ ".", Token.Dot }, .{ ":", Token.Colon } });
+    pub const symbol_map = std.ComptimeStringMap(Token, .{ .{ "(", Token.OpenParen }, .{ ")", Token.CloseParen }, .{ "[", Token.OpenSquare }, .{ "]", Token.CloseSquare }, .{ "{", Token.OpenCurly }, .{ "}", Token.CloseCurly }, .{ ";", Token.Semicolon }, .{ "<", Token.LessThan }, .{ "<=", Token.LessThanEqual }, .{ ">", Token.GreaterThan }, .{ ">=", Token.GreaterThanEqual }, .{ "=", Token.Assign }, .{ "!=", Token.NotEqual }, .{ "==", Token.Equal }, .{ "+", Token.Plus }, .{ "-", Token.Minus }, .{ "*", Token.Star }, .{ "/", Token.Slash }, .{ "%", Token.Percent }, .{ "&&", Token.And }, .{ "||", Token.Or }, .{ "!", Token.Negate }, .{ "..", Token.Range }, .{ ",", Token.Comma }, .{ ".", Token.Dot }, .{ ":", Token.Colon } });
     pub const maxSymbolLength = 2;
 };
 

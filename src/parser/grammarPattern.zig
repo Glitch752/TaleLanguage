@@ -53,6 +53,7 @@ pub const ConsumeResult = struct {
 
 elements: []const GrammarPatternElement,
 patternType: PatternType,
+/// NOTE: If an AST is passed and not used, it _must_ be freed.
 getAST: *const fn (self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) anyerror!?*const AST,
 debugName: []const u8,
 
@@ -116,6 +117,8 @@ pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTo
             }
 
             const astSlice = try asts.toOwnedSlice();
+            defer allocator.free(astSlice); // Intentionally not freeing the ASTs themselves, as they may be used by getAST
+
             const selfAST = try self.getAST(self.*, astSlice, remainingTokens[0..consumed], allocator);
             if (selfAST == null) {
                 return .{ .consumed = consumed, .asts = &[_]*AST{} };

@@ -45,7 +45,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
         if (c == '/') {
             if (self.buffer[self.position] == '/') {
                 // Skip to the end of the line
-                while (self.buffer[self.position] != '\n') {
+                while (self.position < self.buffer.len and self.buffer[self.position] != '\n') {
                     self.position += 1;
                 }
                 self.line += 1;
@@ -53,7 +53,7 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
                 continue;
             } else if (self.buffer[self.position] == '*') {
                 // Skip to the end of the block comment
-                while (self.buffer[self.position] != '*' or self.buffer[self.position + 1] != '/') {
+                while (self.position < self.buffer.len and self.buffer[self.position] != '*' or self.buffer[self.position + 1] != '/') {
                     if (self.buffer[self.position] == '\n') {
                         self.line += 1;
                         self.column = 1;
@@ -67,12 +67,12 @@ pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
             }
         }
 
-        // Next, keywords
+        // Next, keywords and identifiers
         if (std.ascii.isAlphabetic(c)) {
             var keyword = try allocator.alloc(u8, 1);
             keyword[0] = c;
             var i: u16 = 1;
-            while (self.position < self.buffer.len and std.ascii.isAlphanumeric(self.buffer[self.position])) {
+            while (self.position < self.buffer.len and (std.ascii.isAlphanumeric(self.buffer[self.position]) or self.buffer[self.position] == '_')) {
                 keyword = try allocator.realloc(keyword, i + 1);
                 keyword[i] = self.buffer[self.position];
                 i += 1;

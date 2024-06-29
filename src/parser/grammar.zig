@@ -113,7 +113,20 @@ fn printType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocato
     try writer.print("{s}  {s}\n", .{ indentString, self.node.Type.identifier });
 }
 
-const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
+const statement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    // A statement
+    .{ .type = .{ .Pattern = &innerStatement }, .debugName = "Inner statement" },
+    // And a Semicolon
+    .{ .type = .{ .Token = TokenType.Semicolon }, .debugName = "Semicolon" },
+}, passSingleASTForward, "Statement pattern");
+fn passSingleASTForward(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    _ = tokens;
+    _ = allocator;
+    _ = self;
+    return patternASTs[0];
+}
+
+const innerStatement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
     // TODO: Add more statements
     // .{ .Pattern = TokenType.FunctionKeyword },
     // .{ .Pattern = TokenType.IfKeyword },
@@ -122,7 +135,7 @@ const statement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternEle
     // .{ .Pattern = TokenType.ReturnKeyword },
     // .{ .Pattern = TokenType.LetKeyword },
     .{ .type = .{ .Pattern = &letStatement }, .debugName = "Let statement" }, // Testing
-}, createStatementAST, "Statement pattern");
+}, createStatementAST, "Statement inner pattern");
 fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
 
