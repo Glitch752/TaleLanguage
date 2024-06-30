@@ -37,35 +37,82 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
     }
 }
 
-const letStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
-    .{ .type = .{ .Token = TokenType.LetKeyword }, .debugName = "Let keyword" },
-}, createLetStatementAST, "Let statement");
-fn createLetStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+const typePattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Token = TokenType.OpenParen }, .debugName = "Type start" },
+    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type identifier" }, // For now, types are just identifiers surrounded by parentheses
+    .{ .type = .{ .Token = TokenType.CloseParen }, .debugName = "Type end" },
+}, createTypeAST, "Type pattern");
+fn createTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
 
-    const tempValueAllocation = try allocator.create(AST);
+    const identifier = tokens[1].token.Identifier;
 
-    tempValueAllocation.* = AST{
+    allocation.* = AST{
         .column = 0,
         .line = 0,
-        .node = .{ .Literal = .{ .IntLiteral = 10 } }, // TODO: Expression
-
-        .deinit = deinitStatement,
-        .print = printStatement,
-    };
-
-    const tempTypeAllocation = try allocator.create(AST);
-
-    tempTypeAllocation.* = AST{
-        .column = 0,
-        .line = 0,
-        .node = .{ .Type = .{ .identifier = "Int" } },
+        .node = .{ .Type = .{ .identifier = identifier } },
 
         .deinit = deinitType,
         .print = printType,
     };
 
+    _ = self;
     _ = patternASTs;
+
+    return allocation;
+}
+fn deinitType(self: *const AST, allocator: std.mem.Allocator) void {
+    allocator.destroy(self);
+}
+fn printType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+    try writer.print("{s}TYPE:\n", .{indentString});
+    try writer.print("{s}  {s}\n", .{ indentString, self.node.Type.identifier });
+}
+
+const expressionPattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Token = TokenType.IntLiteral }, .debugName = "Int literal" }, // For now, expressions are just integers
+}, createExpressionAST, "Expression pattern");
+fn createExpressionAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    const allocation = try allocator.create(AST);
+
+    const intLiteral = tokens[0].token.IntLiteral;
+
+    allocation.* = AST{
+        .column = 0,
+        .line = 0,
+        .node = .{ .Literal = .{ .IntLiteral = intLiteral } },
+
+        .deinit = deinitExpression,
+        .print = printExpression,
+    };
+
+    _ = self;
+    _ = patternASTs;
+
+    return allocation;
+}
+fn deinitExpression(self: *const AST, allocator: std.mem.Allocator) void {
+    allocator.destroy(self);
+}
+fn printExpression(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+    try writer.print("{s}EXPRESSION:\n", .{indentString});
+    try writer.print("{s}  {d}\n", .{ indentString, self.node.Literal.IntLiteral });
+}
+
+const letStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Token = TokenType.LetKeyword }, .debugName = "Let keyword" },
+    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Let statement identifier" },
+    .{ .type = .{ .Token = TokenType.Colon }, .debugName = "Let statement type colon" },
+    .{ .type = .{ .Pattern = &typePattern }, .debugName = "Let statement type" },
+    .{ .type = .{ .Token = TokenType.Assign }, .debugName = "Let statement equal" },
+    .{ .type = .{ .Pattern = &expressionPattern }, .debugName = "Let statement value" },
+}, createLetStatementAST, "Let statement");
+fn createLetStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    const allocation = try allocator.create(AST);
 
     allocation.* = AST{
         .column = 0,
@@ -74,8 +121,8 @@ fn createLetStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens
             .Assignment = .{
                 // Temporary dummy data
                 .identifier = "x",
-                .value = tempValueAllocation,
-                .type = tempTypeAllocation,
+                .value = patternASTs[1],
+                .type = patternASTs[0],
             },
         },
 
@@ -101,16 +148,6 @@ fn printAssignment(self: AST, writer: *const std.io.AnyWriter, indent: usize, al
     try writer.print("{s}  Identifier: {s}\n", .{ indentString, self.node.Assignment.identifier });
     try self.node.Assignment.type.print(self.node.Assignment.type.*, writer, indent + 1, allocator);
     try self.node.Assignment.value.print(self.node.Assignment.value.*, writer, indent + 1, allocator);
-}
-
-fn deinitType(self: *const AST, allocator: std.mem.Allocator) void {
-    allocator.destroy(self);
-}
-fn printType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
-    const indentString = try repeat("  ", indent, allocator);
-    defer allocator.free(indentString);
-    try writer.print("{s}TYPE:\n", .{indentString});
-    try writer.print("{s}  {s}\n", .{ indentString, self.node.Type.identifier });
 }
 
 const statement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
