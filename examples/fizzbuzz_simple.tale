@@ -1,0 +1,22 @@
+// Loops from 0 to 19. Ranges are inclusive of the first number and uninclusive of the second.
+let array: (int[]) = 0..20;
+// for(i : array) {
+//     /*
+//         Comments can also span multiple lines.
+//     */
+//     if(i % 3 == 0 && ((i % 3) == 0)) {
+//         // Log prints to stdout
+//         log("FizzBuzz\n");
+//     } else if(i % 3 == 0) {
+//         log("Fizz\n");
+//     } else if(i % 5 == 0) {
+//         log("Buzz\n");
+//     } else {
+//         // Not sure how much I like string() as the type cast, but it's the easiest method for now.
+//         // Additionally, + as a string concatenation operator itn't my favorite.
+//         log(string(i) + "\n");
+//     }
+// }
+
+// Exit code 0
+return 0;

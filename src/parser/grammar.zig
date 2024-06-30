@@ -103,6 +103,39 @@ fn printExpression(self: AST, writer: *const std.io.AnyWriter, indent: usize, al
     try writer.print("{s}  {d}\n", .{ indentString, self.node.Literal.IntLiteral });
 }
 
+const returnStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Token = TokenType.ReturnKeyword }, .debugName = "Return keyword" },
+    .{ .type = .{ .Pattern = &expressionPattern }, .debugName = "Return statement expression" },
+}, createReturnStatementAST, "Return statement");
+fn createReturnStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    const allocation = try allocator.create(AST);
+
+    allocation.* = AST{
+        .column = 0,
+        .line = 0,
+        .node = .{ .Return = .{ .value = patternASTs[0] } },
+
+        .deinit = deinitReturnStatement,
+        .print = printReturnStatement,
+    };
+
+    _ = self;
+    _ = tokens;
+
+    return allocation;
+}
+fn deinitReturnStatement(self: *const AST, allocator: std.mem.Allocator) void {
+    self.node.Return.value.deinit(self.node.Return.value, allocator);
+    allocator.destroy(self);
+}
+fn printReturnStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+
+    try writer.print("{s}RETURN:\n", .{indentString});
+    try self.node.Return.value.print(self.node.Return.value.*, writer, indent + 1, allocator);
+}
+
 const letStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
     .{ .type = .{ .Token = TokenType.LetKeyword }, .debugName = "Let keyword" },
     .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Let statement identifier" },
@@ -169,8 +202,7 @@ const innerStatement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatte
     // .{ .Pattern = TokenType.IfKeyword },
     // .{ .Pattern = TokenType.ElseKeyword },
     // .{ .Pattern = TokenType.ForKeyword },
-    // .{ .Pattern = TokenType.ReturnKeyword },
-    // .{ .Pattern = TokenType.LetKeyword },
+    .{ .type = .{ .Pattern = &returnStatement }, .debugName = "Return statement" }, // Testing
     .{ .type = .{ .Pattern = &letStatement }, .debugName = "Let statement" }, // Testing
 }, createStatementAST, "Statement inner pattern");
 fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
