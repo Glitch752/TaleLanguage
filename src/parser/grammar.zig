@@ -7,6 +7,7 @@ const AST = @import("../ast.zig").AST;
 const std = @import("std");
 const oneOf = @import("./grammarPattern.zig").oneOf;
 const atLeastOne = @import("./grammarPattern.zig").atLeastOne;
+const eliminateLeftRecursion = @import("./leftRecursionElimination.zig").eliminateLeftRecursion;
 
 pub fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
     const repeated = try allocator.alloc(u8, s.len * times);
@@ -361,15 +362,21 @@ fn printGrammar(self: AST, writer: *const std.io.AnyWriter, indent: usize, alloc
 pub fn initParserPatterns(allocator: std.mem.Allocator) !std.StringHashMap(GrammarPattern) {
     var patterns = std.StringHashMap(GrammarPattern).init(allocator);
 
-    try patterns.put("typePattern", typePattern);
-    try patterns.put("typeInnerPattern", typeInnerPattern);
-    try patterns.put("typeArray", typeArray);
-    try patterns.put("expressionPattern", expressionPattern);
-    try patterns.put("returnStatement", returnStatement);
-    try patterns.put("letStatement", letStatement);
-    try patterns.put("statement", statement);
-    try patterns.put("innerStatement", innerStatement);
-    try patterns.put("root", grammar);
+    try put_alloc(&patterns, "typePattern", typePattern);
+    try put_alloc(&patterns, "typeInnerPattern", typeInnerPattern);
+    try put_alloc(&patterns, "typeArray", typeArray);
+    try put_alloc(&patterns, "expressionPattern", expressionPattern);
+    try put_alloc(&patterns, "returnStatement", returnStatement);
+    try put_alloc(&patterns, "letStatement", letStatement);
+    try put_alloc(&patterns, "statement", statement);
+    try put_alloc(&patterns, "innerStatement", innerStatement);
+    try put_alloc(&patterns, "root", grammar);
 
-    return patterns;
+    return eliminateLeftRecursion(allocator, patterns);
+}
+
+fn put_alloc(patterns: *std.StringHashMap(GrammarPattern), key: []const u8, value: GrammarPattern) !void {
+    const key_alloc = try patterns.allocator.alloc(u8, key.len);
+    std.mem.copyForwards(u8, key_alloc, key);
+    try patterns.put(key_alloc, value);
 }

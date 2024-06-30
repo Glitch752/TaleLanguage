@@ -56,6 +56,9 @@ pub fn deinit(self: *Parser) void {
         self.ast.?.*.deinit(self.ast.?, self.allocator);
     }
 
+    for (self.parserPatterns.iterator()) |pattern| {
+        pattern.key.deinit(self.allocator);
+    }
     self.parserPatterns.deinit();
 }
 
