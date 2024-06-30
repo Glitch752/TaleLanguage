@@ -27,7 +27,7 @@ pub const GrammarPatternElement = struct {
         switch (self.type) {
             .Token => |token| {
                 if (!std.mem.eql(u8, @tagName(token), @tagName(remainingTokens[0].token))) {
-                    std.debug.print("{s}└─\x1b[0m TOP-LEVEL FAILURE: Expected token '{s}', got '{s}' - Failed to consume pattern '{s}'\n", .{ indentString, token.typeNameString(), remainingTokens[0].token.typeNameString(), self.debugName });
+                    if (flags.verbose) std.debug.print("{s}└─\x1b[0m TOP-LEVEL FAILURE: Expected token '{s}', got '{s}' - Failed to consume pattern '{s}'\n", .{ indentString, token.typeNameString(), remainingTokens[0].token.typeNameString(), self.debugName });
                     return 0;
                 }
                 return 1;
@@ -237,8 +237,14 @@ pub fn printAsCFG(self: *const GrammarPattern, indent: u32, allocator: std.mem.A
     std.debug.print("{s}{s} -> ", .{ indentString, self.debugName });
     switch (self.patternType) {
         PatternType.All => {
-            for (self.elements) |element| {
-                std.debug.print("{s} ", .{element.debugName});
+            var i: usize = 0;
+            while (i < self.elements.len) : (i += 1) {
+                const element = self.elements[i];
+                if (i == 0) {
+                    std.debug.print("\x1b[32m{s}\x1b[0m", .{element.debugName});
+                } else {
+                    std.debug.print(" + \x1b[32m{s}\x1b[0m", .{element.debugName});
+                }
             }
         },
         PatternType.AtLeastOne => {
@@ -246,20 +252,21 @@ pub fn printAsCFG(self: *const GrammarPattern, indent: u32, allocator: std.mem.A
             while (i < self.elements.len) : (i += 1) {
                 const element = self.elements[i];
                 if (i == 0) {
-                    std.debug.print("{s} {s}", .{ element.debugName, element.debugName });
+                    std.debug.print("\x1b[31m{s}\x1b[0m", .{element.debugName});
                 } else {
-                    std.debug.print(" | {s} {s}", .{ element.debugName, element.debugName });
+                    std.debug.print(" | \x1b[31m{s}\x1b[0m", .{element.debugName});
                 }
             }
+            std.debug.print(" | \x1b[31m{s}\x1b[0m + \x1b[31m{s}\x1b[0m", .{ self.debugName, self.debugName });
         },
         PatternType.OneOf => {
             var i: usize = 0;
             while (i < self.elements.len) : (i += 1) {
                 const element = self.elements[i];
                 if (i == 0) {
-                    std.debug.print("{s}", .{element.debugName});
+                    std.debug.print("\x1b[33m{s}\x1b[0m", .{element.debugName});
                 } else {
-                    std.debug.print(" | {s}", .{element.debugName});
+                    std.debug.print(" | \x1b[33m{s}\x1b[0m", .{element.debugName});
                 }
             }
         },
