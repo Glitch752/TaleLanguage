@@ -1,5 +1,5 @@
 // Loops from 0 to 19. Ranges are inclusive of the first number and uninclusive of the second.
-let array: (int[]) = 0..20;
+let array: ((int)[]) = 0..20;
 // for(i : array) {
 //     /*
 //         Comments can also span multiple lines.

@@ -38,7 +38,9 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
 }
 
 const typeArray = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Token = TokenType.OpenParen }, .debugName = "Type array paren start" },
     .{ .type = .{ .PatternId = "typeInnerPattern" }, .debugName = "Type inner type" },
+    .{ .type = .{ .Token = TokenType.CloseParen }, .debugName = "Type array paren end" },
     .{ .type = .{ .Token = TokenType.OpenSquare }, .debugName = "Type array start" },
     .{ .type = .{ .Token = TokenType.CloseSquare }, .debugName = "Type array end" },
 }, createTypeArrayAST, "Type array pattern");
@@ -79,9 +81,9 @@ fn printTypeArray(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
 }
 
 const typeInnerPattern = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
-    .{ .type = .{ .PatternId = "typePattern" }, .debugName = "Type inner type" },
-    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type inner identifier" },
     .{ .type = .{ .PatternId = "typeArray" }, .debugName = "Type inner array" },
+    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type inner identifier" },
+    .{ .type = .{ .PatternId = "typePattern" }, .debugName = "Type inner type" },
 }, createInnerTypeAST, "Type inner pattern");
 fn createInnerTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     // Pass the AST forward if it's already created, otherwise create a new with the token data

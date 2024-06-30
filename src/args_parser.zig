@@ -10,6 +10,8 @@ pub const ArgsFlags = struct {
     stop_after_tokens: bool,
     /// If the parser should print debug information
     verbose: bool = false,
+    /// If the parser should print extremely verbose information
+    extremely_verbose: bool = false,
 };
 const Args = struct {
     file_path: []const u8,
@@ -40,6 +42,9 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
             flags.stop_after_tokens = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {
             flags.verbose = true;
+        } else if (std.mem.eql(u8, arg, "--extremely-verbose")) {
+            flags.verbose = true;
+            flags.extremely_verbose = true;
         } else {
             if (file_path != null) {
                 try pretty_error("Multiple file paths provided\n");
