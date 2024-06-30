@@ -37,20 +37,101 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
     }
 }
 
+const typeArray = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
+    .{ .type = .{ .Pattern = &typeInnerPattern }, .debugName = "Type inner type" },
+    .{ .type = .{ .Token = TokenType.OpenSquare }, .debugName = "Type array start" },
+    .{ .type = .{ .Token = TokenType.CloseSquare }, .debugName = "Type array end" },
+}, createTypeArrayAST, "Type array pattern");
+fn createTypeArrayAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    const allocation = try allocator.create(AST);
+    defer patternASTs[0].deinit(patternASTs[0], allocator);
+
+    const innerString = try allocator.alloc(u8, patternASTs[0].node.Type.identifier.len + 2);
+    for (patternASTs[0].node.Type.identifier, 0..patternASTs[0].node.Type.identifier.len) |c, i| {
+        innerString[i] = c;
+    }
+    innerString[patternASTs[0].node.Type.identifier.len] = '[';
+    innerString[patternASTs[0].node.Type.identifier.len + 1] = ']';
+
+    allocation.* = AST{
+        .column = 0,
+        .line = 0,
+        .node = .{ .Type = .{ .identifier = innerString } },
+
+        .deinit = deinitTypeArray,
+        .print = printTypeArray,
+    };
+
+    _ = self;
+    _ = tokens;
+
+    return allocation;
+}
+fn deinitTypeArray(self: *const AST, allocator: std.mem.Allocator) void {
+    allocator.free(self.node.Type.identifier);
+    allocator.destroy(self);
+}
+fn printTypeArray(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+    try writer.print("{s}TYPE ARRAY:\n", .{indentString});
+    try writer.print("{s}  {s}\n", .{ indentString, self.node.Type.identifier });
+}
+
+const typeInnerPattern = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
+    .{ .type = .{ .Pattern = &typePattern }, .debugName = "Type inner type" },
+    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type inner identifier" },
+    .{ .type = .{ .Pattern = &typeArray }, .debugName = "Type inner array" },
+}, createInnerTypeAST, "Type inner pattern");
+fn createInnerTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
+    // Pass the AST forward if it's already created, otherwise create a new with the token data
+    if (patternASTs.len > 0) {
+        return patternASTs[0];
+    }
+
+    const allocation = try allocator.create(AST);
+
+    allocation.* = AST{
+        .column = 0,
+        .line = 0,
+        .node = .{ .Type = .{ .identifier = tokens[0].token.Identifier } },
+
+        .deinit = deinitIdentifierType,
+        .print = printIdentifierType,
+    };
+
+    _ = self;
+    return allocation;
+}
+fn deinitIdentifierType(self: *const AST, allocator: std.mem.Allocator) void {
+    allocator.destroy(self);
+}
+fn printIdentifierType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
+    const indentString = try repeat("  ", indent, allocator);
+    defer allocator.free(indentString);
+    try writer.print("{s}IDENTIFIER TYPE:\n", .{indentString});
+    try writer.print("{s}  {s}\n", .{ indentString, self.node.Type.identifier });
+}
+
 const typePattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
     .{ .type = .{ .Token = TokenType.OpenParen }, .debugName = "Type start" },
-    .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type identifier" }, // For now, types are just identifiers surrounded by parentheses
+    .{ .type = .{ .Pattern = &typeInnerPattern }, .debugName = "Type inner" },
     .{ .type = .{ .Token = TokenType.CloseParen }, .debugName = "Type end" },
 }, createTypeAST, "Type pattern");
 fn createTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
 
-    const identifier = tokens[1].token.Identifier;
+    const innerString = try allocator.alloc(u8, tokens[1].token.Identifier.len + 2);
+    innerString[0] = '(';
+    for (tokens[1].token.Identifier, 0..tokens[1].token.Identifier.len) |c, i| {
+        innerString[i + 1] = c;
+    }
+    innerString[tokens[1].token.Identifier.len + 1] = ')';
 
     allocation.* = AST{
         .column = 0,
         .line = 0,
-        .node = .{ .Type = .{ .identifier = identifier } },
+        .node = .{ .Type = .{ .identifier = innerString } },
 
         .deinit = deinitType,
         .print = printType,
@@ -62,6 +143,7 @@ fn createTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []Toke
     return allocation;
 }
 fn deinitType(self: *const AST, allocator: std.mem.Allocator) void {
+    allocator.free(self.node.Type.identifier);
     allocator.destroy(self);
 }
 fn printType(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocator: std.mem.Allocator) anyerror!void {
