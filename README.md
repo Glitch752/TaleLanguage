@@ -11,6 +11,13 @@ Testing using `zig run .\src\main.zig -freference-trace -- ./examples/fizzbuzz.t
   - [ ] Bytecode interpreter
 - [ ] Implement a compiler
 
+## Random
+When developing on Windows, you'll need to paste this in PowerShell because it doesn't recognize UTF-8 by default:
+```powershell
+$OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
+```
+I might eventually find the proper way to do this, but for now, this works.
+
 # FAQ (Questions to myself)
 
 ## Where does the name come from?

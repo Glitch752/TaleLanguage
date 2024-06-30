@@ -18,23 +18,23 @@ pub const GrammarPatternElement = struct {
 
     debugName: []const u8,
 
-    pub fn check(self: GrammarPatternElement, flags: ArgsFlags, depth: u32, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern), allocator: std.mem.Allocator) u32 {
-        const indentString = try repeat("  ", depth, allocator);
+    pub fn check(self: GrammarPatternElement, flags: ArgsFlags, prevIndentString: []const u8, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern), allocator: std.mem.Allocator) u32 {
+        const indentString = std.mem.concat(allocator, u8, &[_][]const u8{ prevIndentString, "\x1b[1m│\x1b[22m \x1b[33m" }) catch "";
         defer allocator.free(indentString);
 
         switch (self.type) {
             .Token => |token| {
                 if (!std.mem.eql(u8, @tagName(token), @tagName(remainingTokens[0].token))) {
-                    std.debug.print("{s}TOP-LEVEL FAILURE: Expected token '{s}', got '{s}' - Failed to consume pattern '{s}'\n", .{ indentString, token.typeNameString(), remainingTokens[0].token.typeNameString(), self.debugName });
+                    std.debug.print("{s}└─\x1b[0m TOP-LEVEL FAILURE: Expected token '{s}', got '{s}' - Failed to consume pattern '{s}'\n", .{ indentString, token.typeNameString(), remainingTokens[0].token.typeNameString(), self.debugName });
                     return 0;
                 }
                 return 1;
             },
             .PatternId => |patternId| {
                 const pattern = parserPatterns.get(patternId) orelse return 0;
-                const result = pattern.check(flags, depth + 1, remainingTokens, parserPatterns, allocator);
+                const result = pattern.check(flags, indentString, remainingTokens, parserPatterns, allocator);
                 if (result == 0 and flags.verbose) {
-                    std.debug.print("{s}Failed to consume pattern '{s}'\n", .{ indentString, patternId });
+                    std.debug.print("{s}└─\x1b[0m Failed to consume pattern '{s}'\n", .{ indentString, patternId });
                 }
                 return result;
             },
@@ -72,14 +72,17 @@ pub fn create(comptime patternType: PatternType, comptime elements: []const Gram
     return .{ .elements = elements, .patternType = patternType, .getAST = getAST, .debugName = debugName };
 }
 
-pub fn check(self: *const GrammarPattern, flags: ArgsFlags, depth: u32, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern), allocator: std.mem.Allocator) u32 {
+pub fn check(self: *const GrammarPattern, flags: ArgsFlags, prevIndentString: []const u8, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern), allocator: std.mem.Allocator) u32 {
+    const indentString = std.mem.concat(allocator, u8, &[_][]const u8{ prevIndentString, "\x1b[1m│\x1b[22m \x1b[36m" }) catch ""; // Cyan
+    defer allocator.free(indentString);
+
     switch (self.patternType) {
         PatternType.All => {
             var tokenIndex: u32 = 0;
             for (self.elements) |element| {
-                const consumed = element.check(flags, depth + 1, remainingTokens[tokenIndex..], parserPatterns, allocator);
+                const consumed = element.check(flags, indentString, remainingTokens[tokenIndex..], parserPatterns, allocator);
                 if (consumed == 0) {
-                    if (flags.verbose) std.debug.print("Failed to consume 'All' pattern '{s}' because of element '{s}'\n", .{ self.debugName, element.debugName });
+                    if (flags.verbose) std.debug.print("{s}└─\x1b[0m Failed to consume 'All' pattern '{s}' because of element '{s}'\n", .{ indentString, self.debugName, element.debugName });
                     return 0;
                 }
                 tokenIndex += consumed;
@@ -91,12 +94,12 @@ pub fn check(self: *const GrammarPattern, flags: ArgsFlags, depth: u32, remainin
             while (tokenIndex < remainingTokens.len) {
                 var consumed: u32 = 0;
                 for (self.elements) |element| {
-                    const elementConsumed = element.check(flags, depth + 1, remainingTokens[tokenIndex..], parserPatterns, allocator);
+                    const elementConsumed = element.check(flags, indentString, remainingTokens[tokenIndex..], parserPatterns, allocator);
                     if (elementConsumed == 0) break;
                     consumed += elementConsumed;
                 }
                 if (consumed == 0) {
-                    if (flags.verbose) std.debug.print("Failed to consume any 'AtLeastOne' pattern '{s}'\n", .{self.debugName});
+                    if (flags.verbose) std.debug.print("{s}└─\x1b[0m Failed to consume any 'AtLeastOne' pattern '{s}'\n", .{ indentString, self.debugName });
                     return tokenIndex;
                 }
                 tokenIndex += consumed;
@@ -105,17 +108,17 @@ pub fn check(self: *const GrammarPattern, flags: ArgsFlags, depth: u32, remainin
         },
         PatternType.OneOf => {
             for (self.elements) |element| {
-                const consumed = element.check(flags, remainingTokens, parserPatterns);
+                const consumed = element.check(flags, indentString, remainingTokens, parserPatterns, allocator);
                 if (consumed != 0) return consumed;
             }
-            if (flags.verbose) std.debug.print("Failed to consume any 'OneOf' patterns in '{s}'\n", .{self.debugName});
+            if (flags.verbose) std.debug.print("{s}└─\x1b[0m Failed to consume any 'OneOf' patterns in '{s}'\n", .{ indentString, self.debugName });
             return 0;
         },
     }
 }
 
 pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator, parserPatterns: *std.StringHashMap(GrammarPattern)) !?ConsumeResult {
-    if (self.check(flags, remainingTokens, parserPatterns) == 0) {
+    if (self.check(flags, "\x1b[31m> ", remainingTokens, parserPatterns, allocator) == 0) {
         return null;
     }
 
