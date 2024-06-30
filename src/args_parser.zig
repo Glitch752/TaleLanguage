@@ -3,11 +3,14 @@ const pretty_error = @import("main.zig").pretty_error;
 
 pub const ArgsFlags = struct {
     /// If the tokens should be printed to stdout
-    debug_tokens: bool,
+    debug_tokens: bool = false,
     /// If the AST should be printed to stdout
-    debug_ast: bool,
+    debug_ast: bool = false,
+    /// If the grammar rules should be printed to stdout
+    debug_rules: bool = false,
+
     /// If we should avoid parsing the tokens to an AST
-    stop_after_tokens: bool,
+    stop_after_tokens: bool = false,
     /// If the parser should print debug information
     verbose: bool = false,
     /// If the parser should print extremely verbose information
@@ -30,7 +33,7 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
     defer std.process.argsFree(allocator, args);
 
     var file_path: ?[]u8 = null;
-    var flags = ArgsFlags{ .debug_tokens = false, .debug_ast = false, .stop_after_tokens = false };
+    var flags = ArgsFlags{};
 
     // Skip the first argument, which is the program name
     for (args[1..]) |arg| {
@@ -38,6 +41,8 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
             flags.debug_tokens = true;
         } else if (std.mem.eql(u8, arg, "--debug-ast")) {
             flags.debug_ast = true;
+        } else if (std.mem.eql(u8, arg, "--debug-rules")) {
+            flags.debug_rules = true;
         } else if (std.mem.eql(u8, arg, "--stop-after-tokens")) {
             flags.stop_after_tokens = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {

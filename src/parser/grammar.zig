@@ -8,6 +8,7 @@ const std = @import("std");
 const oneOf = @import("./grammarPattern.zig").oneOf;
 const atLeastOne = @import("./grammarPattern.zig").atLeastOne;
 const eliminateLeftRecursion = @import("./leftRecursionElimination.zig").eliminateLeftRecursion;
+const ArgFlags = @import("../args_parser.zig").ArgsFlags;
 
 pub fn repeat(s: []const u8, times: usize, allocator: std.mem.Allocator) ![]u8 {
     const repeated = try allocator.alloc(u8, s.len * times);
@@ -39,9 +40,7 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
 }
 
 const typeArray = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
-    .{ .type = .{ .Token = TokenType.OpenParen }, .debugName = "Type array paren start" },
     .{ .type = .{ .PatternId = "typeInnerPattern" }, .debugName = "Type inner type" },
-    .{ .type = .{ .Token = TokenType.CloseParen }, .debugName = "Type array paren end" },
     .{ .type = .{ .Token = TokenType.OpenSquare }, .debugName = "Type array start" },
     .{ .type = .{ .Token = TokenType.CloseSquare }, .debugName = "Type array end" },
 }, createTypeArrayAST, "Type array pattern");
@@ -359,7 +358,7 @@ fn printGrammar(self: AST, writer: *const std.io.AnyWriter, indent: usize, alloc
     }
 }
 
-pub fn initParserPatterns(allocator: std.mem.Allocator) !std.StringHashMap(GrammarPattern) {
+pub fn initParserPatterns(allocator: std.mem.Allocator, flags: ArgFlags) !std.StringHashMap(GrammarPattern) {
     var patterns = std.StringHashMap(GrammarPattern).init(allocator);
 
     try put_alloc(&patterns, "typePattern", typePattern);
@@ -372,7 +371,9 @@ pub fn initParserPatterns(allocator: std.mem.Allocator) !std.StringHashMap(Gramm
     try put_alloc(&patterns, "innerStatement", innerStatement);
     try put_alloc(&patterns, "root", grammar);
 
-    return eliminateLeftRecursion(allocator, patterns);
+    try eliminateLeftRecursion(allocator, &patterns, flags);
+
+    return patterns;
 }
 
 fn put_alloc(patterns: *std.StringHashMap(GrammarPattern), key: []const u8, value: GrammarPattern) !void {

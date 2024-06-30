@@ -229,3 +229,40 @@ pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTo
         },
     }
 }
+
+pub fn printAsCFG(self: *const GrammarPattern, indent: u32, allocator: std.mem.Allocator) void {
+    const indentString = repeat("  ", indent, allocator) catch "";
+    defer allocator.free(indentString);
+
+    std.debug.print("{s}{s} -> ", .{ indentString, self.debugName });
+    switch (self.patternType) {
+        PatternType.All => {
+            for (self.elements) |element| {
+                std.debug.print("{s} ", .{element.debugName});
+            }
+        },
+        PatternType.AtLeastOne => {
+            var i: usize = 0;
+            while (i < self.elements.len) : (i += 1) {
+                const element = self.elements[i];
+                if (i == 0) {
+                    std.debug.print("{s} {s}", .{ element.debugName, element.debugName });
+                } else {
+                    std.debug.print(" | {s} {s}", .{ element.debugName, element.debugName });
+                }
+            }
+        },
+        PatternType.OneOf => {
+            var i: usize = 0;
+            while (i < self.elements.len) : (i += 1) {
+                const element = self.elements[i];
+                if (i == 0) {
+                    std.debug.print("{s}", .{element.debugName});
+                } else {
+                    std.debug.print(" | {s}", .{element.debugName});
+                }
+            }
+        },
+    }
+    std.debug.print("\n", .{});
+}

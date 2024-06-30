@@ -30,7 +30,7 @@ pub fn init(tokens: []TokenData, flags: ArgsFlags, allocator: std.mem.Allocator,
         .position = 0,
         .file_name = file_name,
         .ast = null,
-        .parserPatterns = try initParserPatterns(allocator),
+        .parserPatterns = try initParserPatterns(allocator, flags),
     };
 }
 
@@ -56,8 +56,9 @@ pub fn deinit(self: *Parser) void {
         self.ast.?.*.deinit(self.ast.?, self.allocator);
     }
 
-    for (self.parserPatterns.iterator()) |pattern| {
-        pattern.key.deinit(self.allocator);
+    var iterator = self.parserPatterns.iterator();
+    while (iterator.next()) |pattern| {
+        self.allocator.free(pattern.key_ptr.*);
     }
     self.parserPatterns.deinit();
 }
