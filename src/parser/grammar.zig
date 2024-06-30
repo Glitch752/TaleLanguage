@@ -38,7 +38,7 @@ fn printBlock(self: AST, writer: *const std.io.AnyWriter, indent: usize, allocat
 }
 
 const typeArray = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
-    .{ .type = .{ .Pattern = &typeInnerPattern }, .debugName = "Type inner type" },
+    .{ .type = .{ .PatternId = "typeInnerPattern" }, .debugName = "Type inner type" },
     .{ .type = .{ .Token = TokenType.OpenSquare }, .debugName = "Type array start" },
     .{ .type = .{ .Token = TokenType.CloseSquare }, .debugName = "Type array end" },
 }, createTypeArrayAST, "Type array pattern");
@@ -79,9 +79,9 @@ fn printTypeArray(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
 }
 
 const typeInnerPattern = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatternElement{
-    .{ .type = .{ .Pattern = &typePattern }, .debugName = "Type inner type" },
+    .{ .type = .{ .PatternId = "typePattern" }, .debugName = "Type inner type" },
     .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Type inner identifier" },
-    .{ .type = .{ .Pattern = &typeArray }, .debugName = "Type inner array" },
+    .{ .type = .{ .PatternId = "typeArray" }, .debugName = "Type inner array" },
 }, createInnerTypeAST, "Type inner pattern");
 fn createInnerTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     // Pass the AST forward if it's already created, otherwise create a new with the token data
@@ -115,7 +115,7 @@ fn printIdentifierType(self: AST, writer: *const std.io.AnyWriter, indent: usize
 
 const typePattern = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
     .{ .type = .{ .Token = TokenType.OpenParen }, .debugName = "Type start" },
-    .{ .type = .{ .Pattern = &typeInnerPattern }, .debugName = "Type inner" },
+    .{ .type = .{ .PatternId = "typeInnerPattern" }, .debugName = "Type inner" },
     .{ .type = .{ .Token = TokenType.CloseParen }, .debugName = "Type end" },
 }, createTypeAST, "Type pattern");
 fn createTypeAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
@@ -187,7 +187,7 @@ fn printExpression(self: AST, writer: *const std.io.AnyWriter, indent: usize, al
 
 const returnStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
     .{ .type = .{ .Token = TokenType.ReturnKeyword }, .debugName = "Return keyword" },
-    .{ .type = .{ .Pattern = &expressionPattern }, .debugName = "Return statement expression" },
+    .{ .type = .{ .PatternId = "expressionPattern" }, .debugName = "Return statement expression" },
 }, createReturnStatementAST, "Return statement");
 fn createReturnStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
@@ -222,9 +222,9 @@ const letStatement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternEl
     .{ .type = .{ .Token = TokenType.LetKeyword }, .debugName = "Let keyword" },
     .{ .type = .{ .Token = TokenType.Identifier }, .debugName = "Let statement identifier" },
     .{ .type = .{ .Token = TokenType.Colon }, .debugName = "Let statement type colon" },
-    .{ .type = .{ .Pattern = &typePattern }, .debugName = "Let statement type" },
+    .{ .type = .{ .PatternId = "typePattern" }, .debugName = "Let statement type" },
     .{ .type = .{ .Token = TokenType.Assign }, .debugName = "Let statement equal" },
-    .{ .type = .{ .Pattern = &expressionPattern }, .debugName = "Let statement value" },
+    .{ .type = .{ .PatternId = "expressionPattern" }, .debugName = "Let statement value" },
 }, createLetStatementAST, "Let statement");
 fn createLetStatementAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
@@ -267,7 +267,7 @@ fn printAssignment(self: AST, writer: *const std.io.AnyWriter, indent: usize, al
 
 const statement = GrammarPattern.create(PatternType.All, &[_]GrammarPatternElement{
     // A statement
-    .{ .type = .{ .Pattern = &innerStatement }, .debugName = "Inner statement" },
+    .{ .type = .{ .PatternId = "innerStatement" }, .debugName = "Inner statement" },
     // And a Semicolon
     .{ .type = .{ .Token = TokenType.Semicolon }, .debugName = "Semicolon" },
 }, passSingleASTForward, "Statement pattern");
@@ -284,8 +284,8 @@ const innerStatement = GrammarPattern.create(PatternType.OneOf, &[_]GrammarPatte
     // .{ .Pattern = TokenType.IfKeyword },
     // .{ .Pattern = TokenType.ElseKeyword },
     // .{ .Pattern = TokenType.ForKeyword },
-    .{ .type = .{ .Pattern = &returnStatement }, .debugName = "Return statement" }, // Testing
-    .{ .type = .{ .Pattern = &letStatement }, .debugName = "Let statement" }, // Testing
+    .{ .type = .{ .PatternId = "returnStatement" }, .debugName = "Return statement" }, // Testing
+    .{ .type = .{ .PatternId = "letStatement" }, .debugName = "Let statement" }, // Testing
 }, createStatementAST, "Statement inner pattern");
 fn createStatementAST(self: GrammarPattern, childASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*AST {
     const allocation = try allocator.create(AST);
@@ -317,8 +317,8 @@ fn printStatement(self: AST, writer: *const std.io.AnyWriter, indent: usize, all
     try self.node.print(writer, indent + 1, allocator);
 }
 
-pub const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
-    .{ .type = .{ .Pattern = &statement }, .debugName = "Statement" },
+const grammar: GrammarPattern = GrammarPattern.create(PatternType.AtLeastOne, &[_]GrammarPatternElement{
+    .{ .type = .{ .PatternId = "statement" }, .debugName = "Statement" },
 }, createGrammarAST, "Root grammar pattern");
 fn createGrammarAST(self: GrammarPattern, patternASTs: []*const AST, tokens: []TokenData, allocator: std.mem.Allocator) !?*const AST {
     const allocation = try allocator.create(AST);
@@ -354,4 +354,20 @@ fn printGrammar(self: AST, writer: *const std.io.AnyWriter, indent: usize, alloc
     for (self.node.Block.statements) |stmt| {
         try stmt.print(stmt.*, writer, indent + 1, allocator);
     }
+}
+
+pub fn initParserPatterns(allocator: std.mem.Allocator) !std.StringHashMap(GrammarPattern) {
+    var patterns = std.StringHashMap(GrammarPattern).init(allocator);
+
+    try patterns.put("typePattern", typePattern);
+    try patterns.put("typeInnerPattern", typeInnerPattern);
+    try patterns.put("typeArray", typeArray);
+    try patterns.put("expressionPattern", expressionPattern);
+    try patterns.put("returnStatement", returnStatement);
+    try patterns.put("letStatement", letStatement);
+    try patterns.put("statement", statement);
+    try patterns.put("innerStatement", innerStatement);
+    try patterns.put("root", grammar);
+
+    return patterns;
 }

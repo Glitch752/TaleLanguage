@@ -13,11 +13,11 @@ pub const PatternType = enum {
 };
 
 pub const GrammarPatternElement = struct {
-    type: union(enum) { Token: TokenType, Pattern: *const GrammarPattern },
+    type: union(enum) { Token: TokenType, PatternId: []const u8 },
 
     debugName: []const u8,
 
-    pub fn check(self: GrammarPatternElement, remainingTokens: []TokenData) u32 {
+    pub fn check(self: GrammarPatternElement, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern)) u32 {
         switch (self.type) {
             .Token => |token| {
                 if (!std.mem.eql(u8, @tagName(token), @tagName(remainingTokens[0].token))) {
@@ -25,13 +25,14 @@ pub const GrammarPatternElement = struct {
                 }
                 return 1;
             },
-            .Pattern => |pattern| {
-                return pattern.check(remainingTokens);
+            .PatternId => |patternId| {
+                const pattern = parserPatterns.get(patternId) orelse return 0;
+                return pattern.check(remainingTokens, parserPatterns);
             },
         }
     }
 
-    pub fn consumeIfExist(self: GrammarPatternElement, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator) anyerror!?ConsumeResult {
+    pub fn consumeIfExist(self: GrammarPatternElement, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator, parserPatterns: *std.StringHashMap(GrammarPattern)) anyerror!?ConsumeResult {
         switch (self.type) {
             .Token => |token| {
                 if (!std.mem.eql(u8, @tagName(token), @tagName(remainingTokens[0].token))) {
@@ -39,8 +40,9 @@ pub const GrammarPatternElement = struct {
                 }
                 return .{ .consumed = 1, .asts = null };
             },
-            .Pattern => |pattern| {
-                return try pattern.consumeIfExist(flags, remainingTokens, allocator) orelse return null;
+            .PatternId => |patternId| {
+                const pattern = parserPatterns.get(patternId) orelse return null;
+                return try pattern.consumeIfExist(flags, remainingTokens, allocator, parserPatterns) orelse return null;
             },
         }
     }
@@ -61,12 +63,12 @@ pub fn create(comptime patternType: PatternType, comptime elements: []const Gram
     return .{ .elements = elements, .patternType = patternType, .getAST = getAST, .debugName = debugName };
 }
 
-pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
+pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData, parserPatterns: *std.StringHashMap(GrammarPattern)) u32 {
     switch (self.patternType) {
         PatternType.All => {
             var tokenIndex: u32 = 0;
             for (self.elements) |element| {
-                const consumed = element.check(remainingTokens[tokenIndex..]);
+                const consumed = element.check(remainingTokens[tokenIndex..], parserPatterns);
                 if (consumed == 0) return 0;
                 tokenIndex += consumed;
             }
@@ -77,7 +79,7 @@ pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
             while (tokenIndex < remainingTokens.len) {
                 var consumed: u32 = 0;
                 for (self.elements) |element| {
-                    const elementConsumed = element.check(remainingTokens[tokenIndex..]);
+                    const elementConsumed = element.check(remainingTokens[tokenIndex..], parserPatterns);
                     if (elementConsumed == 0) break;
                     consumed += elementConsumed;
                 }
@@ -88,7 +90,7 @@ pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
         },
         PatternType.OneOf => {
             for (self.elements) |element| {
-                const consumed = element.check(remainingTokens);
+                const consumed = element.check(remainingTokens, parserPatterns);
                 if (consumed != 0) return consumed;
             }
             return 0;
@@ -96,8 +98,8 @@ pub fn check(self: *const GrammarPattern, remainingTokens: []TokenData) u32 {
     }
 }
 
-pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator) !?ConsumeResult {
-    if (self.check(remainingTokens) == 0) {
+pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTokens: []TokenData, allocator: std.mem.Allocator, parserPatterns: *std.StringHashMap(GrammarPattern)) !?ConsumeResult {
+    if (self.check(remainingTokens, parserPatterns) == 0) {
         return null;
     }
 
@@ -106,7 +108,7 @@ pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTo
             var consumed: usize = 0;
             var asts = std.ArrayList(*const AST).init(allocator);
             for (self.elements) |element| {
-                const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator) orelse return null;
+                const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator, parserPatterns) orelse return null;
                 consumed += result.consumed;
                 if (result.asts != null) {
                     for (result.asts.?) |ast| {
@@ -137,7 +139,7 @@ pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTo
 
                 var elementConsumed: usize = 0;
                 for (self.elements) |element| {
-                    const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator) orelse continue;
+                    const result = try element.consumeIfExist(flags, remainingTokens[consumed..], allocator, parserPatterns) orelse continue;
                     if (flags.verbose) std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ result.consumed, element.debugName });
                     elementConsumed += result.consumed;
                     if (result.asts != null) {
@@ -174,7 +176,7 @@ pub fn consumeIfExist(self: *const GrammarPattern, flags: ArgsFlags, remainingTo
 
             for (self.elements) |element| {
                 if (flags.verbose) std.debug.print("When consuming {s} | remaining tokens: {d}\n", .{ element.debugName, remainingTokens.len });
-                const result = try element.consumeIfExist(flags, remainingTokens, allocator);
+                const result = try element.consumeIfExist(flags, remainingTokens, allocator, parserPatterns);
                 if (result != null) {
                     if (flags.verbose) std.debug.print("Consumed {d} tokens for pattern {s}\n", .{ result.?.consumed, element.debugName });
                     return result;
