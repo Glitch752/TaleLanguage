@@ -76,6 +76,7 @@ fn runRepl(self: *Main) !void {
     const stdin = std.io.getStdIn().reader();
 
     while (true) {
+        std.debug.print("> ", .{});
         const bare_line = stdin.readUntilDelimiterOrEofAlloc(self.allocator, '\n', 1000000) catch {
             try prettyError("Failed to read line from stdin");
             break;
@@ -127,6 +128,7 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     if (self.args.?.flags.debugAST) {
         const printer = ASTPrinter.init(self.allocator);
         try printer.print(expression);
+        std.debug.print("\n\n", .{});
     }
 
     defer expression.uninit(self.allocator);

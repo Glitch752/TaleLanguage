@@ -58,6 +58,9 @@ pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, a
         }
         scanPosition += 1;
     }
+    if (lineEnd == 0) {
+        lineEnd = @as(u32, @intCast(buffer.len));
+    }
 
     const line = buffer[lineStart..lineEnd];
     const column = position - lineStart;

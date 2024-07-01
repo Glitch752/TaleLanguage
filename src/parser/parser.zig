@@ -71,6 +71,12 @@ pub fn init(tokens: []Token, fileName: []const u8, originalBuffer: []const u8, f
 
 pub fn parse(self: *Parser) anyerror!*Expression {
     const expression = try self.consumeExpression();
+    if (!self.matchToken(TokenType.EOF)) {
+        const err = ParseError.consumeFailed(self, "Expected EOF", self.peek());
+        err.print(self.allocator);
+        return ParseErrorEnum.Unknown;
+    }
+
     return expression;
 }
 
