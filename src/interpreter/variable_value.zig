@@ -1,10 +1,25 @@
+const std = @import("std");
+
 const TokenLiteral = @import("../token.zig").TokenLiteral;
 
 pub const VariableValue = union(enum) {
     Number: f64,
-    String: []const u8,
+    String: struct {
+        string: []const u8,
+        allocated: bool,
+    },
     Boolean: bool,
     Null,
+
+    /// Deinitializes the value if it was allocated.
+    /// Must be called before a string variable is discarded.
+    pub fn deinit(self: VariableValue) []const u8 {
+        if (self.String.allocated) {
+            return string;
+        } else {
+            return self.String;
+        }
+    }
 
     // Accessors and type checks
 
@@ -19,7 +34,7 @@ pub const VariableValue = union(enum) {
         return self == .String;
     }
     pub fn asString(self: VariableValue) []const u8 {
-        return self.String;
+        return self.String.string;
     }
 
     pub fn isBoolean(self: VariableValue) bool {
@@ -70,5 +85,17 @@ pub const VariableValue = union(enum) {
 
     pub fn @"null"() VariableValue {
         return .Null;
+    }
+
+    // Debugging and visualization
+    /// Converts the value to a string for debugging and visualization purposes.
+    /// A new string is always allocated, so the caller is responsible for freeing it.
+    pub fn toString(self: VariableValue, allocator: std.mem.Allocator) []const u8 {
+        switch (self) {
+            .Number => |value| return try std.fmt.allocPrint(allocator, "{d}", .{value}),
+            .String => |value| return std.fmt.allocPrint("{s}", .{value}),
+            .Boolean => return if (self.Boolean) std.fmt.allocPrint("true", .{}) else std.fmt.allocPrint("false", .{}),
+            .Null => return std.fmt.allocPrint("null", .{}),
+        }
     }
 };

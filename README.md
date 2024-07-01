@@ -24,6 +24,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo has the same precedence as multiplication and division)
   - Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
   - Logical: `!`, `&&`, `||`
+    - Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0, and null is falsy
   - Grouping: `()`
 - Simple control-flow constructs:
   - `if` statements, along with `else if` and `else`

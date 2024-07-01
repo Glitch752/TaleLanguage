@@ -1,6 +1,9 @@
 const std = @import("std");
+
 const lexer = @import("lexer.zig");
 const parser = @import("./parser/parser.zig");
+const interpreter = @import("./interpreter/interpreter.zig");
+
 const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
 const ASTPrinter = @import("parser/ast_printer.zig").ASTPrinter;
@@ -10,13 +13,17 @@ pub const Main = @This();
 allocator: std.mem.Allocator,
 hadError: bool = false,
 args: ?*const args_parser.Args = null,
+interpreter: ?interpreter.Interpreter = null,
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    var instance = Main{ .allocator = allocator };
+    var instance = Main{
+        .allocator = allocator,
+        .interpreter = interpreter.init(allocator),
+    };
     defer instance.deinit();
     try instance.entry();
 }
@@ -97,6 +104,7 @@ fn runRepl(self: *Main) !void {
 }
 
 fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
+    // LEXING -------------------------------------
     var sourceLexer = lexer.init(self.allocator, fileName, source);
     defer sourceLexer.deinit();
     const tokens = try sourceLexer.getAllTokens() orelse {
@@ -118,6 +126,7 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
         return;
     }
 
+    // PARSING -------------------------------------
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
     defer sourceParser.uninit();
 
@@ -125,11 +134,14 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
         self.hadError = true;
         return;
     };
+    defer expression.uninit(self.allocator);
+
     if (self.args.?.flags.debugAST) {
         const printer = ASTPrinter.init(self.allocator);
         try printer.print(expression);
         std.debug.print("\n\n", .{});
     }
 
-    defer expression.uninit(self.allocator);
+    // INTERPRETING -------------------------------------
+    try self.interpreter.?.run(expression, source, fileName);
 }
