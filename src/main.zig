@@ -1,6 +1,6 @@
 const std = @import("std");
 const lexer = @import("lexer.zig");
-const parser = @import("parser.zig");
+const parser = @import("./parser/parser.zig");
 const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
 const TokenData = @import("token.zig").TokenData;
@@ -109,35 +109,16 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
             defer self.allocator.free(tokenString);
             std.debug.print("{s}", .{tokenString});
         }
+        std.debug.print("\n\n", .{});
     }
 
-    // while (true) {
-    //     const tokenData = try lxr.getNext(self.allocator);
+    if (self.args.?.flags.stopAfterTokens) {
+        std.debug.print("Stopped early after token generation.\n", .{});
+        return;
+    }
 
-    //     if (tokenData.token == Token.EOF) {
-    //         break;
-    //     }
-    //     if (tokenData.token == Token.Error) {
-    //         return try prettyError(try std.fmt.allocPrint(self.allocator, "Lexer Error: {d}:{d} - {s}", .{ tokenData.line, tokenData.column, tokenData.token.Error }));
-    //     }
+    var sourceParser = try parser.init(tokens, self.args.?.flags, self.allocator);
+    defer sourceParser.deinit();
 
-    //     if (args.flags.debugTokens) {
-    //         const tokenString = try tokenData.token.toStringWithType(self.allocator);
-    //         defer self.allocator.free(tokenString);
-    //         std.debug.print("{s}", .{tokenString});
-    //     }
-
-    //     try tokens.append(tokenData);
-    // }
-
-    // if (args.flags.debugTokens) {
-    //     std.debug.print("\n\n", .{});
-    // }
-
-    // if (args.flags.stopAfterTokens) {
-    //     return;
-    // }
-
-    // var prsr = try parser.init(tokens.items, args.flags, self.allocator, filePath);
-    // defer prsr.deinit();
+    try sourceParser.parse();
 }
