@@ -67,7 +67,7 @@ pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, a
     const lineString = try std.fmt.allocPrint(allocator, "{d}", .{lines});
     defer allocator.free(lineString);
 
-    const caretSpaces = try repeat(column + lineString.len + 2, ' ', allocator);
+    const caretSpaces = try repeat(column + lineString.len + 3, ' ', allocator);
     defer allocator.free(caretSpaces);
 
     const string = try std.fmt.allocPrint(allocator, "{s} | {s}\n{s}\x1b[1;31m^", .{ lineString, line, caretSpaces });

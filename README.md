@@ -21,7 +21,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 - Garbage collection
 - Simple primatives: Booleans, doubles, strings, functions, and null (I'm not sure if arrays or classes should go here)
 - Simple operators (no overloading):
-  - Arithmetic: `+`, `-`, `*`, `/`, `%`
+  - Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo has the same precedence as multiplication and division)
   - Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
   - Logical: `!`, `&&`, `||`
   - Grouping: `()`

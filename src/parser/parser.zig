@@ -24,10 +24,42 @@ allocator: std.mem.Allocator,
 flags: ArgsFlags,
 
 /// Errors in Zig can't hold payloads, so we separate the actual error data from the error type.
-const ParseError = struct { @"error": union(enum) { ConsumeFailed: struct {
-    string: []const u8,
-    token: Token,
-} } };
+const ParseError = struct {
+    @"error": union(enum) { ConsumeFailed: struct {
+        string: []const u8,
+        token: Token,
+    } },
+
+    fileName: []const u8,
+    originalBuffer: []const u8,
+
+    pub fn print(self: *const ParseError, allocator: std.mem.Allocator) void {
+        switch (self.@"error") {
+            .ConsumeFailed => |value| {
+                const tokenString = value.token.toString(allocator) catch {
+                    return;
+                };
+                defer allocator.free(tokenString);
+
+                const errorMessage = std.fmt.allocPrint(allocator, "{s} at {s}", .{ value.string, tokenString }) catch {
+                    return;
+                };
+                defer allocator.free(errorMessage);
+
+                prettyError(errorMessage) catch {
+                    return;
+                };
+                errorContext(self.originalBuffer, self.fileName, value.token.position, allocator) catch {
+                    return;
+                };
+            },
+        }
+    }
+
+    pub fn consumeFailed(parser: *const Parser, string: []const u8, token: Token) ParseError {
+        return .{ .@"error" = .{ .ConsumeFailed = .{ .string = string, .token = token } }, .fileName = parser.fileName, .originalBuffer = parser.originalBuffer };
+    }
+};
 
 const ParseErrorEnum = error{
     Unknown,
@@ -37,18 +69,12 @@ pub fn init(tokens: []Token, fileName: []const u8, originalBuffer: []const u8, f
     return .{ .tokens = tokens, .fileName = fileName, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
 }
 
-pub fn parse(self: *Parser) anyerror!Expression {
+pub fn parse(self: *Parser) anyerror!*Expression {
     const expression = try self.consumeExpression();
-
-    if (self.flags.debugAST) {
-        const printer = ASTPrinter.init(self.allocator);
-        try printer.print(expression);
-    }
-
     return expression;
 }
 
-pub fn deinit(self: *Parser) void {
+pub fn uninit(self: *Parser) void {
     _ = self;
 }
 
@@ -76,7 +102,7 @@ fn matchToken(self: *Parser, @"type": TokenType) bool {
         return false;
     }
     if (self.peek().type == @"type") {
-        self.advance();
+        _ = self.advance();
         return true;
     }
     return false;
@@ -88,36 +114,32 @@ fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
         return self.advance();
     }
 
-    prettyError(self.allocator, errorMessage);
-    errorContext(self.originalBuffer, self.fileName, self.peek().position, self.allocator);
-
-    const err = ParseError{ .@"error" = .{.ConsumeFailed{
-        .string = errorMessage,
-        .token = self.peek(),
-    }} };
+    const err = ParseError.consumeFailed(self, errorMessage, self.peek());
     err.print(self.allocator);
     return ParseErrorEnum.Unknown;
 }
 
 // Grammar rules
 
-fn consumeExpression(self: *Parser) !Expression {
+fn consumeExpression(self: *Parser) anyerror!*Expression {
     return try self.consumeEquality();
 }
 
-fn consumeEquality(self: *Parser) !Expression {
+fn consumeEquality(self: *Parser) anyerror!*Expression {
     var expression = try self.consumeComparison();
 
     while (self.matchToken(TokenType.NotEqual) or self.matchToken(TokenType.Equality)) {
+        errdefer expression.uninit(self.allocator);
+
         const operator = self.peekPrevious();
         const right = try self.consumeComparison();
-        expression = Expression.binary(expression, operator, right);
+        expression = try Expression.binary(self.allocator, expression, operator, right);
     }
 
     return expression;
 }
 
-fn consumeComparison(self: *Parser) !Expression {
+fn consumeComparison(self: *Parser) anyerror!*Expression {
     var expression = try self.consumeTerm();
 
     while (self.matchToken(TokenType.GreaterThan) or
@@ -125,71 +147,89 @@ fn consumeComparison(self: *Parser) !Expression {
         self.matchToken(TokenType.LessThan) or
         self.matchToken(TokenType.LessThanEqual))
     {
+        errdefer expression.uninit(self.allocator);
+
         const operator = self.peekPrevious();
         const right = try self.consumeTerm();
-        expression = Expression.binary(expression, operator, right);
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.binary(self.allocator, expression, operator, right);
     }
 
     return expression;
 }
 
-fn consumeTerm(self: *Parser) !Expression {
+fn consumeTerm(self: *Parser) anyerror!*Expression {
     var expression = try self.consumeFactor();
 
     while (self.matchToken(TokenType.Minus) or self.matchToken(TokenType.Plus)) {
+        errdefer expression.uninit(self.allocator);
+
         const operator = self.peekPrevious();
         const right = try self.consumeFactor();
-        expression = Expression.binary(expression, operator, right);
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.binary(self.allocator, expression, operator, right);
     }
 
     return expression;
 }
 
-fn consumeFactor(self: *Parser) !Expression {
+fn consumeFactor(self: *Parser) anyerror!*Expression {
     var expression = try self.consumeUnary();
 
-    while (self.matchToken(TokenType.Slash) or self.matchToken(TokenType.Star)) {
+    while (self.matchToken(TokenType.Slash) or self.matchToken(TokenType.Star) or self.matchToken(TokenType.Percent)) {
+        errdefer expression.uninit(self.allocator);
+
         const operator = self.peekPrevious();
         const right = try self.consumeUnary();
-        expression = Expression.binary(expression, operator, right);
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.binary(self.allocator, expression, operator, right);
     }
 
     return expression;
 }
 
-fn consumeUnary(self: *Parser) !Expression {
+fn consumeUnary(self: *Parser) anyerror!*Expression {
     if (self.matchToken(TokenType.Negate) or self.matchToken(TokenType.Minus)) {
         const operator = self.peekPrevious();
         const right = try self.consumeUnary();
-        return Expression.unary(operator, right);
+        errdefer right.uninit(self.allocator);
+
+        return try Expression.unary(self.allocator, operator, right);
     }
 
     return try self.consumePrimary();
 }
 
-fn consumePrimary(self: *Parser) !Expression {
+fn consumePrimary(self: *Parser) anyerror!*Expression {
     if (self.matchToken(TokenType.FalseKeyword)) {
-        return Expression.literal(TokenLiteral.False);
+        return Expression.literal(self.allocator, TokenLiteral.False);
     }
     if (self.matchToken(TokenType.TrueKeyword)) {
-        return Expression.literal(TokenLiteral.True);
+        return Expression.literal(self.allocator, TokenLiteral.True);
     }
     if (self.matchToken(TokenType.NullKeyword)) {
-        return Expression.literal(TokenLiteral.Null);
+        return Expression.literal(self.allocator, TokenLiteral.Null);
     }
 
     if (self.matchToken(TokenType.NumberLiteral) or self.matchToken(TokenType.StringLiteral)) { // or self.matchToken(TokenType.Identifier)
-        return Expression.literal(self.peekPrevious().literal);
+        return Expression.literal(self.allocator, self.peekPrevious().literal);
     }
 
-    if (self.matchToken(TokenType.LeftParen)) {
+    if (self.matchToken(TokenType.OpenParen)) {
         const expression = try self.consumeExpression();
-        if (!self.matchToken(TokenType.RightParen)) {
-            return error.ParseError.Unknown;
+        if (!self.matchToken(TokenType.CloseParen)) {
+            const err = ParseError.consumeFailed(self, "Expected ')'", self.peek());
+            err.print(self.allocator);
+            return ParseErrorEnum.Unknown;
         }
-        return Expression.grouping(expression);
+        return Expression.grouping(self.allocator, expression);
     }
 
+    const err = ParseError.consumeFailed(self, "Expected expression", self.peek());
+    err.print(self.allocator);
     return ParseErrorEnum.Unknown;
 }
 

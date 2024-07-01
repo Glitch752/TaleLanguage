@@ -3,7 +3,7 @@ const lexer = @import("lexer.zig");
 const parser = @import("./parser/parser.zig");
 const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
-const TokenData = @import("token.zig").TokenData;
+const ASTPrinter = @import("parser/ast_printer.zig").ASTPrinter;
 const prettyError = @import("errors.zig").prettyError;
 
 pub const Main = @This();
@@ -118,9 +118,16 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     }
 
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
-    defer sourceParser.deinit();
+    defer sourceParser.uninit();
 
-    const expression = try sourceParser.parse();
+    const expression = sourceParser.parse() catch {
+        self.hadError = true;
+        return;
+    };
+    if (self.args.?.flags.debugAST) {
+        const printer = ASTPrinter.init(self.allocator);
+        try printer.print(expression);
+    }
 
-    _ = expression;
+    defer expression.uninit(self.allocator);
 }

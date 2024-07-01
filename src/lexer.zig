@@ -141,15 +141,15 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
         if (std.ascii.isDigit(c)) {
             var number: u64 = 0;
             self.position -= 1;
-            while (std.ascii.isDigit(self.buffer[self.position])) {
+            while (self.position < self.buffer.len and std.ascii.isDigit(self.buffer[self.position])) {
                 number = number * 10 + (self.buffer[self.position] - '0');
                 self.position += 1;
             }
-            if (self.buffer[self.position] == '.' and std.ascii.isDigit(self.buffer[self.position + 1])) {
+            if (self.position < self.buffer.len and self.buffer[self.position] == '.' and std.ascii.isDigit(self.buffer[self.position + 1])) {
                 self.position += 1;
                 var decimal: f64 = 0.0;
                 var decimalPlace: f64 = 0.1;
-                while (std.ascii.isDigit(self.buffer[self.position])) {
+                while (self.position < self.buffer.len and std.ascii.isDigit(self.buffer[self.position])) {
                     decimal += @as(f64, @floatFromInt(self.buffer[self.position] - '0')) * decimalPlace;
                     decimalPlace /= 10.0;
                     self.position += 1;

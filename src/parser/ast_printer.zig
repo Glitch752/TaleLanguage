@@ -11,20 +11,20 @@ pub fn init(allocator: std.mem.Allocator) ASTPrinter {
     };
 }
 
-pub fn print(self: *const ASTPrinter, expression: Expression) !void {
-    switch (expression) {
+pub fn print(self: *const ASTPrinter, expression: *const Expression) !void {
+    switch (expression.*) {
         .Binary => |values| {
             std.debug.print("(", .{});
-            try self.print(values.left.*);
+            try self.print(values.left);
             std.debug.print(" ", .{});
             std.debug.print("{s}", .{values.operator.lexeme});
             std.debug.print(" ", .{});
-            try self.print(values.right.*);
+            try self.print(values.right);
             std.debug.print(")", .{});
         },
         .Grouping => |values| {
             std.debug.print("[", .{});
-            try self.print(values.expression.*);
+            try self.print(values.expression);
             std.debug.print("]", .{});
         },
         .Literal => |values| {
@@ -35,7 +35,7 @@ pub fn print(self: *const ASTPrinter, expression: Expression) !void {
         .Unary => |values| {
             std.debug.print("(", .{});
             std.debug.print("{s}", .{values.operator.lexeme});
-            try self.print(values.right.*);
+            try self.print(values.right);
             std.debug.print(")", .{});
         },
     }
