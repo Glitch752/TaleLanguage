@@ -6,7 +6,7 @@ pub const Program = @This();
 statements: std.ArrayList(*Statement),
 
 pub fn init(allocator: std.mem.Allocator) Program {
-    return .{ .statements = std.ArrayList(Statement).init(allocator) };
+    return .{ .statements = std.ArrayList(*Statement).init(allocator) };
 }
 
 pub fn deinit(self: *Program) void {
@@ -17,6 +17,6 @@ pub fn deinit(self: *Program) void {
     self.statements.deinit();
 }
 
-pub fn addStatement(self: *Program, statement: *Statement) void {
-    self.statements.append(statement);
+pub fn addStatement(self: *Program, statement: *Statement) !void {
+    try self.statements.append(statement);
 }

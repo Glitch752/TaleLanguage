@@ -75,11 +75,21 @@ pub fn parse(self: *Parser) anyerror!Program {
     var program = Program.init(self.allocator);
 
     while (!self.isAtEnd()) {
-        const staement = try self.consumeStatement();
-        try program.addStatement(staement);
+        const statement = try self.consumeStatement();
+        try program.addStatement(statement);
     }
 
-    if (!self.matchToken(TokenType.EOF)) {
+    // We can't use matchToken here because it will detect we're at an EOF and return false
+    if (self.peek().type != TokenType.EOF) {
+        if (self.current == self.tokens.len) {
+            const err = ParseError.consumeFailed(
+                self,
+                "Expected EOF at end of file... wait, what?",
+                Token.init(TokenType.EOF, "", .{ .None = {} }, self.peekPrevious().position + 1),
+            );
+            err.print(self.allocator);
+            return ParseErrorEnum.Unknown;
+        }
         const err = ParseError.consumeFailed(self, "Expected EOF", self.peek());
         err.print(self.allocator);
         return ParseErrorEnum.Unknown;
@@ -93,7 +103,7 @@ pub fn uninit(self: *Parser) void {
 }
 
 fn isAtEnd(self: *Parser) bool {
-    return self.current >= self.tokens.len;
+    return self.current >= self.tokens.len - 1; // -1 because the last token is always EOF
 }
 
 fn peek(self: *Parser) Token {
@@ -124,8 +134,8 @@ fn matchToken(self: *Parser, @"type": TokenType) bool {
 
 /// Attempts to consume a token of the given type. If the token is not of the given type, returns an error.
 fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
-    if (self.check(@"type")) {
-        return self.advance();
+    if (self.matchToken(@"type")) {
+        return self.peekPrevious();
     }
 
     const err = ParseError.consumeFailed(self, errorMessage, self.peek());
@@ -145,13 +155,12 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
 
 fn consumeLetStatement(self: *Parser) anyerror!*Statement {
     const name = try self.consume(TokenType.Identifier, "Expected variable name");
-    const initializer = if (self.matchToken(TokenType.Assign)) {
-        try self.consumeExpression();
-    } else {
-        Expression.literal(self.allocator, TokenLiteral.Null);
-    };
+    const initializer = if (self.matchToken(TokenType.Assign))
+        try self.consumeExpression()
+    else
+        try Expression.literal(self.allocator, TokenLiteral.Null);
 
-    self.consume(TokenType.Semicolon, "Expected ';' after a variable declaration.");
+    _ = try self.consume(TokenType.Semicolon, "Expected ';' after a variable declaration.");
 
     return Statement.let(self.allocator, name, initializer);
 }
@@ -159,7 +168,7 @@ fn consumeLetStatement(self: *Parser) anyerror!*Statement {
 fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
     const expression = try self.consumeExpression();
 
-    self.consume(TokenType.Semicolon, "Expected ';' after an expression statement.");
+    _ = try self.consume(TokenType.Semicolon, "Expected ';' after an expression statement.");
 
     return Statement.expression(self.allocator, expression);
 }

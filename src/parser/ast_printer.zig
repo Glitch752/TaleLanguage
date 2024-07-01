@@ -27,10 +27,8 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement) !voi
             std.debug.print(";", .{});
         },
         .Let => |values| {
-            const name = try values.name.lexeme.toString(self.allocator);
-            defer self.allocator.free(name);
             std.debug.print("let ", .{});
-            std.debug.print("{s}", .{name});
+            std.debug.print("{s}", .{values.name.lexeme});
             std.debug.print(" = ", .{});
             try self.printExpression(values.initializer);
             std.debug.print(";", .{});

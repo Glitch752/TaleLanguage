@@ -6,7 +6,7 @@ pub const Statement = union(enum) {
     Expression: struct { expression: *const Expression },
     Let: struct { name: Token, initializer: *const Expression },
 
-    pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
+    pub fn uninit(self: *const Statement, allocator: std.mem.Allocator) void {
         allocator.destroy(self);
     }
 
@@ -15,9 +15,9 @@ pub const Statement = union(enum) {
         alloc.* = .{ .Expression = .{ .expression = value } };
         return alloc;
     }
-    pub fn let(allocator: std.mem.Allocator, initializer: *const Expression) !*Statement {
+    pub fn let(allocator: std.mem.Allocator, name: Token, initializer: *const Expression) !*Statement {
         const alloc = try allocator.create(Statement);
-        alloc.* = .{ .Let = .{ .initializer = initializer } };
+        alloc.* = .{ .Let = .{ .name = name, .initializer = initializer } };
         return alloc;
     }
 };

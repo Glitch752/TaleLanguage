@@ -69,16 +69,31 @@ pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const 
     self.fileName = fileName;
 
     self.runtimeError = null;
-    const result: ?VariableValue = self.interpretExpression(expression) catch null;
+    try self.interpret(program);
 
     if (self.runtimeError != null) {
         self.runtimeError.?.print(self.allocator);
-    } else {
-        defer result.?.deinit(self.allocator);
-        const str = try result.?.toString(self.allocator);
-        defer self.allocator.free(str);
+    }
+}
 
-        std.debug.print("{s}\n", .{str});
+fn interpret(self: *Interpreter, program: *const Program) !void {
+    for (program.statements.items) |statement| {
+        try self.interpretStatement(statement);
+    }
+}
+
+fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
+    switch (statement.*) {
+        .Expression => |values| {
+            const result = try self.interpretExpression(values.expression);
+            defer result.deinit(self.allocator);
+        },
+        .Let => |values| {
+            const value = try self.interpretExpression(values.initializer);
+            defer value.deinit(self.allocator);
+
+            std.debug.print("Would have assigned {s} to {s}\n", .{ try value.toString(self.allocator), values.name.lexeme });
+        },
     }
 }
 

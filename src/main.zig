@@ -134,7 +134,7 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
     defer sourceParser.uninit();
 
-    const program = sourceParser.parse() catch {
+    var program = sourceParser.parse() catch {
         self.hadError = true;
         return;
     };
@@ -142,10 +142,10 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
 
     if (self.args.?.flags.debugAST) {
         const printer = ASTPrinter.init(self.allocator);
-        try printer.printProgram(program);
+        try printer.printProgram(&program);
         std.debug.print("\n\n", .{});
     }
 
     // INTERPRETING -------------------------------------
-    try self.interpreter.?.run(program, source, fileName);
+    try self.interpreter.?.run(&program, source, fileName);
 }
