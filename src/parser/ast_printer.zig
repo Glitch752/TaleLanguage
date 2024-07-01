@@ -1,4 +1,7 @@
 const Expression = @import("./expression.zig").Expression;
+const Statement = @import("./statement.zig").Statement;
+const Program = @import("./program.zig").Program;
+
 const std = @import("std");
 
 pub const ASTPrinter = @This();
@@ -11,20 +14,44 @@ pub fn init(allocator: std.mem.Allocator) ASTPrinter {
     };
 }
 
-pub fn print(self: *const ASTPrinter, expression: *const Expression) !void {
+pub fn printProgram(self: *const ASTPrinter, program: *const Program) !void {
+    for (program.statements.items) |statement| {
+        try self.printStatement(statement);
+    }
+}
+
+pub fn printStatement(self: *const ASTPrinter, statement: *const Statement) !void {
+    switch (statement.*) {
+        .Expression => |values| {
+            try self.printExpression(values.expression);
+            std.debug.print(";", .{});
+        },
+        .Let => |values| {
+            const name = try values.name.lexeme.toString(self.allocator);
+            defer self.allocator.free(name);
+            std.debug.print("let ", .{});
+            std.debug.print("{s}", .{name});
+            std.debug.print(" = ", .{});
+            try self.printExpression(values.initializer);
+            std.debug.print(";", .{});
+        },
+    }
+}
+
+pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !void {
     switch (expression.*) {
         .Binary => |values| {
             std.debug.print("(", .{});
-            try self.print(values.left);
+            try self.printExpression(values.left);
             std.debug.print(" ", .{});
             std.debug.print("{s}", .{values.operator.lexeme});
             std.debug.print(" ", .{});
-            try self.print(values.right);
+            try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
         .Grouping => |values| {
             std.debug.print("[", .{});
-            try self.print(values.expression);
+            try self.printExpression(values.expression);
             std.debug.print("]", .{});
         },
         .Literal => |values| {
@@ -35,7 +62,7 @@ pub fn print(self: *const ASTPrinter, expression: *const Expression) !void {
         .Unary => |values| {
             std.debug.print("(", .{});
             std.debug.print("{s}", .{values.operator.lexeme});
-            try self.print(values.right);
+            try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
     }

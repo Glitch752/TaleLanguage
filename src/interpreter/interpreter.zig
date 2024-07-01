@@ -1,6 +1,9 @@
 const std = @import("std");
 
 const Expression = @import("../parser/expression.zig").Expression;
+const Statement = @import("../parser/statement.zig").Statement;
+const Program = @import("../parser/program.zig").Program;
+
 const Token = @import("../token.zig").Token;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
 const VariableValue = @import("./variable_value.zig").VariableValue;
@@ -61,12 +64,12 @@ pub fn deinit(self: *Interpreter) void {
     _ = self;
 }
 
-pub fn run(self: *Interpreter, expression: *const Expression, originalBuffer: []const u8, fileName: []const u8) !void {
+pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
     self.originalBuffer = originalBuffer;
     self.fileName = fileName;
 
     self.runtimeError = null;
-    const result: ?VariableValue = self.interpret(expression) catch null;
+    const result: ?VariableValue = self.interpretExpression(expression) catch null;
 
     if (self.runtimeError != null) {
         self.runtimeError.?.print(self.allocator);
@@ -79,13 +82,13 @@ pub fn run(self: *Interpreter, expression: *const Expression, originalBuffer: []
     }
 }
 
-fn interpret(self: *Interpreter, expression: *const Expression) !VariableValue {
+fn interpretExpression(self: *Interpreter, expression: *const Expression) !VariableValue {
     switch (expression.*) {
         .Binary => |values| {
-            const left = try self.interpret(values.left);
+            const left = try self.interpretExpression(values.left);
             errdefer left.deinit(self.allocator);
 
-            const right = try self.interpret(values.right);
+            const right = try self.interpretExpression(values.right);
             errdefer right.deinit(self.allocator);
 
             switch (values.operator.type) {
@@ -179,7 +182,7 @@ fn interpret(self: *Interpreter, expression: *const Expression) !VariableValue {
             }
         },
         .Grouping => |values| {
-            return self.interpret(values.expression);
+            return self.interpretExpression(values.expression);
         },
         .Literal => |values| {
             return VariableValue.fromLiteral(values.value);
@@ -187,7 +190,7 @@ fn interpret(self: *Interpreter, expression: *const Expression) !VariableValue {
         .Unary => |values| {
             switch (values.operator.type) {
                 .Minus => {
-                    const right = try self.interpret(values.right);
+                    const right = try self.interpretExpression(values.right);
                     if (right.isNumber()) {
                         return VariableValue.fromNumber(-right.asNumber());
                     }
@@ -195,7 +198,7 @@ fn interpret(self: *Interpreter, expression: *const Expression) !VariableValue {
                     return InterpretError.RuntimeError;
                 },
                 .Negate => {
-                    const right = try self.interpret(values.right);
+                    const right = try self.interpretExpression(values.right);
                     if (right.isBoolean()) {
                         return VariableValue.fromBoolean(!right.isTruthy());
                     }

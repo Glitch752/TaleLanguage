@@ -6,7 +6,9 @@ const TokenLiteral = @import("../token.zig").TokenLiteral;
 
 const ArgsFlags = @import("../args_parser.zig").ArgsFlags;
 
+const Program = @import("./program.zig").Program;
 const Expression = @import("./expression.zig").Expression;
+const Statement = @import("./statement.zig").Statement;
 const ASTPrinter = @import("./ast_printer.zig").ASTPrinter;
 
 const Parser = @This();
@@ -69,15 +71,21 @@ pub fn init(tokens: []Token, fileName: []const u8, originalBuffer: []const u8, f
     return .{ .tokens = tokens, .fileName = fileName, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
 }
 
-pub fn parse(self: *Parser) anyerror!*Expression {
-    const expression = try self.consumeExpression();
+pub fn parse(self: *Parser) anyerror!Program {
+    var program = Program.init(self.allocator);
+
+    while (!self.isAtEnd()) {
+        const staement = try self.consumeStatement();
+        try program.addStatement(staement);
+    }
+
     if (!self.matchToken(TokenType.EOF)) {
         const err = ParseError.consumeFailed(self, "Expected EOF", self.peek());
         err.print(self.allocator);
         return ParseErrorEnum.Unknown;
     }
 
-    return expression;
+    return program;
 }
 
 pub fn uninit(self: *Parser) void {
@@ -126,6 +134,35 @@ fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
 }
 
 // Grammar rules
+
+fn consumeStatement(self: *Parser) anyerror!*Statement {
+    if (self.matchToken(TokenType.LetKeyword)) {
+        return try self.consumeLetStatement();
+    }
+
+    return try self.consumeExpressionStatement();
+}
+
+fn consumeLetStatement(self: *Parser) anyerror!*Statement {
+    const name = try self.consume(TokenType.Identifier, "Expected variable name");
+    const initializer = if (self.matchToken(TokenType.Assign)) {
+        try self.consumeExpression();
+    } else {
+        Expression.literal(self.allocator, TokenLiteral.Null);
+    };
+
+    self.consume(TokenType.Semicolon, "Expected ';' after a variable declaration.");
+
+    return Statement.let(self.allocator, name, initializer);
+}
+
+fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
+    const expression = try self.consumeExpression();
+
+    self.consume(TokenType.Semicolon, "Expected ';' after an expression statement.");
+
+    return Statement.expression(self.allocator, expression);
+}
 
 fn consumeExpression(self: *Parser) anyerror!*Expression {
     return try self.consumeEquality();
