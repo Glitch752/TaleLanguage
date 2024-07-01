@@ -112,59 +112,63 @@ pub const Token = union(TokenType) {
     EOF,
     Error: []const u8,
 
-    pub fn toString(self: Token) []const u8 {
-        return switch (self) {
+    pub fn toString(self: Token, allocator: std.mem.Allocator) !struct { str: []const u8, allocated: bool } {
+        if (switch (self) {
+            .IntLiteral => |token| try std.fmt.allocPrint(allocator, "{d}", .{token}),
+            else => null,
+        }) |str| {
+            return .{ .str = str, .allocated = true };
+        }
+
+        return .{ .str = switch (self) {
             .Identifier => |token| token,
 
-            .OpenParen => return "(",
-            .CloseParen => return ")",
-            .OpenSquare => return "[",
-            .CloseSquare => return "]",
-            .OpenCurly => return "{",
-            .CloseCurly => return "}",
+            .OpenParen => "(",
+            .CloseParen => ")",
+            .OpenSquare => "[",
+            .CloseSquare => "]",
+            .OpenCurly => "{",
+            .CloseCurly => "}",
 
-            .Semicolon => return ";",
+            .Semicolon => ";",
 
-            .LessThan => return "<",
-            .LessThanEqual => return "<=",
-            .GreaterThan => return ">",
-            .GreaterThanEqual => return ">=",
-            .Equal => return "==",
-            .NotEqual => return "!=",
+            .LessThan => "<",
+            .LessThanEqual => "<=",
+            .GreaterThan => ">",
+            .GreaterThanEqual => ">=",
+            .Equal => "==",
+            .NotEqual => "!=",
 
-            .And => return "&&",
-            .Or => return "||",
+            .And => "&&",
+            .Or => "||",
 
-            .Plus => return "+",
-            .Minus => return "-",
-            .Star => return "*",
-            .Slash => return "/",
-            .Percent => return "%",
-            .Negate => return "!",
+            .Plus => "+",
+            .Minus => "-",
+            .Star => "*",
+            .Slash => "/",
+            .Percent => "%",
+            .Negate => "!",
 
-            .FunctionKeyword => return "function",
-            .IfKeyword => return "if",
-            .ElseKeyword => return "else",
-            .ForKeyword => return "for",
-            .ReturnKeyword => return "return",
-            .LetKeyword => return "let",
+            .FunctionKeyword => "function",
+            .IfKeyword => "if",
+            .ElseKeyword => "else",
+            .ForKeyword => "for",
+            .ReturnKeyword => "return",
+            .LetKeyword => "let",
 
-            .IntLiteral => |token| {
-                var buf: [21]u8 = undefined;
-                _ = std.fmt.formatIntBuf(buf[0..], token, 10, .lower, .{});
-                return buf[0..];
-            },
             .StringLiteral => |token| token,
 
-            .Range => return "..",
-            .Comma => return ",",
-            .Colon => return ":",
-            .Dot => return ".",
-            .Assign => return "=",
+            .Range => "..",
+            .Comma => ",",
+            .Colon => ":",
+            .Dot => ".",
+            .Assign => "=",
 
-            .EOF => return "EOF",
+            .EOF => "EOF",
             .Error => |message| message,
-        };
+
+            else => unreachable,
+        }, .allocated = false };
     }
 
     pub fn typeNameString(self: Token) []const u8 {
@@ -172,7 +176,10 @@ pub const Token = union(TokenType) {
     }
 
     pub fn toStringWithType(self: Token, allocator: std.mem.Allocator) ![]const u8 {
-        const tokenString = self.toString();
+        const tokenStringResult = try self.toString(allocator);
+        defer if (tokenStringResult.allocated) allocator.free(tokenStringResult.str);
+        const tokenString = tokenStringResult.str;
+
         const typeName = self.typeNameString();
         const buffer = try allocator.alloc(u8, tokenString.len + typeName.len + 3);
         for (typeName, 0..) |c, i| {

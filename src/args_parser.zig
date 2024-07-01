@@ -6,8 +6,6 @@ pub const ArgsFlags = struct {
     debug_tokens: bool = false,
     /// If the AST should be printed to stdout
     debug_ast: bool = false,
-    /// If the grammar rules should be printed to stdout
-    debug_rules: bool = false,
 
     /// If we should avoid parsing the tokens to an AST
     stop_after_tokens: bool = false,
@@ -26,7 +24,7 @@ const Args = struct {
     }
 };
 
-const ArgParseError = error{ NoFileProvided, MultiplePathsProvided };
+pub const ArgParseError = error{ NoFileProvided, MultiplePathsProvided };
 
 pub fn parse(allocator: std.mem.Allocator) !Args {
     const args = try std.process.argsAlloc(allocator);
@@ -41,8 +39,6 @@ pub fn parse(allocator: std.mem.Allocator) !Args {
             flags.debug_tokens = true;
         } else if (std.mem.eql(u8, arg, "--debug-ast")) {
             flags.debug_ast = true;
-        } else if (std.mem.eql(u8, arg, "--debug-rules")) {
-            flags.debug_rules = true;
         } else if (std.mem.eql(u8, arg, "--stop-after-tokens")) {
             flags.stop_after_tokens = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {

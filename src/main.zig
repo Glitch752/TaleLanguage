@@ -33,7 +33,17 @@ pub fn main() !void {
     // };
 
     // Print the process arguments
-    const args = try args_parser.parse(allocator);
+    const args = args_parser.parse(allocator) catch |err| {
+        switch (err) {
+            args_parser.ArgParseError.NoFileProvided => {
+                std.process.exit(1);
+            },
+            args_parser.ArgParseError.MultiplePathsProvided => {
+                std.process.exit(1);
+            },
+            else => return err,
+        }
+    };
     defer args.deinit();
 
     // Open the file in the arguments of the program
@@ -96,16 +106,9 @@ pub fn main() !void {
     var prsr = try parser.init(tokens.items, args.flags, allocator, file_path);
     defer prsr.deinit();
 
-    const ast = prsr.parse() catch {
-        return try pretty_error("Unexpected error parsing the AST");
-    } orelse {
-        return try pretty_error("Unexpected error parsing the AST -- no AST generated");
-    };
-
-    if (args.flags.debug_ast) {
-        try stdout.print("AST:\n", .{});
-        // TODO
-        try ast.print(ast.*, &stdout.any(), 1, allocator);
-        std.debug.print("\n", .{});
-    }
+    // const ast = prsr.parse() catch {
+    //     return try pretty_error("Unexpected error parsing the AST");
+    // } orelse {
+    //     return try pretty_error("Unexpected error parsing the AST -- no AST generated");
+    // };
 }
