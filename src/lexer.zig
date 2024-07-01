@@ -9,6 +9,7 @@ buffer: []u8,
 line: usize,
 column: usize,
 position: usize,
+allocator: std.mem.Allocator,
 
 const escapeSequences = std.ComptimeStringMap(u8, .{
     .{ "n", '\n' },
@@ -19,11 +20,11 @@ const escapeSequences = std.ComptimeStringMap(u8, .{
     .{ "'", '\'' },
 });
 
-pub fn init(buffer: []u8) Tokenizer {
-    return .{ .buffer = buffer, .line = 1, .column = 1, .position = 0 };
+pub fn init(allocator: std.mem.Allocator, buffer: []u8) Tokenizer {
+    return .{ .allocator = allocator, .buffer = buffer, .line = 1, .column = 1, .position = 0 };
 }
 
-pub fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
+fn getNext(self: *Tokenizer, allocator: std.mem.Allocator) !TokenData {
     while (self.position < self.buffer.len) {
         // Read the next character
         const c = self.buffer[self.position];

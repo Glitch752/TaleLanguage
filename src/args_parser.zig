@@ -1,69 +1,75 @@
 const std = @import("std");
-const pretty_error = @import("main.zig").pretty_error;
+const prettyError = @import("errors.zig").prettyError;
 
 pub const ArgsFlags = struct {
     /// If the tokens should be printed to stdout
-    debug_tokens: bool = false,
+    debugTokens: bool = false,
     /// If the AST should be printed to stdout
-    debug_ast: bool = false,
+    debugAST: bool = false,
 
     /// If we should avoid parsing the tokens to an AST
-    stop_after_tokens: bool = false,
+    stopAfterTokens: bool = false,
     /// If the parser should print debug information
     verbose: bool = false,
     /// If the parser should print extremely verbose information
-    extremely_verbose: bool = false,
+    extremelyVerbose: bool = false,
 };
-const Args = struct {
-    file_path: []const u8,
+pub const Args = struct {
+    mode: union(enum) {
+        RunFile: []const u8,
+        RunRepl,
+    },
     flags: ArgsFlags,
 
     allocator: std.mem.Allocator,
     pub fn deinit(self: *const Args) void {
-        self.allocator.free(self.file_path);
+        switch (self.mode) {
+            .RunFile => self.allocator.free(self.mode.RunFile),
+            .RunRepl => {},
+        }
     }
 };
 
-pub const ArgParseError = error{ NoFileProvided, MultiplePathsProvided };
+pub const ArgParseError = error{MultiplePathsProvided};
 
 pub fn parse(allocator: std.mem.Allocator) !Args {
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 
-    var file_path: ?[]u8 = null;
+    var filePath: ?[]u8 = null;
     var flags = ArgsFlags{};
 
     // Skip the first argument, which is the program name
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--debug-tokens")) {
-            flags.debug_tokens = true;
+            flags.debugTokens = true;
         } else if (std.mem.eql(u8, arg, "--debug-ast")) {
-            flags.debug_ast = true;
+            flags.debugAST = true;
         } else if (std.mem.eql(u8, arg, "--stop-after-tokens")) {
-            flags.stop_after_tokens = true;
+            flags.stopAfterTokens = true;
         } else if (std.mem.eql(u8, arg, "--verbose")) {
             flags.verbose = true;
         } else if (std.mem.eql(u8, arg, "--extremely-verbose")) {
             flags.verbose = true;
-            flags.extremely_verbose = true;
+            flags.extremelyVerbose = true;
         } else {
-            if (file_path != null) {
-                try pretty_error("Multiple file paths provided\n");
+            if (filePath != null) {
+                try prettyError(try std.fmt.allocPrint(allocator, "Usage: {s} [<file>]\n", .{args[0]}));
+                try prettyError(try std.fmt.allocPrint(allocator, "Multiple paths provided: {s} and {s}\n", .{ filePath.?, arg }));
                 return ArgParseError.MultiplePathsProvided;
             }
 
-            file_path = arg;
+            filePath = arg;
         }
     }
 
-    if (file_path == null) {
-        try pretty_error(try std.fmt.allocPrint(allocator, "Usage: {s} <file>\n", .{ .name_string = args[0] }));
-        return ArgParseError.NoFileProvided;
+    if (filePath == null) {
+        return Args{ .mode = .RunRepl, .flags = flags, .allocator = allocator };
     }
 
-    // Clone file_path into a new buffer
-    const cloned_file_path: []u8 = try allocator.alloc(u8, file_path.?.len);
-    std.mem.copyForwards(u8, cloned_file_path, file_path.?);
+    // We clone filePath so we don't need to worry about the lifetime of the arguments
+    const clonedFilePath: []u8 = try allocator.alloc(u8, filePath.?.len);
+    std.mem.copyForwards(u8, clonedFilePath, filePath.?);
 
-    return Args{ .file_path = cloned_file_path, .flags = flags, .allocator = allocator };
+    return Args{ .mode = .{ .RunFile = clonedFilePath }, .flags = flags, .allocator = allocator };
 }

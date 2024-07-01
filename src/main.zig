@@ -4,54 +4,54 @@ const parser = @import("parser.zig");
 const args_parser = @import("args_parser.zig");
 const Token = @import("token.zig").Token;
 const TokenData = @import("token.zig").TokenData;
+const prettyError = @import("errors.zig").prettyError;
 
-pub fn pretty_error(message: []const u8) !void {
-    const stderr_file = std.io.getStdErr().writer();
-    var bw_err = std.io.bufferedWriter(stderr_file);
-    const stderr = bw_err.writer();
-    defer bw_err.flush() catch |err| {
-        std.debug.panic("Failed to flush stderr: {any}\n", .{err});
-    };
-
-    try stderr.print("\x1b[1;31m Error: {s}\x1b[0m\n", .{message});
-}
+pub const Main = @This();
+allocator: std.mem.Allocator,
+hadError: bool,
+args: ?*const args_parser.Args = null,
 
 pub fn main() !void {
-    // A general purpose allocator -- needed for nearly everything requiring memory allocation
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
-    // Get the standard output file
-    const stdout_file = std.io.getStdOut().writer();
-    // Temporary: Don't buffer the output
-    // var bw = std.io.bufferedWriter(stdout_file);
-    // const stdout = bw.writer();
-    const stdout = stdout_file;
-    // defer bw.flush() catch |err| {
-    //     std.debug.panic("Failed to flush stdout: {any}\n", .{err});
-    // };
+    var instance = Main{ .allocator = allocator };
+    defer instance.deinit();
+    try instance.entry();
+}
 
+pub fn entry(self: *Main) !void {
     // Print the process arguments
-    const args = args_parser.parse(allocator) catch |err| {
+    const args = args_parser.parse(self.allocator) catch |err| {
         switch (err) {
-            args_parser.ArgParseError.NoFileProvided => {
-                std.process.exit(1);
-            },
-            args_parser.ArgParseError.MultiplePathsProvided => {
-                std.process.exit(1);
-            },
+            args_parser.ArgParseError.MultiplePathsProvided => std.process.exit(1),
             else => return err,
         }
     };
     defer args.deinit();
 
+    switch (args.mode) {
+        .RunFile => {
+            try self.runFile(&args);
+        },
+        .RunRepl => {
+            try self.runRepl(&args);
+        },
+    }
+}
+
+pub fn deinit(self: *Main) void {
+    _ = self;
+}
+
+fn runFile(self: *Main) !void {
     // Open the file in the arguments of the program
-    const file_path = args.file_path;
-    const file = std.fs.cwd().openFile(file_path, .{ .mode = .read_only }) catch |err|
+    const filePath = self.args.?.mode.RunFile;
+    const file = std.fs.cwd().openFile(filePath, .{ .mode = .read_only }) catch |err|
         switch (err) {
         error.FileNotFound => {
-            try stdout.print("File not found: {s}\n", .{ .name_string = file_path });
+            std.debug.print("File not found: {s}\n", .{ .name_string = filePath });
             return;
         },
         else => return err,
@@ -59,56 +59,78 @@ pub fn main() !void {
 
     defer file.close();
 
-    const buffer = try file.readToEndAllocOptions(allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
-    defer allocator.free(buffer);
+    const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
+    defer self.allocator.free(buffer);
 
-    var lxr = lexer.init(buffer);
+    self.run(buffer);
 
-    var tokens = std.ArrayList(TokenData).init(allocator);
-    defer {
-        for (tokens.items) |tokenData| {
-            tokenData.deinit(&allocator);
-        }
-        tokens.deinit();
+    if (self.hadError) {
+        std.process.exit(65);
     }
+}
 
-    if (args.flags.debug_tokens) {
-        try stdout.print("Tokens:\n", .{});
-    }
+fn runRepl(self: *Main) !void {
+    const stdin = std.io.getStdIn().reader();
 
     while (true) {
-        const tokenData = try lxr.getNext(allocator);
+        const bare_line = try stdin.readUntilDelimiterOrEofAlloc(self.allocator, '\n', 1000000) catch |err| {
+            prettyError("Failed to read line from stdin");
+            break;
+        };
+        defer self.allocator.free(bare_line);
 
-        if (tokenData.token == Token.EOF) {
+        const line = std.mem.trim(u8, bare_line, "\r");
+
+        if (line.len == 0) {
             break;
         }
-        if (tokenData.token == Token.Error) {
-            return try pretty_error(try std.fmt.allocPrint(allocator, "Lexer Error: {d}:{d} - {s}", .{ tokenData.line, tokenData.column, tokenData.token.Error }));
+
+        self.run(line);
+        self.hadError = false;
+    }
+}
+
+fn run(self: *Main, source: []const u8) !void {
+    var sourceLexer = lexer.init(self.allocator, source);
+    var tokens = sourceLexer.getAllTokens();
+    defer sourceLexer.deinit();
+
+    if (self.args.flags.debugTokens) {
+        std.debug.print("Tokens:\n", .{});
+        for (tokens.items) |tokenData| {
+            const tokenString = try tokenData.token.toStringWithType(self.allocator);
+            defer self.allocator.free(tokenString);
+            std.debug.print("{s}", .{tokenString});
         }
-
-        if (args.flags.debug_tokens) {
-            const tokenString = try tokenData.token.toStringWithType(allocator);
-            defer allocator.free(tokenString);
-            try stdout.print("{s}", .{tokenString});
-        }
-
-        try tokens.append(tokenData);
     }
 
-    if (args.flags.debug_tokens) {
-        try stdout.print("\n\n", .{});
-    }
+    // while (true) {
+    //     const tokenData = try lxr.getNext(self.allocator);
 
-    if (args.flags.stop_after_tokens) {
-        return;
-    }
+    //     if (tokenData.token == Token.EOF) {
+    //         break;
+    //     }
+    //     if (tokenData.token == Token.Error) {
+    //         return try prettyError(try std.fmt.allocPrint(self.allocator, "Lexer Error: {d}:{d} - {s}", .{ tokenData.line, tokenData.column, tokenData.token.Error }));
+    //     }
 
-    var prsr = try parser.init(tokens.items, args.flags, allocator, file_path);
-    defer prsr.deinit();
+    //     if (args.flags.debugTokens) {
+    //         const tokenString = try tokenData.token.toStringWithType(self.allocator);
+    //         defer self.allocator.free(tokenString);
+    //         std.debug.print("{s}", .{tokenString});
+    //     }
 
-    // const ast = prsr.parse() catch {
-    //     return try pretty_error("Unexpected error parsing the AST");
-    // } orelse {
-    //     return try pretty_error("Unexpected error parsing the AST -- no AST generated");
-    // };
+    //     try tokens.append(tokenData);
+    // }
+
+    // if (args.flags.debugTokens) {
+    //     std.debug.print("\n\n", .{});
+    // }
+
+    // if (args.flags.stopAfterTokens) {
+    //     return;
+    // }
+
+    // var prsr = try parser.init(tokens.items, args.flags, self.allocator, filePath);
+    // defer prsr.deinit();
 }
