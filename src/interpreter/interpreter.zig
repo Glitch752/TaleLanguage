@@ -14,7 +14,7 @@ const errorContext = @import("../errors.zig").errorContext;
 pub const Interpreter = @This();
 
 /// Zig errors can't hold payloads, so we separate the actual error data from the error type.
-const RuntimeError = struct {
+pub const RuntimeError = struct {
     message: []const u8,
     token: Token,
 
@@ -39,13 +39,13 @@ const RuntimeError = struct {
         prettyError(errorMessage) catch {
             return;
         };
-        errorContext(self.originalBuffer, self.fileName, self.token.position, allocator) catch {
+        errorContext(self.originalBuffer, self.fileName, self.token.position, self.token.lexeme.len, allocator) catch {
             return;
         };
     }
 };
 
-const InterpretError = error{
+pub const InterpreterError = error{
     RuntimeError,
 };
 
@@ -112,21 +112,21 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                         return VariableValue.fromNumber(left.asNumber() - right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .Slash => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(left.asNumber() / right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .Star => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(left.asNumber() * right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .Plus => {
                     if (left.isNumber() and right.isNumber()) {
@@ -144,14 +144,14 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                         return VariableValue.fromString(mergedString, true);
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must both be numbers or strings", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .Percent => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(@mod(left.asNumber(), right.asNumber()));
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
 
                 .GreaterThan => {
@@ -159,28 +159,28 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                         return VariableValue.fromBoolean(left.asNumber() > right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .GreaterThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() >= right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .LessThan => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() < right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .LessThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() <= right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
 
                 .Equality => {
@@ -192,7 +192,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
 
                 else => {
                     self.runtimeError = RuntimeError.tokenError(self, "Unknown operator", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
             }
         },
@@ -210,7 +210,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                         return VariableValue.fromNumber(-right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operand must be a number", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 .Negate => {
                     const right = try self.interpretExpression(values.right);
@@ -218,12 +218,16 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                         return VariableValue.fromBoolean(!right.isTruthy());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, "Operand must be a boolean", values.operator);
-                    return InterpretError.RuntimeError;
+                    return InterpreterError.RuntimeError;
                 },
                 else => {
                     return VariableValue.null();
                 },
             }
+        },
+        .VariableAccess => |values| {
+            self.runtimeError = RuntimeError.tokenError(self, "Not implemented", values.name);
+            return InterpreterError.RuntimeError;
         },
     }
 }

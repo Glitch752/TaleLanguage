@@ -67,7 +67,7 @@ pub fn getAllTokens(self: *Tokenizer) !?[]Token {
             const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
             defer self.allocator.free(errorMessage);
             try prettyError(errorMessage);
-            try errorContext(self.buffer, self.fileName, self.position - 1, self.allocator);
+            try errorContext(self.buffer, self.fileName, self.position - 1, 1, self.allocator);
             return null;
         }
     }

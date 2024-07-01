@@ -51,7 +51,7 @@ const ParseError = struct {
                 prettyError(errorMessage) catch {
                     return;
                 };
-                errorContext(self.originalBuffer, self.fileName, value.token.position, allocator) catch {
+                errorContext(self.originalBuffer, self.fileName, value.token.position, value.token.lexeme.len, allocator) catch {
                     return;
                 };
             },
@@ -75,8 +75,8 @@ pub fn parse(self: *Parser) anyerror!Program {
     var program = Program.init(self.allocator);
 
     while (!self.isAtEnd()) {
-        const statement = try self.consumeStatement();
-        try program.addStatement(statement);
+        const declaration = try self.consumeDeclarationAndSynchronize() orelse continue;
+        try program.addStatement(declaration);
     }
 
     // We can't use matchToken here because it will detect we're at an EOF and return false
@@ -145,11 +145,22 @@ fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
 
 // Grammar rules
 
-fn consumeStatement(self: *Parser) anyerror!*Statement {
+fn consumeDeclarationAndSynchronize(self: *Parser) anyerror!?*Statement {
+    return self.consumeDeclaration() catch {
+        self.synchronize();
+        return null;
+    };
+}
+
+fn consumeDeclaration(self: *Parser) anyerror!*Statement {
     if (self.matchToken(TokenType.LetKeyword)) {
         return try self.consumeLetStatement();
     }
 
+    return try self.consumeStatement();
+}
+
+fn consumeStatement(self: *Parser) anyerror!*Statement {
     return try self.consumeExpressionStatement();
 }
 
@@ -280,6 +291,10 @@ fn consumePrimary(self: *Parser) anyerror!*Expression {
         return Expression.grouping(self.allocator, expression);
     }
 
+    if (self.matchToken(TokenType.Identifier)) {
+        return Expression.variableAccess(self.allocator, self.peekPrevious());
+    }
+
     const err = ParseError.consumeFailed(self, "Expected expression", self.peek());
     err.print(self.allocator);
     return ParseErrorEnum.Unknown;
@@ -288,7 +303,7 @@ fn consumePrimary(self: *Parser) anyerror!*Expression {
 // Error handling
 
 fn synchronize(self: *Parser) void {
-    self.advance();
+    _ = self.advance();
 
     while (!self.isAtEnd()) {
         if (self.peekPrevious().type == TokenType.Semicolon) {
@@ -306,6 +321,6 @@ fn synchronize(self: *Parser) void {
             else => {},
         }
 
-        self.advance();
+        _ = self.advance();
     }
 }

@@ -30,7 +30,7 @@ pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]cons
     return buffer;
 }
 
-pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, allocator: std.mem.Allocator) !void {
+pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, length: usize, allocator: std.mem.Allocator) !void {
     const stderrFile = std.io.getStdErr().writer();
     var bwErr = std.io.bufferedWriter(stderrFile);
     const stderr = bwErr.writer();
@@ -73,7 +73,10 @@ pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, a
     const caretSpaces = try repeat(column + lineString.len + 3, ' ', allocator);
     defer allocator.free(caretSpaces);
 
-    const string = try std.fmt.allocPrint(allocator, "{s} | {s}\n{s}\x1b[1;31m^", .{ lineString, line, caretSpaces });
+    const carets = try repeat(length, '^', allocator);
+    defer allocator.free(carets);
+
+    const string = try std.fmt.allocPrint(allocator, "{s} | {s}\n{s}\x1b[1;31m{s}", .{ lineString, line, caretSpaces, carets });
     defer allocator.free(string);
 
     try stderr.print("{s}\x1b[0m\n", .{string});

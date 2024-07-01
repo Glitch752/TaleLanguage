@@ -7,6 +7,7 @@ pub const Expression = union(enum) {
     Grouping: struct { expression: *const Expression },
     Literal: struct { value: TokenLiteral },
     Unary: struct { operator: Token, right: *const Expression },
+    VariableAccess: struct { name: Token },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -15,8 +16,8 @@ pub const Expression = union(enum) {
                 data.right.uninit(allocator);
             },
             .Grouping => |data| data.expression.uninit(allocator),
-            .Literal => {},
             .Unary => |data| data.right.uninit(allocator),
+            else => {},
         }
         allocator.destroy(self);
     }
@@ -39,6 +40,11 @@ pub const Expression = union(enum) {
     pub fn unary(allocator: std.mem.Allocator, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .Unary = .{ .operator = operator, .right = right } };
+        return alloc;
+    }
+    pub fn variableAccess(allocator: std.mem.Allocator, name: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .VariableAccess = .{ .name = name } };
         return alloc;
     }
 };

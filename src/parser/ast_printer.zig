@@ -63,5 +63,8 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
             try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
+        .VariableAccess => |values| {
+            std.debug.print("{s}", .{values.name.lexeme});
+        },
     }
 }
