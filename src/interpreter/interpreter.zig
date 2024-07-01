@@ -57,12 +57,10 @@ originalBuffer: []const u8 = "",
 fileName: []const u8 = "",
 
 rootEnvironment: Environment,
+activeEnvironment: ?*Environment = null,
 
 pub fn init(allocator: std.mem.Allocator) Interpreter {
-    return .{
-        .allocator = allocator,
-        .rootEnvironment = Environment.init(allocator),
-    };
+    return .{ .allocator = allocator, .rootEnvironment = Environment.init(allocator) };
 }
 
 pub fn deinit(self: *Interpreter) void {
@@ -74,12 +72,33 @@ pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const 
     self.originalBuffer = originalBuffer;
     self.fileName = fileName;
 
+    self.activeEnvironment = &self.rootEnvironment;
+
     self.runtimeError = null;
     _ = self.interpret(program) catch null;
 
     if (self.runtimeError != null) {
         self.runtimeError.?.print(self.allocator);
     }
+}
+
+pub fn runExpression(self: *Interpreter, expression: *const Expression, originalBuffer: []const u8, fileName: []const u8) !VariableValue {
+    self.originalBuffer = originalBuffer;
+    self.fileName = fileName;
+
+    self.activeEnvironment = &self.rootEnvironment;
+
+    self.runtimeError = null;
+    const result: ?VariableValue = self.interpretExpression(expression) catch null;
+
+    if (self.runtimeError != null) {
+        self.runtimeError.?.print(self.allocator);
+    }
+    if (result == null) {
+        return VariableValue.null();
+    }
+
+    return result.?;
 }
 
 fn interpret(self: *Interpreter, program: *const Program) !void {
@@ -99,6 +118,17 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
             defer value.deinit(self.allocator);
 
             try self.rootEnvironment.define(values.name.lexeme, value);
+        },
+        .Block => |values| {
+            var childEnvironment = self.rootEnvironment.createChild();
+            defer childEnvironment.deinit();
+
+            self.activeEnvironment = &childEnvironment;
+            defer self.activeEnvironment = &self.rootEnvironment;
+
+            for (values.statements.items) |childStatement| {
+                try self.interpretStatement(childStatement);
+            }
         },
     }
 }
@@ -232,14 +262,14 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             }
         },
         .VariableAccess => |values| {
-            const variable = try self.rootEnvironment.get(values.name, self);
+            const variable = try self.activeEnvironment.?.get(values.name, self);
             return variable;
         },
         .VariableAssignment => |values| {
             const value = try self.interpretExpression(values.value);
             defer value.deinit(self.allocator);
 
-            try self.rootEnvironment.assign(values.name, value, self);
+            try self.activeEnvironment.?.assign(values.name, value, self);
             return value;
         },
     }

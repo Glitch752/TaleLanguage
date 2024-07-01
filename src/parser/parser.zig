@@ -85,21 +85,24 @@ pub fn parse(self: *Parser) anyerror!Program {
 
     // We can't use matchToken here because it will detect we're at an EOF and return false
     if (self.peek().type != TokenType.EOF) {
-        if (self.current == self.tokens.len) {
-            const err = ParseError.consumeFailed(
-                self,
-                "Expected EOF at end of file... wait, what?",
-                Token.init(TokenType.EOF, "", .{ .None = {} }, self.peekPrevious().position + 1),
-            );
-            err.print(self.allocator);
-            return ParseErrorEnum.Unknown;
-        }
         const err = ParseError.consumeFailed(self, "Expected EOF", self.peek());
         err.print(self.allocator);
         return ParseErrorEnum.Unknown;
     }
 
     return program;
+}
+
+pub fn parseExpression(self: *Parser) anyerror!*Expression {
+    const expression = try self.consumeExpression();
+
+    if (!self.isAtEnd()) {
+        const err = ParseError.consumeFailed(self, "Expected EOF", self.peek());
+        err.print(self.allocator);
+        return ParseErrorEnum.Unknown;
+    }
+
+    return expression;
 }
 
 pub fn uninit(self: *Parser) void {
@@ -174,7 +177,24 @@ fn consumeDeclaration(self: *Parser) anyerror!*Statement {
 }
 
 fn consumeStatement(self: *Parser) anyerror!*Statement {
+    if (self.matchToken(TokenType.OpenCurly)) {
+        return try self.consumeBlockStatement();
+    }
+
     return try self.consumeExpressionStatement();
+}
+
+fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
+    var statements = std.ArrayList(*Statement).init(self.allocator);
+
+    while (!self.matchToken(TokenType.CloseCurly) and !self.isAtEnd()) {
+        const statement = self.consumeDeclarationAndSynchronize() orelse continue;
+        try statements.append(statement);
+    }
+
+    _ = try self.consume(TokenType.CloseCurly, "Expected '}' after a block statement.");
+
+    return Statement.block(self.allocator, statements);
 }
 
 fn consumeLetStatement(self: *Parser) anyerror!*Statement {

@@ -15,12 +15,18 @@ pub fn init(allocator: std.mem.Allocator) ASTPrinter {
 }
 
 pub fn printProgram(self: *const ASTPrinter, program: *const Program) !void {
+    std.debug.print("Program:\n", .{});
     for (program.statements.items) |statement| {
-        try self.printStatement(statement);
+        try self.printStatement(statement, 1);
     }
 }
 
-pub fn printStatement(self: *const ASTPrinter, statement: *const Statement) !void {
+pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, indent: u32) !void {
+    var i: u32 = 0;
+    while (i < indent) : (i += 1) {
+        std.debug.print("  ", .{});
+    }
+
     switch (statement.*) {
         .Expression => |values| {
             try self.printExpression(values.expression);
@@ -32,6 +38,13 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement) !voi
             std.debug.print(" = ", .{});
             try self.printExpression(values.initializer);
             std.debug.print(";", .{});
+        },
+        .Block => |values| {
+            std.debug.print("{{", .{});
+            for (values.statements.items) |childStatement| {
+                try self.printStatement(childStatement, indent + 1);
+            }
+            std.debug.print("}}", .{});
         },
     }
 }

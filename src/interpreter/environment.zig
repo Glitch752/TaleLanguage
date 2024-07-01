@@ -11,11 +11,21 @@ pub const Environment = @This();
 
 allocator: std.mem.Allocator,
 values: std.StringHashMap(VariableValue),
+parent: ?*Environment = null,
 
 pub fn init(allocator: std.mem.Allocator) Environment {
     return .{
         .allocator = allocator,
         .values = std.StringHashMap(VariableValue).init(allocator),
+        .parent = null,
+    };
+}
+
+pub fn createChild(self: *Environment) Environment {
+    return .{
+        .allocator = self.allocator,
+        .values = std.StringHashMap(VariableValue).init(self.allocator),
+        .parent = self,
     };
 }
 
@@ -40,14 +50,22 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
         return;
     }
 
+    if (self.parent != null) {
+        try self.parent.?.assign(name, value, interpreter);
+        return;
+    }
+
     try self.values.put(name.lexeme, value);
 }
 
 pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !VariableValue {
     const entry = self.values.get(name.lexeme);
-    if (entry == null) {
-        interpreter.runtimeError = RuntimeError.tokenError(interpreter, "Tried to access undefined variable", name);
-        return InterpreterError.RuntimeError;
+    if (entry != null) return entry.?;
+
+    if (self.parent != null) {
+        return try self.parent.?.get(name, interpreter);
     }
-    return entry.?;
+
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, "Tried to access undefined variable", name);
+    return InterpreterError.RuntimeError;
 }

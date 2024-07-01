@@ -5,7 +5,10 @@ const parser = @import("./parser/parser.zig");
 const interpreter = @import("./interpreter/interpreter.zig");
 
 const args_parser = @import("args_parser.zig");
+
 const Token = @import("token.zig").Token;
+const TokenType = @import("token.zig").TokenType;
+
 const ASTPrinter = @import("parser/ast_printer.zig").ASTPrinter;
 const prettyError = @import("errors.zig").prettyError;
 
@@ -72,7 +75,7 @@ fn runFile(self: *Main) !void {
     const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
     defer self.allocator.free(buffer);
 
-    try self.run(filePath, buffer);
+    try self.run(filePath, buffer, false);
 
     if (self.hadError) {
         std.process.exit(65);
@@ -98,12 +101,12 @@ fn runRepl(self: *Main) !void {
             break;
         }
 
-        try self.run("repl", line);
+        try self.run("repl", line, true);
         self.hadError = false;
     }
 }
 
-fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
+fn run(self: *Main, fileName: []const u8, source: []const u8, allowEvaluatingExpressions: bool) !void {
     // LEXING -------------------------------------
     var sourceLexer = lexer.init(self.allocator, fileName, source);
     defer sourceLexer.deinit();
@@ -134,18 +137,43 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
     defer sourceParser.uninit();
 
-    var program = sourceParser.parse() catch {
-        self.hadError = true;
-        return;
-    };
-    defer program.deinit();
+    if (allowEvaluatingExpressions and
+        tokens[tokens.len - 2].type != TokenType.Semicolon and
+        tokens[tokens.len - 2].type != TokenType.CloseCurly)
+    {
+        var expression = sourceParser.parseExpression() catch {
+            self.hadError = true;
+            return;
+        };
+        defer expression.uninit(self.allocator);
 
-    if (self.args.?.flags.debugAST) {
-        const printer = ASTPrinter.init(self.allocator);
-        try printer.printProgram(&program);
-        std.debug.print("\n\n", .{});
+        if (self.args.?.flags.debugAST) {
+            const printer = ASTPrinter.init(self.allocator);
+            try printer.printExpression(expression);
+            std.debug.print("\n\n", .{});
+        }
+
+        // INTERPRETING -------------------------------------
+        const result = self.interpreter.?.runExpression(expression, source, fileName) catch {
+            self.hadError = true;
+            return;
+        };
+
+        std.debug.print("=> {s}\n", .{try result.toString(self.allocator)});
+    } else {
+        var program = sourceParser.parse() catch {
+            self.hadError = true;
+            return;
+        };
+        defer program.deinit();
+
+        if (self.args.?.flags.debugAST) {
+            const printer = ASTPrinter.init(self.allocator);
+            try printer.printProgram(&program);
+            std.debug.print("\n\n", .{});
+        }
+
+        // INTERPRETING -------------------------------------
+        try self.interpreter.?.run(&program, source, fileName);
     }
-
-    // INTERPRETING -------------------------------------
-    try self.interpreter.?.run(&program, source, fileName);
 }
