@@ -65,7 +65,7 @@ fn runFile(self: *Main) !void {
     const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
     defer self.allocator.free(buffer);
 
-    try self.run(buffer);
+    try self.run(filePath, buffer);
 
     if (self.hadError) {
         std.process.exit(65);
@@ -90,15 +90,17 @@ fn runRepl(self: *Main) !void {
             break;
         }
 
-        try self.run(line);
+        try self.run("repl", line);
         self.hadError = false;
     }
 }
 
-fn run(self: *Main, source: []const u8) !void {
-    var sourceLexer = lexer.init(self.allocator, source);
-    const tokens = try sourceLexer.getAllTokens();
+fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
+    var sourceLexer = lexer.init(self.allocator, fileName, source);
     defer sourceLexer.deinit();
+    const tokens = try sourceLexer.getAllTokens() orelse {
+        return;
+    };
 
     if (self.args.?.flags.debugTokens) {
         std.debug.print("Tokens:\n", .{});

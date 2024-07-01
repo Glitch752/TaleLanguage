@@ -30,6 +30,7 @@ pub const TokenType = enum {
 
     SuperKeyword, // super
     ThisKeyword, // this
+    ExtendingKeyword, // extending
 
     IfKeyword, // if
     ElseKeyword, // else
@@ -126,6 +127,7 @@ pub const Token = struct {
         .{ "class", TokenType.ClassKeyword },
         .{ "super", TokenType.SuperKeyword },
         .{ "this", TokenType.ThisKeyword },
+        .{ "extending", TokenType.ExtendingKeyword },
     });
     pub const symbolMap = std.ComptimeStringMap(TokenType, .{
         // This comment is to prevent zigfmt from collapsing the lines

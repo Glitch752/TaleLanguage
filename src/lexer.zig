@@ -6,6 +6,7 @@ const TokenType = @import("token.zig").TokenType;
 const TokenLiteral = @import("token.zig").TokenLiteral;
 
 const prettyError = @import("errors.zig").prettyError;
+const errorContext = @import("errors.zig").errorContext;
 
 const Tokenizer = @This();
 
@@ -18,6 +19,7 @@ tokenStartPosition: usize = 0,
 position: usize = 0,
 allocator: std.mem.Allocator,
 tokens: std.ArrayList(Token),
+fileName: []const u8,
 
 const escapeSequences = std.ComptimeStringMap(u8, .{
     .{ "n", '\n' },
@@ -28,11 +30,12 @@ const escapeSequences = std.ComptimeStringMap(u8, .{
     .{ "'", '\'' },
 });
 
-pub fn init(allocator: std.mem.Allocator, buffer: []const u8) Tokenizer {
+pub fn init(allocator: std.mem.Allocator, fileName: []const u8, buffer: []const u8) Tokenizer {
     return .{
         .allocator = allocator,
         // The source data to tokenize
         .buffer = buffer,
+        .fileName = fileName,
         .tokens = std.ArrayList(Token).init(allocator),
     };
 }
@@ -55,7 +58,7 @@ fn addToken(self: *Tokenizer, @"type": TokenType, literal: TokenLiteral) !bool {
     return false;
 }
 
-pub fn getAllTokens(self: *Tokenizer) ![]Token {
+pub fn getAllTokens(self: *Tokenizer) !?[]Token {
     var errorPayload = TokenizerErrorPayload{ .InvalidCharacter = 0 };
 
     while (!self.isAtEnd()) {
@@ -64,7 +67,8 @@ pub fn getAllTokens(self: *Tokenizer) ![]Token {
             const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
             defer self.allocator.free(errorMessage);
             try prettyError(errorMessage);
-            break;
+            try errorContext(self.buffer, self.fileName, self.position, self.allocator);
+            return null;
         }
     }
 
