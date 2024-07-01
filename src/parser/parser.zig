@@ -25,6 +25,8 @@ fileName: []const u8,
 allocator: std.mem.Allocator,
 flags: ArgsFlags,
 
+hasError: bool = false,
+
 /// Errors in Zig can't hold payloads, so we separate the actual error data from the error type.
 const ParseError = struct {
     @"error": union(enum) { ConsumeFailed: struct {
@@ -72,10 +74,12 @@ pub fn init(tokens: []Token, fileName: []const u8, originalBuffer: []const u8, f
 }
 
 pub fn parse(self: *Parser) anyerror!Program {
+    self.hasError = false;
+
     var program = Program.init(self.allocator);
 
     while (!self.isAtEnd()) {
-        const declaration = try self.consumeDeclarationAndSynchronize() orelse continue;
+        const declaration = self.consumeDeclarationAndSynchronize() orelse continue;
         try program.addStatement(declaration);
     }
 
@@ -100,6 +104,14 @@ pub fn parse(self: *Parser) anyerror!Program {
 
 pub fn uninit(self: *Parser) void {
     _ = self;
+}
+
+/// Sets "hasError" to true and prints an error message on the current token.
+/// If you want it to be an error that allows continued parsing of a statement, just don't reutrn anything (`_ = self.errorOccured("Error message")`).
+fn errorOccured(self: *Parser, errorMessage: []const u8) void {
+    const err = ParseError.consumeFailed(self, errorMessage, self.peek());
+    err.print(self.allocator);
+    self.hasError = true;
 }
 
 fn isAtEnd(self: *Parser) bool {
@@ -138,14 +150,15 @@ fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
         return self.peekPrevious();
     }
 
-    const err = ParseError.consumeFailed(self, errorMessage, self.peek());
-    err.print(self.allocator);
+    self.errorOccured(errorMessage);
     return ParseErrorEnum.Unknown;
 }
 
+//
 // Grammar rules
+//
 
-fn consumeDeclarationAndSynchronize(self: *Parser) anyerror!?*Statement {
+fn consumeDeclarationAndSynchronize(self: *Parser) ?*Statement {
     return self.consumeDeclaration() catch {
         self.synchronize();
         return null;
@@ -184,8 +197,35 @@ fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
     return Statement.expression(self.allocator, expression);
 }
 
+// Expression parsing
+
 fn consumeExpression(self: *Parser) anyerror!*Expression {
-    return try self.consumeEquality();
+    return try self.consumeAssignment();
+}
+
+fn consumeAssignment(self: *Parser) anyerror!*Expression {
+    const expression = try self.consumeEquality();
+
+    if (self.matchToken(TokenType.Assign)) {
+        // This is an assignment
+
+        const equals = self.peekPrevious(); // Used for error reporting
+        const value = try self.consumeAssignment();
+
+        switch (expression.*) {
+            .VariableAccess => {
+                const variable = expression.VariableAccess.name;
+                return Expression.variableAssignment(self.allocator, variable, value);
+            },
+            else => {},
+        }
+
+        const err = ParseError.consumeFailed(self, "Invalid assignment target", equals);
+        err.print(self.allocator);
+        return ParseErrorEnum.Unknown;
+    }
+
+    return expression;
 }
 
 fn consumeEquality(self: *Parser) anyerror!*Expression {

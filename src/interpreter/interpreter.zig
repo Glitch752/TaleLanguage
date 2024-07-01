@@ -3,6 +3,7 @@ const std = @import("std");
 const Expression = @import("../parser/expression.zig").Expression;
 const Statement = @import("../parser/statement.zig").Statement;
 const Program = @import("../parser/program.zig").Program;
+const Environment = @import("./environment.zig").Environment;
 
 const Token = @import("../token.zig").Token;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
@@ -55,8 +56,13 @@ runtimeError: ?RuntimeError = null,
 originalBuffer: []const u8 = "",
 fileName: []const u8 = "",
 
+rootEnvironment: Environment,
+
 pub fn init(allocator: std.mem.Allocator) Interpreter {
-    return .{ .allocator = allocator };
+    return .{
+        .allocator = allocator,
+        .rootEnvironment = Environment.init(allocator),
+    };
 }
 
 pub fn deinit(self: *Interpreter) void {
@@ -69,7 +75,7 @@ pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const 
     self.fileName = fileName;
 
     self.runtimeError = null;
-    try self.interpret(program);
+    _ = self.interpret(program) catch null;
 
     if (self.runtimeError != null) {
         self.runtimeError.?.print(self.allocator);
@@ -92,7 +98,7 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
             const value = try self.interpretExpression(values.initializer);
             defer value.deinit(self.allocator);
 
-            std.debug.print("Would have assigned {s} to {s}\n", .{ try value.toString(self.allocator), values.name.lexeme });
+            try self.rootEnvironment.define(values.name.lexeme, value);
         },
     }
 }
@@ -226,8 +232,15 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             }
         },
         .VariableAccess => |values| {
-            self.runtimeError = RuntimeError.tokenError(self, "Not implemented", values.name);
-            return InterpreterError.RuntimeError;
+            const variable = try self.rootEnvironment.get(values.name, self);
+            return variable;
+        },
+        .VariableAssignment => |values| {
+            const value = try self.interpretExpression(values.value);
+            defer value.deinit(self.allocator);
+
+            try self.rootEnvironment.assign(values.name, value, self);
+            return value;
         },
     }
 }

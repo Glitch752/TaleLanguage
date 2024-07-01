@@ -8,6 +8,7 @@ pub const Expression = union(enum) {
     Literal: struct { value: TokenLiteral },
     Unary: struct { operator: Token, right: *const Expression },
     VariableAccess: struct { name: Token },
+    VariableAssignment: struct { name: Token, value: *const Expression },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -45,6 +46,11 @@ pub const Expression = union(enum) {
     pub fn variableAccess(allocator: std.mem.Allocator, name: Token) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .VariableAccess = .{ .name = name } };
+        return alloc;
+    }
+    pub fn variableAssignment(allocator: std.mem.Allocator, name: Token, value: *const Expression) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .VariableAssignment = .{ .name = name, .value = value } };
         return alloc;
     }
 };
