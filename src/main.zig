@@ -114,9 +114,13 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     if (self.args.?.flags.debugTokens) {
         std.debug.print("Tokens:\n", .{});
         for (tokens) |token| {
-            const tokenString = try token.toCondensedString(self.allocator);
-            defer self.allocator.free(tokenString);
-            std.debug.print("{s}", .{tokenString});
+            if (self.args.?.flags.extremelyVerbose) {
+                std.debug.print("  {any}\n", .{token});
+            } else {
+                const tokenString = try token.toCondensedString(self.allocator);
+                defer self.allocator.free(tokenString);
+                std.debug.print("{s}", .{tokenString});
+            }
         }
         std.debug.print("\n\n", .{});
     }

@@ -67,7 +67,7 @@ pub fn getAllTokens(self: *Tokenizer) !?[]Token {
             const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
             defer self.allocator.free(errorMessage);
             try prettyError(errorMessage);
-            try errorContext(self.buffer, self.fileName, self.position, self.allocator);
+            try errorContext(self.buffer, self.fileName, self.position - 1, self.allocator);
             return null;
         }
     }
@@ -81,18 +81,15 @@ pub fn getAllTokens(self: *Tokenizer) !?[]Token {
 /// True means there was an error, and errorPayload will be set.
 /// This isn't an ideal solution, but Zig's lack of error payloads makes it difficult to get detailed error information out of a function.
 fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
-    self.tokenStartPosition = self.position;
-
     while (self.position < self.buffer.len) {
+        self.tokenStartPosition = self.position;
+
         // Read the next character
         const c = self.buffer[self.position];
         self.position += 1;
 
         // First, skip whitespace
-        if (std.ascii.isWhitespace(c)) {
-            self.tokenStartPosition = self.position;
-            continue;
-        }
+        if (std.ascii.isWhitespace(c)) continue;
 
         // Next, handle comments
         if (c == '/') {
@@ -101,7 +98,6 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
                 while (self.position < self.buffer.len and self.buffer[self.position] != '\n') {
                     self.position += 1;
                 }
-                self.tokenStartPosition = self.position;
                 continue;
             } else if (self.buffer[self.position] == '*') {
                 // Skip to the end of the block comment
@@ -109,7 +105,6 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
                     self.position += 1;
                 }
                 self.position += 2;
-                self.tokenStartPosition = self.position;
                 continue;
             }
         }

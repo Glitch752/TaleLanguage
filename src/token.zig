@@ -109,6 +109,7 @@ pub const Token = struct {
     pub fn toString(self: *const Token, allocator: std.mem.Allocator) ![]const u8 {
         const literalString = try self.literal.toString(allocator);
         defer allocator.free(literalString);
+
         return try std.fmt.allocPrint(allocator, "{s} {s} {s}", .{ self.type.typeNameString(), self.lexeme, literalString });
     }
 
