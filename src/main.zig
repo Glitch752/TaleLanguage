@@ -117,8 +117,10 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
         return;
     }
 
-    var sourceParser = try parser.init(tokens, self.args.?.flags, self.allocator);
+    var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
     defer sourceParser.deinit();
 
-    try sourceParser.parse();
+    const expression = try sourceParser.parse();
+
+    _ = expression;
 }

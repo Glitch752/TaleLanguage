@@ -39,6 +39,7 @@ pub const TokenType = enum {
 
     TrueKeyword, // true
     FalseKeyword, // false
+    NullKeyword, // null
 
     ReturnKeyword, // return
     LetKeyword, // let
@@ -64,6 +65,11 @@ pub const TokenLiteral = union(enum) {
     NumberLiteral: f64,
     StringLiteral: []const u8,
     Identifier: []const u8,
+
+    False,
+    True,
+    Null,
+
     None,
 
     pub fn toString(self: TokenLiteral, allocator: std.mem.Allocator) ![]const u8 {
@@ -71,6 +77,9 @@ pub const TokenLiteral = union(enum) {
             .NumberLiteral => |number| return try std.fmt.allocPrint(allocator, "{d}", .{number}),
             .StringLiteral => |string| return try std.fmt.allocPrint(allocator, "{s}", .{string}),
             .Identifier => |identifier| return try std.fmt.allocPrint(allocator, "{s}", .{identifier}),
+            .False => return try std.fmt.allocPrint(allocator, "False", .{}),
+            .True => return try std.fmt.allocPrint(allocator, "True", .{}),
+            .Null => return try std.fmt.allocPrint(allocator, "Null", .{}),
             .None => return try std.fmt.allocPrint(allocator, "None", .{}),
         }
     }
@@ -124,6 +133,7 @@ pub const Token = struct {
         .{ "while", TokenType.WhileKeyword },
         .{ "true", TokenType.TrueKeyword },
         .{ "false", TokenType.FalseKeyword },
+        .{ "null", TokenType.NullKeyword },
         .{ "class", TokenType.ClassKeyword },
         .{ "super", TokenType.SuperKeyword },
         .{ "this", TokenType.ThisKeyword },
