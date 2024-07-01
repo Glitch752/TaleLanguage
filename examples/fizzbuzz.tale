@@ -2,21 +2,21 @@ let main = function() {
     let i = 0;
     while(i < 20) {
         i = i + 1;
-        
+
         /*
          Comments can also span multiple lines.
         */
         if(i % 3 == 0 && ((i % 3) == 0)) {
             // Log prints to stdout
-            log("FizzBuzz\n");
+            Std.print("FizzBuzz\n");
         }
-        else if(i % 3 == 0) log("Fizz\n");
+        else if(i % 3 == 0) Std.print("Fizz\n");
         else if(i % 5 == 0) {
-            log("Buzz\n");
+            Std.print("Buzz\n");
         } else {
             // Not sure how much I like string() as the type cast, but it's the easiest method for now.
             // Additionally, + as a string concatenation operator itn't my favorite.
-            log(string(i) + "\n");
+            Std.print(string(i) + "\n");
         }
     }
 

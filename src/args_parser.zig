@@ -27,6 +27,7 @@ pub const Args = struct {
             .RunFile => self.allocator.free(self.mode.RunFile),
             .RunRepl => {},
         }
+        self.allocator.destroy(self);
     }
 };
 

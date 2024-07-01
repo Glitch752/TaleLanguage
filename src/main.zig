@@ -23,15 +23,18 @@ pub fn main() !void {
 
 pub fn entry(self: *Main) !void {
     // Print the process arguments
-    const args = args_parser.parse(self.allocator) catch |err| {
+    const args = try self.allocator.create(args_parser.Args);
+    args.* = args_parser.parse(self.allocator) catch |err| {
         switch (err) {
             args_parser.ArgParseError.MultiplePathsProvided => std.process.exit(1),
             else => return err,
         }
     };
-    defer args.deinit();
+    self.args = args;
 
-    switch (args.mode) {
+    defer self.args.?.deinit();
+
+    switch (self.args.?.mode) {
         .RunFile => {
             try self.runFile();
         },
@@ -73,9 +76,10 @@ fn runRepl(self: *Main) !void {
     const stdin = std.io.getStdIn().reader();
 
     while (true) {
-        const bare_line = try stdin.readUntilDelimiterOrEofAlloc(self.allocator, '\n', 1000000) catch |err| {
-            _ = err;
-            prettyError("Failed to read line from stdin");
+        const bare_line = stdin.readUntilDelimiterOrEofAlloc(self.allocator, '\n', 1000000) catch {
+            try prettyError("Failed to read line from stdin");
+            break;
+        } orelse {
             break;
         };
         defer self.allocator.free(bare_line);
@@ -98,8 +102,8 @@ fn run(self: *Main, source: []const u8) !void {
 
     if (self.args.?.flags.debugTokens) {
         std.debug.print("Tokens:\n", .{});
-        for (tokens.items) |tokenData| {
-            const tokenString = try tokenData.token.toStringWithType(self.allocator);
+        for (tokens) |token| {
+            const tokenString = try token.toCondensedString(self.allocator);
             defer self.allocator.free(tokenString);
             std.debug.print("{s}", .{tokenString});
         }

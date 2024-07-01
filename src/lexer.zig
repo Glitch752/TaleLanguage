@@ -1,7 +1,10 @@
 const std = @import("std");
 const io = @import("std").io;
+
 const Token = @import("token.zig").Token;
 const TokenType = @import("token.zig").TokenType;
+const TokenLiteral = @import("token.zig").TokenLiteral;
+
 const prettyError = @import("errors.zig").prettyError;
 
 const Tokenizer = @This();
@@ -35,33 +38,45 @@ pub fn init(allocator: std.mem.Allocator, buffer: []const u8) Tokenizer {
 }
 
 pub fn deinit(self: *Tokenizer) void {
+    for (self.tokens.items) |token| {
+        token.deinit(self.allocator);
+    }
     self.tokens.deinit();
+}
+
+fn isAtEnd(self: *Tokenizer) bool {
+    return self.position >= self.buffer.len;
+}
+
+/// Always returns false to make `return try self.addToken(...)` work
+fn addToken(self: *Tokenizer, @"type": TokenType, literal: TokenLiteral) !bool {
+    const lexeme = self.buffer[self.tokenStartPosition..self.position];
+    try self.tokens.append(Token.init(@"type", lexeme, literal, self.tokenStartPosition));
+    return false;
 }
 
 pub fn getAllTokens(self: *Tokenizer) ![]Token {
     var errorPayload = TokenizerErrorPayload{ .InvalidCharacter = 0 };
 
-    while (true) {
-        const next = try self.getNext(&errorPayload) orelse {
-            if (errorPayload.InvalidCharacter != 0) {
-                const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
-                defer self.allocator.free(errorMessage);
-                prettyError(errorMessage);
-            }
-            break;
-        };
-
-        self.tokens.append(next);
-
-        if (next.token == Token.EOF) {
+    while (!self.isAtEnd()) {
+        if (try self.takeNext(&errorPayload)) {
+            // TODO: Better errors with at least some context and line numbers
+            const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
+            defer self.allocator.free(errorMessage);
+            try prettyError(errorMessage);
             break;
         }
     }
 
+    try self.tokens.append(Token.init(TokenType.EOF, "", TokenLiteral.None, self.position));
+
     return self.tokens.items;
 }
 
-fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
+/// Returns an error if there was an allocation error, but otherwise returns a boolean indicating if there was a tokenizer error.
+/// True means there was an error, and errorPayload will be set.
+/// This isn't an ideal solution, but Zig's lack of error payloads makes it difficult to get detailed error information out of a function.
+fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
     self.tokenStartPosition = self.position;
 
     while (self.position < self.buffer.len) {
@@ -70,7 +85,10 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
         self.position += 1;
 
         // First, skip whitespace
-        if (std.ascii.isWhitespace(c)) continue;
+        if (std.ascii.isWhitespace(c)) {
+            self.tokenStartPosition = self.position;
+            continue;
+        }
 
         // Next, handle comments
         if (c == '/') {
@@ -79,6 +97,7 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
                 while (self.position < self.buffer.len and self.buffer[self.position] != '\n') {
                     self.position += 1;
                 }
+                self.tokenStartPosition = self.position;
                 continue;
             } else if (self.buffer[self.position] == '*') {
                 // Skip to the end of the block comment
@@ -86,6 +105,7 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
                     self.position += 1;
                 }
                 self.position += 2;
+                self.tokenStartPosition = self.position;
                 continue;
             }
         }
@@ -106,11 +126,11 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
             const token = Token.keywordMap.get(keyword);
             if (token != null) {
                 self.allocator.free(keyword);
-                return Token.init(token.?, token.?.typeNameString(), self.tokenStartPosition);
+                return try self.addToken(token.?, TokenLiteral.None);
             }
 
             // If it's not a keyword, it's an identifier
-            return Token.init(TokenType.Identifier, keyword, self.tokenStartPosition);
+            return try self.addToken(TokenType.Identifier, .{ .Identifier = keyword });
         }
 
         // Next, numbers
@@ -126,14 +146,14 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
                 var decimal: f64 = 0.0;
                 var decimalPlace: f64 = 0.1;
                 while (std.ascii.isDigit(self.buffer[self.position])) {
-                    decimal += (self.buffer[self.position] - '0') * decimalPlace;
+                    decimal += @as(f64, @floatFromInt(self.buffer[self.position] - '0')) * decimalPlace;
                     decimalPlace /= 10.0;
                     self.position += 1;
                 }
-                return Token.init(TokenType.NumberLiteral, number + decimal, self.tokenStartPosition);
+                return try self.addToken(TokenType.NumberLiteral, .{ .NumberLiteral = @as(f64, @floatFromInt(number)) + decimal });
             }
 
-            return Token.init(TokenType.NumberLiteral, number, self.tokenStartPosition);
+            return try self.addToken(TokenType.NumberLiteral, .{ .NumberLiteral = @as(f64, @floatFromInt(number)) });
         }
 
         // Next, strings
@@ -167,7 +187,7 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
             }
             self.position += 1;
 
-            return .{ .token = Token{ .StringLiteral = string }, .line = self.line, .column = self.column };
+            return try self.addToken(TokenType.StringLiteral, .{ .StringLiteral = string });
         }
 
         // Next, symbols.
@@ -187,7 +207,7 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
             const tokenType = Token.symbolMap.get(symbol);
             if (tokenType != null) {
                 self.position += symbol.len - 1;
-                return Token.init(tokenType.?, tokenType.?.typeNameString(), self.position);
+                return try self.addToken(tokenType.?, TokenLiteral.None);
             }
 
             symbol = try self.allocator.realloc(symbol, symbol.len - 1);
@@ -195,8 +215,9 @@ fn getNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !?Token {
 
         // If we got here, it's an unknown token
         errorPayload.* = TokenizerErrorPayload{ .InvalidCharacter = c };
-        return null;
+        return true;
     }
 
-    return Token.init(TokenType.EOF, "EOF", self.position);
+    errorPayload.* = TokenizerErrorPayload{ .InvalidCharacter = 0 };
+    return true;
 }

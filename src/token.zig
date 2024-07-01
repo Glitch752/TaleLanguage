@@ -59,23 +59,57 @@ pub const TokenType = enum {
     }
 };
 
+pub const TokenLiteral = union(enum) {
+    NumberLiteral: f64,
+    StringLiteral: []const u8,
+    Identifier: []const u8,
+    None,
+
+    pub fn toString(self: TokenLiteral, allocator: std.mem.Allocator) ![]const u8 {
+        switch (self) {
+            .NumberLiteral => |number| return try std.fmt.allocPrint(allocator, "{d}", .{number}),
+            .StringLiteral => |string| return try std.fmt.allocPrint(allocator, "{s}", .{string}),
+            .Identifier => |identifier| return try std.fmt.allocPrint(allocator, "{s}", .{identifier}),
+            .None => return try std.fmt.allocPrint(allocator, "None", .{}),
+        }
+    }
+};
+
 pub const Token = struct {
     type: TokenType,
+    /// The actual text of the token.
     lexeme: []const u8,
+    /// The literal value of the token, if applicable. Somewhat redundant with type, but I find it easier to write the parser when they're separate.
+    literal: TokenLiteral,
 
     position: usize,
 
-    pub fn init(@"type": TokenType, lexeme: []const u8, position: usize) Token {
-        return .{ .type = @"type", .lexeme = lexeme, .position = position };
+    pub fn init(@"type": TokenType, lexeme: []const u8, literal: TokenLiteral, position: usize) Token {
+        return .{ .type = @"type", .lexeme = lexeme, .literal = literal, .position = position };
     }
 
-    pub fn deinit(self: *const Token, allocator: *const std.mem.Allocator) void {
-        _ = self;
-        _ = allocator;
+    pub fn deinit(self: *const Token, allocator: std.mem.Allocator) void {
+        switch (self.literal) {
+            .StringLiteral => allocator.free(self.literal.StringLiteral),
+            .Identifier => allocator.free(self.literal.Identifier),
+            else => {},
+        }
     }
 
-    pub fn toString(self: *const Token, allocator: *const std.mem.Allocator) ![]const u8 {
-        return try std.fmt.allocPrint(allocator, "{s} {s}", .{ self.type.typeNameString(), self.lexeme });
+    pub fn toString(self: *const Token, allocator: std.mem.Allocator) ![]const u8 {
+        const literalString = try self.literal.toString(allocator);
+        defer allocator.free(literalString);
+        return try std.fmt.allocPrint(allocator, "{s} {s} {s}", .{ self.type.typeNameString(), self.lexeme, literalString });
+    }
+
+    pub fn toCondensedString(self: *const Token, allocator: std.mem.Allocator) ![]const u8 {
+        switch (self.literal) {
+            .None => return try std.fmt.allocPrint(allocator, "{s} ", .{self.type.typeNameString()}),
+            else => {},
+        }
+        const literalString = try self.literal.toString(allocator);
+        defer allocator.free(literalString);
+        return try std.fmt.allocPrint(allocator, "{s}({s}) ", .{ self.type.typeNameString(), literalString });
     }
 
     pub const keywordMap = std.ComptimeStringMap(TokenType, .{
@@ -106,7 +140,7 @@ pub const Token = struct {
         .{ ">=", TokenType.GreaterThanEqual },
         .{ "=", TokenType.Assign },
         .{ "!=", TokenType.NotEqual },
-        .{ "==", TokenType.Equal },
+        .{ "==", TokenType.Equality },
         .{ "+", TokenType.Plus },
         .{ "-", TokenType.Minus },
         .{ "*", TokenType.Star },
@@ -115,10 +149,8 @@ pub const Token = struct {
         .{ "&&", TokenType.And },
         .{ "||", TokenType.Or },
         .{ "!", TokenType.Negate },
-        .{ "..", TokenType.Range },
         .{ ",", TokenType.Comma },
         .{ ".", TokenType.Dot },
-        .{ ":", TokenType.Colon },
     });
     pub const maxSymbolLength = symbolMap.kvs[symbolMap.kvs.len - 1].key.len;
 };
