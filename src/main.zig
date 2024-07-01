@@ -8,7 +8,7 @@ const prettyError = @import("errors.zig").prettyError;
 
 pub const Main = @This();
 allocator: std.mem.Allocator,
-hadError: bool,
+hadError: bool = false,
 args: ?*const args_parser.Args = null,
 
 pub fn main() !void {
@@ -33,10 +33,10 @@ pub fn entry(self: *Main) !void {
 
     switch (args.mode) {
         .RunFile => {
-            try self.runFile(&args);
+            try self.runFile();
         },
         .RunRepl => {
-            try self.runRepl(&args);
+            try self.runRepl();
         },
     }
 }
@@ -62,7 +62,7 @@ fn runFile(self: *Main) !void {
     const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
     defer self.allocator.free(buffer);
 
-    self.run(buffer);
+    try self.run(buffer);
 
     if (self.hadError) {
         std.process.exit(65);
@@ -74,6 +74,7 @@ fn runRepl(self: *Main) !void {
 
     while (true) {
         const bare_line = try stdin.readUntilDelimiterOrEofAlloc(self.allocator, '\n', 1000000) catch |err| {
+            _ = err;
             prettyError("Failed to read line from stdin");
             break;
         };
@@ -85,17 +86,17 @@ fn runRepl(self: *Main) !void {
             break;
         }
 
-        self.run(line);
+        try self.run(line);
         self.hadError = false;
     }
 }
 
 fn run(self: *Main, source: []const u8) !void {
     var sourceLexer = lexer.init(self.allocator, source);
-    var tokens = sourceLexer.getAllTokens();
+    const tokens = try sourceLexer.getAllTokens();
     defer sourceLexer.deinit();
 
-    if (self.args.flags.debugTokens) {
+    if (self.args.?.flags.debugTokens) {
         std.debug.print("Tokens:\n", .{});
         for (tokens.items) |tokenData| {
             const tokenString = try tokenData.token.toStringWithType(self.allocator);

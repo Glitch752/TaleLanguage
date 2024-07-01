@@ -1,215 +1,124 @@
 const std = @import("std");
 
 pub const TokenType = enum {
-    Identifier,
-
+    // Single-character tokens
     OpenParen, // (
     CloseParen, // )
-
-    OpenSquare, // [
-    CloseSquare, // ]
-
     OpenCurly, // {
     CloseCurly, // }
-
-    Semicolon,
+    Semicolon, // ;
 
     LessThan,
     LessThanEqual,
     GreaterThan,
     GreaterThanEqual,
-    Equal, // ==
+    Equality, // ==
     NotEqual, // !=
 
     And, // &&
     Or, // ||
 
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
+    Plus, // +
+    Minus, // -
+    Star, // *
+    Slash, // /
+    Percent, // %
     Negate, // !
 
-    FunctionKeyword,
-    IfKeyword,
-    ElseKeyword,
-    ForKeyword,
-    // TODO: While
-    ReturnKeyword,
-    // TODO: Continue, Break
-    LetKeyword,
+    FunctionKeyword, // function
+    ClassKeyword, // class
 
-    IntLiteral,
-    // No floats for now
+    SuperKeyword, // super
+    ThisKeyword, // this
+
+    IfKeyword, // if
+    ElseKeyword, // else
+    ForKeyword, // for
+    WhileKeyword, // while
+
+    TrueKeyword, // true
+    FalseKeyword, // false
+
+    ReturnKeyword, // return
+    LetKeyword, // let
+
+    // Literals
+    NumberLiteral,
     StringLiteral,
+    Identifier,
 
-    Range, // ..
     Comma, // ,
-    Colon, // :
     Dot, // .
 
     Assign, // =
 
     EOF,
-    Error,
 
     pub fn typeNameString(self: TokenType) []const u8 {
         return @tagName(self);
     }
 };
 
-pub const Token = union(TokenType) {
-    Identifier: []const u8,
+pub const Token = struct {
+    type: TokenType,
+    lexeme: []const u8,
 
-    // Void is implicit when there's no type
-    OpenParen,
-    CloseParen,
+    position: usize,
 
-    OpenSquare,
-    CloseSquare,
-
-    OpenCurly,
-    CloseCurly,
-
-    Semicolon,
-
-    LessThan,
-    LessThanEqual,
-    GreaterThan,
-    GreaterThanEqual,
-    Equal,
-    NotEqual,
-
-    And,
-    Or,
-
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    Percent,
-    Negate,
-
-    FunctionKeyword,
-    IfKeyword,
-    ElseKeyword,
-    ForKeyword,
-    ReturnKeyword,
-    LetKeyword,
-
-    IntLiteral: u64,
-    StringLiteral: []const u8,
-
-    Range,
-    Comma,
-    Colon,
-    Dot,
-
-    Assign,
-
-    // Special tokens
-    EOF,
-    Error: []const u8,
-
-    pub fn toString(self: Token, allocator: std.mem.Allocator) !struct { str: []const u8, allocated: bool } {
-        if (switch (self) {
-            .IntLiteral => |token| try std.fmt.allocPrint(allocator, "{d}", .{token}),
-            else => null,
-        }) |str| {
-            return .{ .str = str, .allocated = true };
-        }
-
-        return .{ .str = switch (self) {
-            .Identifier => |token| token,
-
-            .OpenParen => "(",
-            .CloseParen => ")",
-            .OpenSquare => "[",
-            .CloseSquare => "]",
-            .OpenCurly => "{",
-            .CloseCurly => "}",
-
-            .Semicolon => ";",
-
-            .LessThan => "<",
-            .LessThanEqual => "<=",
-            .GreaterThan => ">",
-            .GreaterThanEqual => ">=",
-            .Equal => "==",
-            .NotEqual => "!=",
-
-            .And => "&&",
-            .Or => "||",
-
-            .Plus => "+",
-            .Minus => "-",
-            .Star => "*",
-            .Slash => "/",
-            .Percent => "%",
-            .Negate => "!",
-
-            .FunctionKeyword => "function",
-            .IfKeyword => "if",
-            .ElseKeyword => "else",
-            .ForKeyword => "for",
-            .ReturnKeyword => "return",
-            .LetKeyword => "let",
-
-            .StringLiteral => |token| token,
-
-            .Range => "..",
-            .Comma => ",",
-            .Colon => ":",
-            .Dot => ".",
-            .Assign => "=",
-
-            .EOF => "EOF",
-            .Error => |message| message,
-
-            else => unreachable,
-        }, .allocated = false };
+    pub fn init(@"type": TokenType, lexeme: []const u8, position: usize) Token {
+        return .{ .type = @"type", .lexeme = lexeme, .position = position };
     }
 
-    pub fn typeNameString(self: Token) []const u8 {
-        return TokenType.typeNameString(self);
+    pub fn deinit(self: *const Token, allocator: *const std.mem.Allocator) void {
+        _ = self;
+        _ = allocator;
     }
 
-    pub fn toStringWithType(self: Token, allocator: std.mem.Allocator) ![]const u8 {
-        const tokenStringResult = try self.toString(allocator);
-        defer if (tokenStringResult.allocated) allocator.free(tokenStringResult.str);
-        const tokenString = tokenStringResult.str;
-
-        const typeName = self.typeNameString();
-        const buffer = try allocator.alloc(u8, tokenString.len + typeName.len + 3);
-        for (typeName, 0..) |c, i| {
-            buffer[i] = c;
-        }
-        buffer[typeName.len] = '(';
-        for (tokenString, 0..) |c, i| {
-            buffer[typeName.len + 1 + i] = c;
-        }
-        buffer[tokenString.len + 1 + typeName.len] = ')';
-        buffer[tokenString.len + 2 + typeName.len] = ' ';
-        return buffer;
+    pub fn toString(self: *const Token, allocator: *const std.mem.Allocator) ![]const u8 {
+        return try std.fmt.allocPrint(allocator, "{s} {s}", .{ self.type.typeNameString(), self.lexeme });
     }
 
-    pub const keyword_map = std.ComptimeStringMap(Token, .{ .{ "function", Token.FunctionKeyword }, .{ "if", Token.IfKeyword }, .{ "else", Token.ElseKeyword }, .{ "for", Token.ForKeyword }, .{ "return", Token.ReturnKeyword }, .{ "let", Token.LetKeyword } });
-    pub const symbol_map = std.ComptimeStringMap(Token, .{ .{ "(", Token.OpenParen }, .{ ")", Token.CloseParen }, .{ "[", Token.OpenSquare }, .{ "]", Token.CloseSquare }, .{ "{", Token.OpenCurly }, .{ "}", Token.CloseCurly }, .{ ";", Token.Semicolon }, .{ "<", Token.LessThan }, .{ "<=", Token.LessThanEqual }, .{ ">", Token.GreaterThan }, .{ ">=", Token.GreaterThanEqual }, .{ "=", Token.Assign }, .{ "!=", Token.NotEqual }, .{ "==", Token.Equal }, .{ "+", Token.Plus }, .{ "-", Token.Minus }, .{ "*", Token.Star }, .{ "/", Token.Slash }, .{ "%", Token.Percent }, .{ "&&", Token.And }, .{ "||", Token.Or }, .{ "!", Token.Negate }, .{ "..", Token.Range }, .{ ",", Token.Comma }, .{ ".", Token.Dot }, .{ ":", Token.Colon } });
-    pub const maxSymbolLength = 2;
-};
-
-pub const TokenData = struct {
-    token: Token,
-    line: usize,
-    column: usize,
-
-    pub fn deinit(self: *const TokenData, allocator: *const std.mem.Allocator) void {
-        switch (self.token) {
-            .Identifier => |token| allocator.free(token),
-            .StringLiteral => |token| allocator.free(token),
-            .Error => |message| allocator.free(message),
-            else => {},
-        }
-    }
+    pub const keywordMap = std.ComptimeStringMap(TokenType, .{
+        // This comment is to prevent zigfmt from collapsing the lines
+        .{ "function", TokenType.FunctionKeyword },
+        .{ "if", TokenType.IfKeyword },
+        .{ "else", TokenType.ElseKeyword },
+        .{ "for", TokenType.ForKeyword },
+        .{ "return", TokenType.ReturnKeyword },
+        .{ "let", TokenType.LetKeyword },
+        .{ "while", TokenType.WhileKeyword },
+        .{ "true", TokenType.TrueKeyword },
+        .{ "false", TokenType.FalseKeyword },
+        .{ "class", TokenType.ClassKeyword },
+        .{ "super", TokenType.SuperKeyword },
+        .{ "this", TokenType.ThisKeyword },
+    });
+    pub const symbolMap = std.ComptimeStringMap(TokenType, .{
+        // This comment is to prevent zigfmt from collapsing the lines
+        .{ "(", TokenType.OpenParen },
+        .{ ")", TokenType.CloseParen },
+        .{ "{", TokenType.OpenCurly },
+        .{ "}", TokenType.CloseCurly },
+        .{ ";", TokenType.Semicolon },
+        .{ "<", TokenType.LessThan },
+        .{ "<=", TokenType.LessThanEqual },
+        .{ ">", TokenType.GreaterThan },
+        .{ ">=", TokenType.GreaterThanEqual },
+        .{ "=", TokenType.Assign },
+        .{ "!=", TokenType.NotEqual },
+        .{ "==", TokenType.Equal },
+        .{ "+", TokenType.Plus },
+        .{ "-", TokenType.Minus },
+        .{ "*", TokenType.Star },
+        .{ "/", TokenType.Slash },
+        .{ "%", TokenType.Percent },
+        .{ "&&", TokenType.And },
+        .{ "||", TokenType.Or },
+        .{ "!", TokenType.Negate },
+        .{ "..", TokenType.Range },
+        .{ ",", TokenType.Comma },
+        .{ ".", TokenType.Dot },
+        .{ ":", TokenType.Colon },
+    });
+    pub const maxSymbolLength = symbolMap.kvs[symbolMap.kvs.len - 1].key.len;
 };
