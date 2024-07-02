@@ -246,7 +246,39 @@ fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
 // Operators with higher precedence are parsed first
 
 fn consumeExpression(self: *Parser) anyerror!*Expression {
+    if (self.matchToken(TokenType.FunctionKeyword)) {
+        return try self.consumeFunctionExpression();
+    }
+
     return try self.consumeAssignment();
+}
+
+fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
+    const startToken = self.peekPrevious();
+    const parameters = std.ArrayList(*Token).init(self.allocator);
+
+    _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'function'");
+    if (!self.matchToken(TokenType.CloseParen)) {
+        while (true) {
+            if (parameters.items.len >= 255) {
+                // Continue parsing but alert the user
+                self.errorOccured("Too many parameters in function; can't have more than 255 parameters");
+            }
+
+            const parameter = try self.consume(TokenType.Identifier, "Expected parameter name");
+            try parameters.append(parameter);
+
+            if (!self.matchToken(TokenType.Comma)) {
+                break;
+            }
+        }
+
+        _ = try self.consume(TokenType.CloseParen, "Expected ')' after function parameters");
+    }
+
+    const body = try self.consumeBlockStatement();
+
+    return Expression.function(self.allocator, startToken, parameters, body);
 }
 
 fn consumeAssignment(self: *Parser) anyerror!*Expression {
