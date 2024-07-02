@@ -1,0 +1,12 @@
+let a = 0;
+let b = 1;
+let temp = a;
+
+while (a < 1000000000000000000) {
+    print(a);
+    print("\n");
+
+    temp = a;
+    a = b;
+    b = temp + b;
+}

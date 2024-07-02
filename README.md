@@ -25,6 +25,8 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
   - [X] Logical: `!`, `&&`, `||`
     - [X] Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0, and null is falsy
+  - [X] Bitwise: `&`, `|`, `^`
+    - We take the Javascript approach to bitwise operators: convert their operands to 32-bit signed integers before performing the operation
   - [X] Grouping: `()`
 - [ ] Simple control-flow constructs:
   - [X] `if` statements, along with `else if` and `else`

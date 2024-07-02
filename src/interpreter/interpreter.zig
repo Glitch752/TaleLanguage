@@ -330,6 +330,32 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
 
             return right;
         },
+        .Bitwise => |value| {
+            // We take the Javascript approach and treat bitwise operators as integer operations
+            const left = try self.interpretExpression(value.left);
+            errdefer left.deinit(self.allocator);
+
+            const right = try self.interpretExpression(value.right);
+            errdefer right.deinit(self.allocator);
+
+            if (!left.isNumber() or !right.isNumber()) {
+                self.runtimeError = RuntimeError.tokenError(self, value.operator, "Operands must be numbers", .{});
+                return InterpreterError.RuntimeError;
+            }
+
+            const leftInt = @as(u64, @intFromFloat(left.asNumber()));
+            const rightInt = @as(u64, @intFromFloat(right.asNumber()));
+
+            switch (value.operator.type) {
+                .BitwiseAnd => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt & rightInt))),
+                .BitwiseOr => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt | rightInt))),
+                .BitwiseXor => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt ^ rightInt))),
+                else => {
+                    self.runtimeError = RuntimeError.tokenError(self, value.operator, "Unknown operator", .{});
+                    return InterpreterError.RuntimeError;
+                },
+            }
+        },
 
         .FunctionCall => |values| {
             const callee = try self.interpretExpression(values.callee);

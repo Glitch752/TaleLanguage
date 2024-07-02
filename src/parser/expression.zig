@@ -9,6 +9,7 @@ pub const Expression = union(enum) {
     Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
     Unary: struct { operator: Token, right: *const Expression },
     Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
+    Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
 
     FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
 
@@ -24,6 +25,10 @@ pub const Expression = union(enum) {
             .Grouping => |data| data.expression.uninit(allocator),
             .Unary => |data| data.right.uninit(allocator),
             .Logical => |data| {
+                data.left.uninit(allocator);
+                data.right.uninit(allocator);
+            },
+            .Bitwise => |data| {
                 data.left.uninit(allocator);
                 data.right.uninit(allocator);
             },
@@ -65,6 +70,11 @@ pub const Expression = union(enum) {
     pub fn logical(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .Logical = .{ .left = left, .operator = operator, .right = right } };
+        return alloc;
+    }
+    pub fn bitwise(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .Bitwise = .{ .left = left, .operator = operator, .right = right } };
         return alloc;
     }
 

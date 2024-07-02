@@ -243,6 +243,7 @@ fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
 }
 
 // Expression parsing
+// Operators with higher precedence are parsed first
 
 fn consumeExpression(self: *Parser) anyerror!*Expression {
     return try self.consumeAssignment();
@@ -321,7 +322,7 @@ fn consumeEquality(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeComparison(self: *Parser) anyerror!*Expression {
-    var expression = try self.consumeTerm();
+    var expression = try self.consumeBitwiseOr();
 
     while (self.matchToken(TokenType.GreaterThan) or
         self.matchToken(TokenType.GreaterThanEqual) or
@@ -331,10 +332,58 @@ fn consumeComparison(self: *Parser) anyerror!*Expression {
         errdefer expression.uninit(self.allocator);
 
         const operator = self.peekPrevious();
-        const right = try self.consumeTerm();
+        const right = try self.consumeBitwiseOr();
         errdefer right.uninit(self.allocator);
 
         expression = try Expression.binary(self.allocator, expression, operator, right);
+    }
+
+    return expression;
+}
+
+fn consumeBitwiseOr(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumeBitwiseXor();
+
+    while (self.matchToken(TokenType.BitwiseOr)) {
+        errdefer expression.uninit(self.allocator);
+
+        const operator = self.peekPrevious();
+        const right = try self.consumeBitwiseXor();
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.bitwise(self.allocator, expression, operator, right);
+    }
+
+    return expression;
+}
+
+fn consumeBitwiseXor(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumeBitwiseAnd();
+
+    while (self.matchToken(TokenType.BitwiseXor)) {
+        errdefer expression.uninit(self.allocator);
+
+        const operator = self.peekPrevious();
+        const right = try self.consumeBitwiseAnd();
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.bitwise(self.allocator, expression, operator, right);
+    }
+
+    return expression;
+}
+
+fn consumeBitwiseAnd(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumeTerm();
+
+    while (self.matchToken(TokenType.BitwiseAnd)) {
+        errdefer expression.uninit(self.allocator);
+
+        const operator = self.peekPrevious();
+        const right = try self.consumeTerm();
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.bitwise(self.allocator, expression, operator, right);
     }
 
     return expression;

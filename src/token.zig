@@ -18,6 +18,10 @@ pub const TokenType = enum {
     And, // &&
     Or, // ||
 
+    BitwiseAnd, // &
+    BitwiseOr, // |
+    BitwiseXor, // ^
+
     Plus, // +
     Minus, // -
     Star, // *
@@ -146,7 +150,7 @@ pub const Token = struct {
         .{ ")", TokenType.CloseParen },
         .{ "{", TokenType.OpenCurly },
         .{ "}", TokenType.CloseCurly },
-        .{ ";", TokenType.Semicolon },
+
         .{ "<", TokenType.LessThan },
         .{ "<=", TokenType.LessThanEqual },
         .{ ">", TokenType.GreaterThan },
@@ -154,16 +158,24 @@ pub const Token = struct {
         .{ "=", TokenType.Assign },
         .{ "!=", TokenType.NotEqual },
         .{ "==", TokenType.Equality },
+
         .{ "+", TokenType.Plus },
         .{ "-", TokenType.Minus },
         .{ "*", TokenType.Star },
         .{ "/", TokenType.Slash },
         .{ "%", TokenType.Percent },
+
         .{ "&&", TokenType.And },
         .{ "||", TokenType.Or },
+
+        .{ "&", TokenType.BitwiseAnd },
+        .{ "|", TokenType.BitwiseOr },
+        .{ "^", TokenType.BitwiseXor },
+
         .{ "!", TokenType.Negate },
         .{ ",", TokenType.Comma },
         .{ ".", TokenType.Dot },
+        .{ ";", TokenType.Semicolon },
     });
     pub const maxSymbolLength = symbolMap.kvs[symbolMap.kvs.len - 1].key.len;
 };

@@ -82,9 +82,7 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
         .Binary => |values| {
             std.debug.print("(", .{});
             try self.printExpression(values.left);
-            std.debug.print(" ", .{});
-            std.debug.print("{s}", .{values.operator.lexeme});
-            std.debug.print(" ", .{});
+            std.debug.print(" {s} ", .{values.operator.lexeme});
             try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
@@ -97,9 +95,14 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
         .Logical => |values| {
             std.debug.print("(", .{});
             try self.printExpression(values.left);
-            std.debug.print(" ", .{});
-            std.debug.print("{s}", .{values.operator.lexeme});
-            std.debug.print(" ", .{});
+            std.debug.print(" {s} ", .{values.operator.lexeme});
+            try self.printExpression(values.right);
+            std.debug.print(")", .{});
+        },
+        .Bitwise => |values| {
+            std.debug.print("(", .{});
+            try self.printExpression(values.left);
+            std.debug.print(" {s} ", .{values.operator.lexeme});
             try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
@@ -120,8 +123,7 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
             std.debug.print("{s}", .{values.name.lexeme});
         },
         .VariableAssignment => |values| {
-            std.debug.print("{s}", .{values.name.lexeme});
-            std.debug.print(" = ", .{});
+            std.debug.print("{s} = ", .{values.name.lexeme});
             try self.printExpression(values.value);
         },
     }

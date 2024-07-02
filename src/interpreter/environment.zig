@@ -50,12 +50,13 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
         return;
     }
 
-    const entry = self.values.get(name.lexeme);
+    const entry = self.values.getEntry(name.lexeme);
     if (entry == null) {
         interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to assign to {s}, which is undefined.", .{name.lexeme});
         return;
     }
 
+    // Deallocate the existing key
     try self.values.put(name.lexeme, value);
 }
 
