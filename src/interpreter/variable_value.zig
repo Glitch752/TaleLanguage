@@ -9,6 +9,12 @@ pub const VariableValue = union(enum) {
         allocated: bool,
     },
     Boolean: bool,
+
+    Function: struct {
+        arity: u32,
+        body: *const std.ArrayList(*const Statement), // TODO
+    },
+
     Null,
 
     /// Deinitializes the value if it was allocated.

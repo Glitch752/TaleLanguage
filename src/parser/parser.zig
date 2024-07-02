@@ -180,6 +180,9 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
     if (self.matchToken(TokenType.IfKeyword)) {
         return try self.consumeIfStatement();
     }
+    if (self.matchToken(TokenType.WhileKeyword)) {
+        return try self.consumeWhileStatement();
+    }
     if (self.matchToken(TokenType.OpenCurly)) {
         return try self.consumeBlockStatement();
     }
@@ -195,6 +198,15 @@ fn consumeIfStatement(self: *Parser) anyerror!*Statement {
 
     const falseBranch: ?*Statement = if (self.matchToken(TokenType.ElseKeyword)) try self.consumeStatement() else null;
     return Statement.ifBlock(self.allocator, condition, trueBranch, falseBranch);
+}
+
+fn consumeWhileStatement(self: *Parser) anyerror!*Statement {
+    _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'while'");
+    const condition = try self.consumeExpression();
+    _ = try self.consume(TokenType.CloseParen, "Expected ')' after while condition");
+    const body = try self.consumeStatement();
+
+    return Statement.whileBlock(self.allocator, condition, body);
 }
 
 fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
@@ -362,13 +374,47 @@ fn consumeFactor(self: *Parser) anyerror!*Expression {
 fn consumeUnary(self: *Parser) anyerror!*Expression {
     if (self.matchToken(TokenType.Negate) or self.matchToken(TokenType.Minus)) {
         const operator = self.peekPrevious();
-        const right = try self.consumeUnary();
+        const right = try self.consumeFunctionCall();
         errdefer right.uninit(self.allocator);
 
         return try Expression.unary(self.allocator, operator, right);
     }
 
-    return try self.consumePrimary();
+    return try self.consumeFunctionCall();
+}
+
+fn consumeFunctionCall(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumePrimary();
+
+    while (self.matchToken(TokenType.OpenParen)) {
+        expression = try self.finishFunctionCall(expression);
+    }
+
+    return expression;
+}
+
+fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
+    var arguments = std.ArrayList(*Expression).init(self.allocator);
+
+    if (!self.matchToken(TokenType.CloseParen)) {
+        while (true) {
+            if (arguments.len >= 255) {
+                // Continue parsing but alert the user
+                self.errorOccured("Too many arguments in function call; can't have more than 255 arguments");
+            }
+
+            const argument = try self.consumeExpression();
+            try arguments.append(argument);
+
+            if (!self.matchToken(TokenType.Comma)) {
+                break;
+            }
+        }
+
+        _ = try self.consume(TokenType.CloseParen, "Expected ')' after function arguments");
+    }
+
+    return Expression.functionCall(self.allocator, callee, arguments);
 }
 
 fn consumePrimary(self: *Parser) anyerror!*Expression {

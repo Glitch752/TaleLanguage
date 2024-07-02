@@ -46,6 +46,7 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
             }
             std.debug.print("}}", .{});
         },
+
         .If => |values| {
             std.debug.print("if ", .{});
             try self.printExpression(values.condition);
@@ -55,6 +56,12 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
                 std.debug.print(" else \n", .{});
                 try self.printStatement(values.falseBranch.?, indent + 1);
             }
+        },
+        .While => |values| {
+            std.debug.print("while ", .{});
+            try self.printExpression(values.condition);
+            std.debug.print(" \n", .{});
+            try self.printStatement(values.body, indent + 1);
         },
     }
 }
@@ -94,6 +101,18 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
             std.debug.print("{s}", .{values.operator.lexeme});
             std.debug.print(" ", .{});
             try self.printExpression(values.right);
+            std.debug.print(")", .{});
+        },
+
+        .FunctionCall => |values| {
+            try self.printExpression(values.callee);
+            std.debug.print("(", .{});
+            for (values.arguments.items) |argument| {
+                try self.printExpression(argument);
+                if (argument != values.arguments.items[values.arguments.items.len - 1]) {
+                    std.debug.print(", ", .{});
+                }
+            }
             std.debug.print(")", .{});
         },
 

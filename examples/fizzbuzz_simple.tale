@@ -1,0 +1,16 @@
+let i = 0;
+while(i < 20) {
+    i = i + 1;
+
+    if(i % 3 == 0 && ((i % 3) == 0)) {
+        // Log prints to stdout
+        print("FizzBuzz\n");
+    } else if(i % 3 == 0) print("Fizz\n");
+    else if(i % 5 == 0) {
+        print("Buzz\n");
+    } else {
+        // Not sure how much I like string() as the type cast, but it's the easiest method for now.
+        // Additionally, + as a string concatenation operator itn't my favorite.
+        print(string(i) + "\n");
+    }
+}

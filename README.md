@@ -15,50 +15,50 @@ I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/)
 
 # The language
 The language, Tale, is not very well-defined yet -- I'm mostly experimenting with different ideas. However, here are the characteristics I'm aiming for:
-- Dynamic typing (for now)
-- First-class functions
-- C-derived syntax
-- Garbage collection
-- Simple primatives: Booleans, doubles, strings, functions, and null (I'm not sure if arrays or classes should go here)
-- Simple operators (no overloading):
-  - Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo has the same precedence as multiplication and division)
-  - Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
-  - Logical: `!`, `&&`, `||`
-    - Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0, and null is falsy
-  - Grouping: `()`
-- Simple control-flow constructs:
-  - `if` statements, along with `else if` and `else`
-  - `while` loops
-  - `for` loops (iterating over arrays)
-  - `break` and `continue` statements
-  - `return` statements
-- Block scoping: `{}`
-- Comments: `//` and `/* */`
-- Variable declaration: `let x = 5;`, `let x;` (uninitialized -- value is `null`)
-- Assignment: `x = 5;`
-- Functions:
-  - Declaration: `let add = function(x, y) { return x + y; }` (This is a value that must be assigned to a variable)
+- [X] Dynamic typing (for now)
+- [ ] First-class functions
+- [X] C-derived syntax
+- [ ] Garbage collection
+- [X] Simple primatives: Booleans, doubles, strings, functions, and null (I'm not sure if arrays or classes should go here)
+- [X] Simple operators (no overloading):
+  - [X] Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo has the same precedence as multiplication and division)
+  - [X] Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
+  - [X] Logical: `!`, `&&`, `||`
+    - [X] Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0, and null is falsy
+  - [X] Grouping: `()`
+- [ ] Simple control-flow constructs:
+  - [X] `if` statements, along with `else if` and `else`
+  - [X] `while` loops
+  - [ ] `for` loops (only for iterating over arrays -- `for (let x . array) { ... }`) (I'm not sure if I should add a more general `for` loop or even condense both loops into one)
+  - [ ] `break` and `continue` statements
+  - [X] `return` statements
+- [X] Block scoping: `{}`
+- [X] Comments: `//` and `/* */`
+- [X] Variable declaration: `let x = 5;`, `let x;` (uninitialized -- value is `null`)
+- [X] Assignment: `x = 5;`
+- [ ] Functions:
+  - [ ] Declaration: `let add = function(x, y) { return x + y; }` (This is a value that must be assigned to a variable)
     - If no value is returned, the function returns `null`
     - Functions hold a reference to the environment in which they were created -- commonly referred to as a closure
-  - Calling: `add(5, 3);` (`add` is a variable containing a function)
-- Classes
-  - Declaration: `let Point = class { let constructor = function(x, y) { this.x = x; this.y = y; } }`
+  - [ ] Calling: `add(5, 3);` (`add` is a variable containing a function)
+- [ ] Classes
+  - [ ] Declaration: `let Point = class { let constructor = function(x, y) { this.x = x; this.y = y; } }`
     - The `constructor` method is called when the class is instantiated
-  - Instantiation: `let p = Point(5, 3);`
-  - Field access: `p.x`, `p.z = 5;` (creates a new field)
-  - Single inheritance: `let Point3D = class extending Point { let constructor = function(x, y, z) { super.constructor(x, y); this.z = z; } }`
+  - [ ] Instantiation: `let p = Point(5, 3);`
+  - [ ] Field access: `p.x`, `p.z = 5;` (creates a new field)
+  - [ ] Single inheritance: `let Point3D = class extending Point { let constructor = function(x, y, z) { super.constructor(x, y); this.z = z; } }`
     - Constructors are inherited just like any other method
-  - Method access: `p.method()` (Just another function)
-  - Static:
-    - Methods: `let Point = class { let static method() { return 5; } }`
+  - [ ] Method access: `p.method()` (Just another function)
+  - [ ] Static:
+    - [ ] Methods: `let Point = class { let static method() { return 5; } }`
       - Access: `Point.method()` (No `this` reference)
-    - Fields: `let Point = class { let static x = 5; }`
+    - [ ] Fields: `let Point = class { let static x = 5; }`
       - Access: `Point.x`
-- Extremely simple standard library, globally accessible as `Std` (for now):
-  - `print` function: `Std.print("Hello, world!");`
-  - (From Crafting Interpreters) `clock` function: `std.print(Std.clock());` (Returns the time in seconds since the program started running)
-  - `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
-  - `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
+- [ ] Extremely simple standard library, globally accessible as `Std` (for now):
+  - [ ] `print` function: `Std.print("Hello, world!");`
+  - [ ] (From Crafting Interpreters) `clock` function: `std.print(Std.clock());` (Returns the time in seconds since the program started running)
+  - [ ] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
+  - [ ] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
 
 ## Considerations for the future
 - Static typing

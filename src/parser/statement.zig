@@ -7,8 +7,9 @@ pub const Statement = union(enum) {
     Let: struct { name: Token, initializer: *const Expression },
     Block: struct { statements: std.ArrayList(*Statement) },
 
-    // Branching
+    // Control flow
     If: struct { condition: *const Expression, trueBranch: *const Statement, falseBranch: ?*const Statement },
+    While: struct { condition: *const Expression, body: *const Statement },
 
     pub fn uninit(self: *const Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -17,6 +18,17 @@ pub const Statement = union(enum) {
                     statement.*.uninit(allocator);
                 }
                 data.statements.deinit();
+            },
+            .If => |data| {
+                data.condition.uninit(allocator);
+                data.trueBranch.uninit(allocator);
+                if (data.falseBranch != null) {
+                    data.falseBranch.?.uninit(allocator);
+                }
+            },
+            .While => |data| {
+                data.condition.uninit(allocator);
+                data.body.uninit(allocator);
             },
             else => {},
         }
@@ -39,9 +51,15 @@ pub const Statement = union(enum) {
         alloc.* = .{ .Block = .{ .statements = statements } };
         return alloc;
     }
+
     pub fn ifBlock(allocator: std.mem.Allocator, condition: *const Expression, trueBranch: *const Statement, falseBranch: ?*const Statement) !*Statement {
         const alloc = try allocator.create(Statement);
         alloc.* = .{ .If = .{ .condition = condition, .trueBranch = trueBranch, .falseBranch = falseBranch } };
+        return alloc;
+    }
+    pub fn whileBlock(allocator: std.mem.Allocator, condition: *const Expression, body: *const Statement) !*Statement {
+        const alloc = try allocator.create(Statement);
+        alloc.* = .{ .While = .{ .condition = condition, .body = body } };
         return alloc;
     }
 };

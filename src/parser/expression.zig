@@ -10,6 +10,8 @@ pub const Expression = union(enum) {
     Unary: struct { operator: Token, right: *const Expression },
     Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
 
+    FunctionCall: struct { callee: *const Expression, arguments: std.ArrayList(*const Expression) },
+
     VariableAccess: struct { name: Token },
     VariableAssignment: struct { name: Token, value: *const Expression },
 
@@ -21,6 +23,20 @@ pub const Expression = union(enum) {
             },
             .Grouping => |data| data.expression.uninit(allocator),
             .Unary => |data| data.right.uninit(allocator),
+            .Logical => |data| {
+                data.left.uninit(allocator);
+                data.right.uninit(allocator);
+            },
+
+            .FunctionCall => |data| {
+                data.callee.uninit(allocator);
+                for (data.arguments.items) |argument| {
+                    argument.*.uninit(allocator);
+                }
+                data.arguments.deinit();
+            },
+
+            .VariableAssignment => |data| data.value.uninit(allocator),
             else => {},
         }
         allocator.destroy(self);
@@ -49,6 +65,12 @@ pub const Expression = union(enum) {
     pub fn logical(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .Logical = .{ .left = left, .operator = operator, .right = right } };
+        return alloc;
+    }
+
+    pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, arguments: std.ArrayList(*const Expression)) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .FunctionCall = .{ .callee = callee, .arguments = arguments } };
         return alloc;
     }
 

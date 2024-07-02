@@ -130,6 +130,7 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
                 try self.interpretStatement(childStatement);
             }
         },
+
         .If => |values| {
             const condition = try self.interpretExpression(values.condition);
             defer condition.deinit(self.allocator);
@@ -138,6 +139,11 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
                 try self.interpretStatement(values.trueBranch);
             } else if (values.falseBranch != null) {
                 try self.interpretStatement(values.falseBranch.?);
+            }
+        },
+        .While => |values| {
+            while ((try self.interpretExpression(values.condition)).isTruthy()) {
+                try self.interpretStatement(values.body);
             }
         },
     }
@@ -290,6 +296,35 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             errdefer right.deinit(self.allocator);
 
             return right;
+        },
+
+        .FunctionCall => |values| {
+            const callee = try self.interpretExpression(values.callee);
+            defer callee.deinit(self.allocator);
+
+            if (!callee.isCallable()) {
+                self.runtimeError = RuntimeError.tokenError(self, "Can only call functions and classes", values.callee.token);
+                return InterpreterError.RuntimeError;
+            }
+
+            const callable = callee.asCallable();
+
+            if (values.arguments.items.len != callable.arity()) {
+                self.runtimeError = RuntimeError.tokenError(self, "Expected {d} arguments but got {d}", .{ callable.arity(), values.arguments.items.len }, values.callee.token);
+                return InterpreterError.RuntimeError;
+            }
+
+            const argumentValues = std.ArrayList(VariableValue).init(self.allocator);
+            defer argumentValues.deinit();
+
+            for (values.arguments.items) |argument| {
+                const value = try self.interpretExpression(argument);
+                defer value.deinit(self.allocator);
+
+                argumentValues.append(value);
+            }
+
+            return callable.call(argumentValues, self);
         },
 
         .VariableAccess => |values| {
