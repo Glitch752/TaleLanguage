@@ -23,9 +23,12 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() == .ok);
     const allocator = gpa.allocator();
 
+    var astInterpreter = try interpreter.init(allocator);
+    defer astInterpreter.deinit();
+
     var instance = Main{
         .allocator = allocator,
-        .interpreter = interpreter.init(allocator),
+        .interpreter = astInterpreter,
     };
     defer instance.deinit();
     try instance.entry();

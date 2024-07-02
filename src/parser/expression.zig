@@ -10,7 +10,7 @@ pub const Expression = union(enum) {
     Unary: struct { operator: Token, right: *const Expression },
     Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
 
-    FunctionCall: struct { callee: *const Expression, arguments: std.ArrayList(*const Expression) },
+    FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
 
     VariableAccess: struct { name: Token },
     VariableAssignment: struct { name: Token, value: *const Expression },
@@ -68,9 +68,9 @@ pub const Expression = union(enum) {
         return alloc;
     }
 
-    pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, arguments: std.ArrayList(*const Expression)) !*Expression {
+    pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression)) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .FunctionCall = .{ .callee = callee, .arguments = arguments } };
+        alloc.* = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } };
         return alloc;
     }
 

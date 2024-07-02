@@ -394,11 +394,13 @@ fn consumeFunctionCall(self: *Parser) anyerror!*Expression {
 }
 
 fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
-    var arguments = std.ArrayList(*Expression).init(self.allocator);
+    const startToken = self.peekPrevious();
+
+    var arguments = std.ArrayList(*const Expression).init(self.allocator);
 
     if (!self.matchToken(TokenType.CloseParen)) {
         while (true) {
-            if (arguments.len >= 255) {
+            if (arguments.items.len >= 255) {
                 // Continue parsing but alert the user
                 self.errorOccured("Too many arguments in function call; can't have more than 255 arguments");
             }
@@ -414,7 +416,7 @@ fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
         _ = try self.consume(TokenType.CloseParen, "Expected ')' after function arguments");
     }
 
-    return Expression.functionCall(self.allocator, callee, arguments);
+    return Expression.functionCall(self.allocator, callee, startToken, arguments);
 }
 
 fn consumePrimary(self: *Parser) anyerror!*Expression {

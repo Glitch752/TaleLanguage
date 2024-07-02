@@ -1,6 +1,13 @@
 const std = @import("std");
 
+const Interpreter = @import("./interpreter.zig").Interpreter;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
+
+pub const CallableFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) VariableValue;
+pub const Callable = struct {
+    arity: u32,
+    call: CallableFunction,
+};
 
 pub const VariableValue = union(enum) {
     Number: f64,
@@ -12,7 +19,7 @@ pub const VariableValue = union(enum) {
 
     Function: struct {
         arity: u32,
-        body: *const std.ArrayList(*const Statement), // TODO
+        function: CallableFunction,
     },
 
     Null,
@@ -53,13 +60,23 @@ pub const VariableValue = union(enum) {
         return self == .Null;
     }
 
+    pub fn isCallable(self: VariableValue) bool {
+        return self == .Function;
+    }
+    pub fn asCallable(self: VariableValue) Callable {
+        return .{
+            .arity = self.Function.arity,
+            .call = self.Function.function,
+        };
+    }
+
     // Type coercion
     pub fn isTruthy(self: VariableValue) bool {
         switch (self) {
             .Number => |value| return value != 0,
             .String => |value| return value.string.len != 0,
             .Boolean => |value| return value,
-            .Null => return false,
+            else => return false,
         }
     }
 
@@ -69,6 +86,7 @@ pub const VariableValue = union(enum) {
             .String => |value| return other.isString() and std.mem.eql(u8, other.asString(), value.string),
             .Boolean => |value| return other.isBoolean() and other.asBoolean() == value,
             .Null => return other.isNull(),
+            else => return false,
         }
     }
 
@@ -97,6 +115,10 @@ pub const VariableValue = union(enum) {
         }
     }
 
+    pub fn nativeFunction(arity: u32, function: CallableFunction) VariableValue {
+        return .{ .Function = .{ .arity = arity, .function = function } };
+    }
+
     pub fn @"null"() VariableValue {
         return .Null;
     }
@@ -110,6 +132,7 @@ pub const VariableValue = union(enum) {
             .String => |value| return std.fmt.allocPrint(allocator, "{s}", .{value.string}),
             .Boolean => return if (self.Boolean) std.fmt.allocPrint(allocator, "true", .{}) else std.fmt.allocPrint(allocator, "false", .{}),
             .Null => return std.fmt.allocPrint(allocator, "null", .{}),
+            .Function => return std.fmt.allocPrint(allocator, "<native function>", .{}),
         }
     }
 };

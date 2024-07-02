@@ -44,14 +44,14 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue) !void 
 }
 
 pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
-    const entry = self.values.get(name.lexeme);
-    if (entry == null) {
-        interpreter.runtimeError = RuntimeError.tokenError(interpreter, "Tried to assign to undefined variable", name);
+    if (self.parent != null) {
+        try self.parent.?.assign(name, value, interpreter);
         return;
     }
 
-    if (self.parent != null) {
-        try self.parent.?.assign(name, value, interpreter);
+    const entry = self.values.get(name.lexeme);
+    if (entry == null) {
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to assign to {s}, which is undefined.", .{name.lexeme});
         return;
     }
 
@@ -66,6 +66,6 @@ pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !Variable
         return try self.parent.?.get(name, interpreter);
     }
 
-    interpreter.runtimeError = RuntimeError.tokenError(interpreter, "Tried to access undefined variable", name);
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
     return InterpreterError.RuntimeError;
 }

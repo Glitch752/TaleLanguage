@@ -12,35 +12,65 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const prettyError = @import("../errors.zig").prettyError;
 const errorContext = @import("../errors.zig").errorContext;
 
+const natives = @import("./natives.zig");
+
 pub const Interpreter = @This();
 
 /// Zig errors can't hold payloads, so we separate the actual error data from the error type.
 pub const RuntimeError = struct {
     message: []const u8,
+    allocatedMessage: bool,
+
+    allocator: std.mem.Allocator,
+
     token: Token,
 
     originalBuffer: []const u8,
     fileName: []const u8,
 
-    pub fn tokenError(interpreter: *Interpreter, message: []const u8, token: Token) RuntimeError {
-        return .{ .message = message, .token = token, .originalBuffer = interpreter.originalBuffer, .fileName = interpreter.fileName };
+    pub fn tokenError(interpreter: *Interpreter, token: Token, comptime message: []const u8, format: anytype) RuntimeError {
+        const formattedMessage = std.fmt.allocPrint(interpreter.allocator, message, format) catch {
+            return .{
+                .allocator = interpreter.allocator,
+                .message = message,
+                .allocatedMessage = false,
+                .token = token,
+                .originalBuffer = interpreter.originalBuffer,
+                .fileName = interpreter.fileName,
+            };
+        };
+        return .{
+            .allocator = interpreter.allocator,
+            .message = formattedMessage,
+            .allocatedMessage = true,
+            .token = token,
+            .originalBuffer = interpreter.originalBuffer,
+            .fileName = interpreter.fileName,
+        };
     }
 
-    pub fn print(self: *const RuntimeError, allocator: std.mem.Allocator) void {
-        const tokenString = self.token.toString(allocator) catch {
-            return;
-        };
-        defer allocator.free(tokenString);
+    pub fn printAndDeinit(self: *RuntimeError) void {
+        self.print();
+        if (self.allocatedMessage) {
+            self.allocator.free(self.message);
+        }
+    }
 
-        const errorMessage = std.fmt.allocPrint(allocator, "{s} at {s}", .{ self.message, tokenString }) catch {
+    pub fn print(self: *const RuntimeError) void {
+        const tokenString = self.token.toString(self.allocator) catch {
             return;
         };
-        defer allocator.free(errorMessage);
+        defer self.allocator.free(tokenString);
+
+        const errorMessage = std.fmt.allocPrint(self.allocator, "\"{s}\" at {s}", .{ self.message, tokenString }) catch {
+            return;
+        };
+        defer self.allocator.free(errorMessage);
 
         prettyError(errorMessage) catch {
             return;
         };
-        errorContext(self.originalBuffer, self.fileName, self.token.position, self.token.lexeme.len, allocator) catch {
+        errorContext(self.originalBuffer, self.fileName, self.token.position, self.token.lexeme.len, self.allocator) catch {
             return;
         };
     }
@@ -59,8 +89,12 @@ fileName: []const u8 = "",
 rootEnvironment: Environment,
 activeEnvironment: ?*Environment = null,
 
-pub fn init(allocator: std.mem.Allocator) Interpreter {
-    return .{ .allocator = allocator, .rootEnvironment = Environment.init(allocator) };
+pub fn init(allocator: std.mem.Allocator) !Interpreter {
+    var environment = Environment.init(allocator);
+
+    try environment.define("print", VariableValue.nativeFunction(1, &natives.print));
+
+    return .{ .allocator = allocator, .rootEnvironment = environment };
 }
 
 pub fn deinit(self: *Interpreter) void {
@@ -78,7 +112,7 @@ pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const 
     _ = self.interpret(program) catch null;
 
     if (self.runtimeError != null) {
-        self.runtimeError.?.print(self.allocator);
+        self.runtimeError.?.printAndDeinit();
     }
 }
 
@@ -92,7 +126,7 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     const result: ?VariableValue = self.interpretExpression(expression) catch null;
 
     if (self.runtimeError != null) {
-        self.runtimeError.?.print(self.allocator);
+        self.runtimeError.?.printAndDeinit();
     }
     if (result == null) {
         return VariableValue.null();
@@ -170,21 +204,21 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(left.asNumber() - right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Slash => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(left.asNumber() / right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Star => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(left.asNumber() * right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Plus => {
@@ -202,14 +236,14 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
 
                         return VariableValue.fromString(mergedString, true);
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must both be numbers or strings", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must both be numbers or strings", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Percent => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromNumber(@mod(left.asNumber(), right.asNumber()));
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
 
@@ -217,28 +251,28 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() > right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .GreaterThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() >= right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .LessThan => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() < right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .LessThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
                         return VariableValue.fromBoolean(left.asNumber() <= right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operands must be numbers", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
 
@@ -250,7 +284,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                 },
 
                 else => {
-                    self.runtimeError = RuntimeError.tokenError(self, "Unknown operator", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Unknown operator", .{});
                     return InterpreterError.RuntimeError;
                 },
             }
@@ -262,7 +296,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                     if (right.isNumber()) {
                         return VariableValue.fromNumber(-right.asNumber());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operand must be a number", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operand must be a number", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Negate => {
@@ -270,7 +304,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                     if (right.isBoolean()) {
                         return VariableValue.fromBoolean(!right.isTruthy());
                     }
-                    self.runtimeError = RuntimeError.tokenError(self, "Operand must be a boolean", values.operator);
+                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operand must be a boolean", .{});
                     return InterpreterError.RuntimeError;
                 },
                 else => {
@@ -303,28 +337,28 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             defer callee.deinit(self.allocator);
 
             if (!callee.isCallable()) {
-                self.runtimeError = RuntimeError.tokenError(self, "Can only call functions and classes", values.callee.token);
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and classes", .{});
                 return InterpreterError.RuntimeError;
             }
 
             const callable = callee.asCallable();
 
-            if (values.arguments.items.len != callable.arity()) {
-                self.runtimeError = RuntimeError.tokenError(self, "Expected {d} arguments but got {d}", .{ callable.arity(), values.arguments.items.len }, values.callee.token);
+            if (values.arguments.items.len != callable.arity) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.arity, values.arguments.items.len });
                 return InterpreterError.RuntimeError;
             }
 
-            const argumentValues = std.ArrayList(VariableValue).init(self.allocator);
+            var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
             defer argumentValues.deinit();
 
             for (values.arguments.items) |argument| {
                 const value = try self.interpretExpression(argument);
                 defer value.deinit(self.allocator);
 
-                argumentValues.append(value);
+                try argumentValues.append(value);
             }
 
-            return callable.call(argumentValues, self);
+            return callable.call(self, argumentValues);
         },
 
         .VariableAccess => |values| {
@@ -336,6 +370,9 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             defer value.deinit(self.allocator);
 
             try self.activeEnvironment.?.assign(values.name, value, self);
+            if (self.runtimeError != null) {
+                return InterpreterError.RuntimeError;
+            }
             return value;
         },
     }
