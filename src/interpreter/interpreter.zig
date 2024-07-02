@@ -150,14 +150,16 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
             const value = try self.interpretExpression(values.initializer);
             defer value.deinit(self.allocator);
 
-            try self.rootEnvironment.define(values.name.lexeme, value);
+            try self.activeEnvironment.?.define(values.name.lexeme, value);
         },
         .Block => |values| {
-            var childEnvironment = self.rootEnvironment.createChild();
+            const oldEnvironment = self.activeEnvironment.?;
+
+            var childEnvironment = self.activeEnvironment.?.createChild();
             defer childEnvironment.deinit();
 
             self.activeEnvironment = &childEnvironment;
-            defer self.activeEnvironment = &self.rootEnvironment;
+            defer self.activeEnvironment = oldEnvironment;
 
             for (values.statements.items) |childStatement| {
                 try self.interpretStatement(childStatement);
