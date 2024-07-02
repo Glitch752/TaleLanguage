@@ -217,6 +217,5 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
         return true;
     }
 
-    errorPayload.* = TokenizerErrorPayload{ .InvalidCharacter = 0 };
-    return true;
+    return false;
 }

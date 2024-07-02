@@ -13,12 +13,15 @@ pub const Statement = union(enum) {
 
     pub fn uninit(self: *const Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
+            .Expression => |data| data.expression.uninit(allocator),
+            .Let => |data| data.initializer.uninit(allocator),
             .Block => |data| {
                 for (data.statements.items) |statement| {
                     statement.*.uninit(allocator);
                 }
                 data.statements.deinit();
             },
+
             .If => |data| {
                 data.condition.uninit(allocator);
                 data.trueBranch.uninit(allocator);
@@ -30,7 +33,6 @@ pub const Statement = union(enum) {
                 data.condition.uninit(allocator);
                 data.body.uninit(allocator);
             },
-            else => {},
         }
 
         allocator.destroy(self);

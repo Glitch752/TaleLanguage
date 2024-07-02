@@ -258,8 +258,9 @@ fn consumeAssignment(self: *Parser) anyerror!*Expression {
         const value = try self.consumeAssignment();
 
         switch (expression.*) {
-            .VariableAccess => {
-                const variable = expression.VariableAccess.name;
+            .VariableAccess => |access| {
+                expression.uninit(self.allocator);
+                const variable = access.name;
                 return Expression.variableAssignment(self.allocator, variable, value);
             },
             else => {},

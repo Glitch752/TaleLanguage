@@ -30,9 +30,10 @@ pub fn createChild(self: *Environment) Environment {
 }
 
 pub fn deinit(self: *Environment) void {
-    var iter = self.values.keyIterator();
+    var iter = self.values.iterator();
     while (iter.next()) |entry| {
-        self.allocator.free(entry.*);
+        entry.value_ptr.deinit(self.allocator);
+        self.allocator.free(entry.key_ptr.*);
     }
     self.values.deinit();
 }

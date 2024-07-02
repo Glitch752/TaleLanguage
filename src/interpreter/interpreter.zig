@@ -98,8 +98,7 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
 }
 
 pub fn deinit(self: *Interpreter) void {
-    // No cleanup needed for now
-    _ = self;
+    self.rootEnvironment.deinit();
 }
 
 pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
