@@ -46,20 +46,21 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
             }
             std.debug.print("}}", .{});
         },
+        .If => |values| {
+            std.debug.print("if ", .{});
+            try self.printExpression(values.condition);
+            std.debug.print(" \n", .{});
+            try self.printStatement(values.trueBranch, indent + 1);
+            if (values.falseBranch != null) {
+                std.debug.print(" else \n", .{});
+                try self.printStatement(values.falseBranch.?, indent + 1);
+            }
+        },
     }
 }
 
 pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !void {
     switch (expression.*) {
-        .Binary => |values| {
-            std.debug.print("(", .{});
-            try self.printExpression(values.left);
-            std.debug.print(" ", .{});
-            std.debug.print("{s}", .{values.operator.lexeme});
-            std.debug.print(" ", .{});
-            try self.printExpression(values.right);
-            std.debug.print(")", .{});
-        },
         .Grouping => |values| {
             std.debug.print("[", .{});
             try self.printExpression(values.expression);
@@ -70,12 +71,32 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
             defer self.allocator.free(str);
             std.debug.print("{s}", .{str});
         },
+
+        .Binary => |values| {
+            std.debug.print("(", .{});
+            try self.printExpression(values.left);
+            std.debug.print(" ", .{});
+            std.debug.print("{s}", .{values.operator.lexeme});
+            std.debug.print(" ", .{});
+            try self.printExpression(values.right);
+            std.debug.print(")", .{});
+        },
         .Unary => |values| {
             std.debug.print("(", .{});
             std.debug.print("{s}", .{values.operator.lexeme});
             try self.printExpression(values.right);
             std.debug.print(")", .{});
         },
+        .Logical => |values| {
+            std.debug.print("(", .{});
+            try self.printExpression(values.left);
+            std.debug.print(" ", .{});
+            std.debug.print("{s}", .{values.operator.lexeme});
+            std.debug.print(" ", .{});
+            try self.printExpression(values.right);
+            std.debug.print(")", .{});
+        },
+
         .VariableAccess => |values| {
             std.debug.print("{s}", .{values.name.lexeme});
         },

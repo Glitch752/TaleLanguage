@@ -177,6 +177,9 @@ fn consumeDeclaration(self: *Parser) anyerror!*Statement {
 }
 
 fn consumeStatement(self: *Parser) anyerror!*Statement {
+    if (self.matchToken(TokenType.IfKeyword)) {
+        return try self.consumeIfStatement();
+    }
     if (self.matchToken(TokenType.OpenCurly)) {
         return try self.consumeBlockStatement();
     }
@@ -184,15 +187,25 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
     return try self.consumeExpressionStatement();
 }
 
+fn consumeIfStatement(self: *Parser) anyerror!*Statement {
+    _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'if'");
+    const condition = try self.consumeExpression();
+    _ = try self.consume(TokenType.CloseParen, "Expected ')' after if condition");
+    const trueBranch = try self.consumeStatement();
+
+    const falseBranch: ?*Statement = if (self.matchToken(TokenType.ElseKeyword)) try self.consumeStatement() else null;
+    return Statement.ifBlock(self.allocator, condition, trueBranch, falseBranch);
+}
+
 fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
     var statements = std.ArrayList(*Statement).init(self.allocator);
 
-    while (!self.matchToken(TokenType.CloseCurly) and !self.isAtEnd()) {
+    while (!(self.peek().type == TokenType.CloseCurly) and !self.isAtEnd()) {
         const statement = self.consumeDeclarationAndSynchronize() orelse continue;
         try statements.append(statement);
     }
 
-    _ = try self.consume(TokenType.CloseCurly, "Expected '}' after a block statement.");
+    _ = try self.consume(TokenType.CloseCurly, "Expected '}' after a block statement");
 
     return Statement.block(self.allocator, statements);
 }
@@ -224,7 +237,7 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeAssignment(self: *Parser) anyerror!*Expression {
-    const expression = try self.consumeEquality();
+    const expression = try self.consumeLogicalOr();
 
     if (self.matchToken(TokenType.Assign)) {
         // This is an assignment
@@ -243,6 +256,38 @@ fn consumeAssignment(self: *Parser) anyerror!*Expression {
         const err = ParseError.consumeFailed(self, "Invalid assignment target", equals);
         err.print(self.allocator);
         return ParseErrorEnum.Unknown;
+    }
+
+    return expression;
+}
+
+fn consumeLogicalOr(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumeLogicalAnd();
+
+    while (self.matchToken(TokenType.Or)) {
+        errdefer expression.uninit(self.allocator);
+
+        const operator = self.peekPrevious();
+        const right = try self.consumeLogicalAnd();
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.logical(self.allocator, expression, operator, right);
+    }
+
+    return expression;
+}
+
+fn consumeLogicalAnd(self: *Parser) anyerror!*Expression {
+    var expression = try self.consumeEquality();
+
+    while (self.matchToken(TokenType.And)) {
+        errdefer expression.uninit(self.allocator);
+
+        const operator = self.peekPrevious();
+        const right = try self.consumeEquality();
+        errdefer right.uninit(self.allocator);
+
+        expression = try Expression.logical(self.allocator, expression, operator, right);
     }
 
     return expression;

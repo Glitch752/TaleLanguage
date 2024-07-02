@@ -130,11 +130,28 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
                 try self.interpretStatement(childStatement);
             }
         },
+        .If => |values| {
+            const condition = try self.interpretExpression(values.condition);
+            defer condition.deinit(self.allocator);
+
+            if (condition.isTruthy()) {
+                try self.interpretStatement(values.trueBranch);
+            } else if (values.falseBranch != null) {
+                try self.interpretStatement(values.falseBranch.?);
+            }
+        },
     }
 }
 
 fn interpretExpression(self: *Interpreter, expression: *const Expression) !VariableValue {
     switch (expression.*) {
+        .Grouping => |values| {
+            return self.interpretExpression(values.expression);
+        },
+        .Literal => |values| {
+            return VariableValue.fromLiteral(values.value);
+        },
+
         .Binary => |values| {
             const left = try self.interpretExpression(values.left);
             errdefer left.deinit(self.allocator);
@@ -232,12 +249,6 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                 },
             }
         },
-        .Grouping => |values| {
-            return self.interpretExpression(values.expression);
-        },
-        .Literal => |values| {
-            return VariableValue.fromLiteral(values.value);
-        },
         .Unary => |values| {
             switch (values.operator.type) {
                 .Minus => {
@@ -261,6 +272,26 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
                 },
             }
         },
+        .Logical => |values| {
+            const left = try self.interpretExpression(values.left);
+            errdefer left.deinit(self.allocator);
+
+            if (values.operator.type == .Or) {
+                if (left.isTruthy()) {
+                    return left;
+                }
+            } else {
+                if (!left.isTruthy()) {
+                    return left;
+                }
+            }
+
+            const right = try self.interpretExpression(values.right);
+            errdefer right.deinit(self.allocator);
+
+            return right;
+        },
+
         .VariableAccess => |values| {
             const variable = try self.activeEnvironment.?.get(values.name, self);
             return variable;

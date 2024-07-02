@@ -3,10 +3,13 @@ const TokenLiteral = @import("../token.zig").TokenLiteral;
 const std = @import("std");
 
 pub const Expression = union(enum) {
-    Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
     Grouping: struct { expression: *const Expression },
     Literal: struct { value: TokenLiteral },
+
+    Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
     Unary: struct { operator: Token, right: *const Expression },
+    Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
+
     VariableAccess: struct { name: Token },
     VariableAssignment: struct { name: Token, value: *const Expression },
 
@@ -22,12 +25,6 @@ pub const Expression = union(enum) {
         }
         allocator.destroy(self);
     }
-
-    pub fn binary(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
-        const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Binary = .{ .left = left, .operator = operator, .right = right } };
-        return alloc;
-    }
     pub fn grouping(allocator: std.mem.Allocator, expression: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .Grouping = .{ .expression = expression } };
@@ -38,11 +35,23 @@ pub const Expression = union(enum) {
         alloc.* = .{ .Literal = .{ .value = value } };
         return alloc;
     }
+
     pub fn unary(allocator: std.mem.Allocator, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .Unary = .{ .operator = operator, .right = right } };
         return alloc;
     }
+    pub fn binary(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .Binary = .{ .left = left, .operator = operator, .right = right } };
+        return alloc;
+    }
+    pub fn logical(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
+        const alloc = try allocator.create(Expression);
+        alloc.* = .{ .Logical = .{ .left = left, .operator = operator, .right = right } };
+        return alloc;
+    }
+
     pub fn variableAccess(allocator: std.mem.Allocator, name: Token) !*Expression {
         const alloc = try allocator.create(Expression);
         alloc.* = .{ .VariableAccess = .{ .name = name } };
