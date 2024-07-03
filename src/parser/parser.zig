@@ -259,7 +259,7 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
-    const parameters = std.ArrayList(*Token).init(self.allocator);
+    var parameters = std.ArrayList(Token).init(self.allocator);
 
     _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'function'");
     if (!self.matchToken(TokenType.CloseParen)) {

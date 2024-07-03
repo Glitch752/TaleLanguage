@@ -3,6 +3,8 @@ const TokenLiteral = @import("../token.zig").TokenLiteral;
 const Statement = @import("./statement.zig").Statement;
 const std = @import("std");
 
+pub const FunctionExpression = struct { parameters: std.ArrayList(Token), body: *const Statement };
+
 pub const Expression = union(enum) {
     Grouping: struct { expression: *const Expression },
     Literal: struct { value: TokenLiteral },
@@ -13,7 +15,7 @@ pub const Expression = union(enum) {
     Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
 
     FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
-    Function: struct { parameters: std.ArrayList(Token), body: *const Statement },
+    Function: FunctionExpression,
 
     VariableAccess: struct { name: Token },
     VariableAssignment: struct { name: Token, value: *const Expression },
@@ -85,9 +87,8 @@ pub const Expression = union(enum) {
         alloc.* = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } };
         return alloc;
     }
-
-    pub fn function(allocator: std.mem.Allocator, parameters: std.ArrayList(Token), body: *const Statement) !*Statement {
-        const alloc = try allocator.create(Statement);
+    pub fn function(allocator: std.mem.Allocator, parameters: std.ArrayList(Token), body: *const Statement) !*Expression {
+        const alloc = try allocator.create(Expression);
         alloc.* = .{ .Function = .{ .parameters = parameters, .body = body } };
         return alloc;
     }

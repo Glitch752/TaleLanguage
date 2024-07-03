@@ -98,7 +98,7 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
 }
 
 pub fn deinit(self: *Interpreter) void {
-    self.rootEnvironment.deinit();
+    self.rootEnvironment.deinit(self);
 }
 
 pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
@@ -135,7 +135,13 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
 }
 
 pub fn enterNewEnvironment(self: *Interpreter) Environment {
-    const child = self.activeEnvironment.?.createChild();
+    var child = self.activeEnvironment.?.createChild();
+    self.activeEnvironment = &child;
+    return child;
+}
+
+pub fn enterChildEnvironment(self: *Interpreter, parent: *Environment) Environment {
+    var child = parent.createChild();
     self.activeEnvironment = &child;
     return child;
 }
@@ -146,7 +152,7 @@ fn interpret(self: *Interpreter, program: *const Program) !void {
     }
 }
 
-fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
+pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
     switch (statement.*) {
         .Expression => |values| {
             const result = try self.interpretExpression(values.expression);
@@ -160,7 +166,7 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
         },
         .Block => |values| {
             var childEnvironment = self.enterNewEnvironment();
-            defer childEnvironment.deinit();
+            defer childEnvironment.deinit(self);
 
             for (values.statements.items) |childStatement| {
                 try self.interpretStatement(childStatement);
@@ -185,7 +191,7 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
     }
 }
 
-fn interpretExpression(self: *Interpreter, expression: *const Expression) !VariableValue {
+fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
     switch (expression.*) {
         .Grouping => |values| {
             return self.interpretExpression(values.expression);
@@ -389,7 +395,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             return callable.call(self, argumentValues);
         },
         .Function => |values| {
-            const function = VariableValue.fromFunction(values, self.activeEnvironment.?, self.allocator);
+            const function = VariableValue.fromFunction(values, self.activeEnvironment.?);
             return function;
         },
 

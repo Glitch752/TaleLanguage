@@ -21,7 +21,7 @@ pub fn printProgram(self: *const ASTPrinter, program: *const Program) !void {
     }
 }
 
-pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, indent: u32) !void {
+pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, indent: u32) anyerror!void {
     var i: u32 = 0;
     while (i < indent) : (i += 1) {
         std.debug.print("  ", .{});
@@ -66,7 +66,7 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
     }
 }
 
-pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !void {
+pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) anyerror!void {
     switch (expression.*) {
         .Grouping => |values| {
             std.debug.print("[", .{});
@@ -108,10 +108,10 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
         },
 
         .Function => |values| {
-            std.debug.print("function {s}(", .{values.name.lexeme});
-            for (values.parameters.items) |parameter| {
+            std.debug.print("function(", .{});
+            for (values.parameters.items, 0..) |parameter, index| {
                 std.debug.print("{s}", .{parameter.lexeme});
-                if (parameter != values.parameters.items[values.parameters.items.len - 1]) {
+                if (index != values.parameters.items.len - 1) {
                     std.debug.print(", ", .{});
                 }
             }
