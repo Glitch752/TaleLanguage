@@ -1,6 +1,7 @@
-let n = 64;
+// Sierpinski triangle
+let layers = 64;
 
-let y = n - 1;
+let y = layers - 1;
 while(y >= 0) {
     let i = 0;
     while(i < y) {
@@ -9,7 +10,7 @@ while(y >= 0) {
     }
 
     let x = 0;
-    while(x + y < n) {
+    while(x + y < layers) {
         if ((x & y) != 0) 
             print("  "); 
         else
@@ -21,4 +22,4 @@ while(y >= 0) {
     print("\n");
 
     y = y - 1;
-} 
+}

@@ -110,9 +110,14 @@ pub fn uninit(self: *Parser) void {
 }
 
 /// Sets "hasError" to true and prints an error message on the current token.
-/// If you want it to be an error that allows continued parsing of a statement, just don't reutrn anything (`_ = self.errorOccured("Error message")`).
 fn errorOccured(self: *Parser, errorMessage: []const u8) void {
     const err = ParseError.consumeFailed(self, errorMessage, self.peek());
+    err.print(self.allocator);
+    self.hasError = true;
+}
+/// Sets "hasError" to true and prints an error message on a specific token.
+fn errorOccuredAt(self: *Parser, errorMessage: []const u8, token: Token) void {
+    const err = ParseError.consumeFailed(self, errorMessage, token);
     err.print(self.allocator);
     self.hasError = true;
 }
@@ -254,7 +259,6 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
-    const startToken = self.peekPrevious();
     const parameters = std.ArrayList(*Token).init(self.allocator);
 
     _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'function'");
@@ -265,7 +269,10 @@ fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
                 self.errorOccured("Too many parameters in function; can't have more than 255 parameters");
             }
 
-            const parameter = try self.consume(TokenType.Identifier, "Expected parameter name");
+            const parameter = self.consume(TokenType.Identifier, "Expected parameter name") catch {
+                self.errorOccured("Expected parameter name");
+                return ParseErrorEnum.Unknown;
+            };
             try parameters.append(parameter);
 
             if (!self.matchToken(TokenType.Comma)) {
@@ -273,12 +280,15 @@ fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
             }
         }
 
-        _ = try self.consume(TokenType.CloseParen, "Expected ')' after function parameters");
+        _ = self.consume(TokenType.CloseParen, "Expected ')' after function parameters") catch {
+            self.errorOccured("Expected ')' after function parameters");
+            return ParseErrorEnum.Unknown;
+        };
     }
 
     const body = try self.consumeBlockStatement();
 
-    return Expression.function(self.allocator, startToken, parameters, body);
+    return Expression.function(self.allocator, parameters, body);
 }
 
 fn consumeAssignment(self: *Parser) anyerror!*Expression {

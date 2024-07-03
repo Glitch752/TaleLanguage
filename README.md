@@ -7,9 +7,9 @@ I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/)
 
 # TODO
 - [x] Implement a lexer
-- [ ] Implement a parser
-- [ ] Implement an interpreter
-  - [ ] Tree-walking interpreter
+- [X] Implement a parser
+- [X] Implement an interpreter
+  - [X] Tree-walking interpreter
   - [ ] Bytecode interpreter
 - [ ] Implement a compiler
 
@@ -38,11 +38,11 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 - [X] Comments: `//` and `/* */`
 - [X] Variable declaration: `let x = 5;`, `let x;` (uninitialized -- value is `null`)
 - [X] Assignment: `x = 5;`
-- [ ] Functions:
-  - [ ] Declaration: `let add = function(x, y) { return x + y; }` (This is a value that must be assigned to a variable)
+- [X] Functions:
+  - [X] Declaration: `let add = function(x, y) { return x + y; }` (This is a value that must be assigned to a variable)
     - If no value is returned, the function returns `null`
     - Functions hold a reference to the environment in which they were created -- commonly referred to as a closure
-  - [ ] Calling: `add(5, 3);` (`add` is a variable containing a function)
+  - [X] Calling: `add(5, 3);` (`add` is a variable containing a function)
 - [ ] Classes
   - [ ] Declaration: `let Point = class { let constructor = function(x, y) { this.x = x; this.y = y; } }`
     - The `constructor` method is called when the class is instantiated
@@ -57,7 +57,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
     - [ ] Fields: `let Point = class { let static x = 5; }`
       - Access: `Point.x`
 - [ ] Extremely simple standard library, globally accessible as `Std` (for now):
-  - [ ] `print` function: `Std.print("Hello, world!");`
+  - [X] `print` function: `Std.print("Hello, world!");`
   - [ ] (From Crafting Interpreters) `clock` function: `std.print(Std.clock());` (Returns the time in seconds since the program started running)
   - [ ] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
   - [ ] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)

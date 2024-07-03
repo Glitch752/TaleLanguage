@@ -2,11 +2,48 @@ const std = @import("std");
 
 const Interpreter = @import("./interpreter.zig").Interpreter;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
+const Token = @import("../token.zig").Token;
+const Statement = @import("../parser/statement.zig").Statement;
+const RuntimeError = @import("./interpreter.zig").RuntimeError;
+const InterpreterError = @import("./interpreter.zig").InterpreterError;
 
-pub const CallableFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) VariableValue;
+pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) VariableValue;
+
+pub const CallableFunction = union(enum) {
+    Native: CallableNativeFunction,
+    User: struct {
+        arguments: std.ArrayList(Token),
+        body: *const Statement,
+    },
+
+    pub fn call(self: CallableFunction, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) !VariableValue {
+        switch (self) {
+            .Native => |data| return data(interpreter, arguments),
+            .User => |data| {
+                var environment = try interpreter.enterNewEnvironment();
+                defer environment.deinit();
+
+                // Check the number of arguments
+                if (data.arity != data.arguments.items.len) {
+                    interpreter.runtimeError = RuntimeError.tokenError(self, data.arguments[0], "Expected {d} arguments but got {d}.", .{ data.arity, arguments.items.len });
+                    return InterpreterError.RuntimeError;
+                }
+
+                // Bind the arguments to the scope
+                for (arguments.items, 0..) |argument, index| {
+                    try environment.define(data.arguments.items[index].lexeme, argument);
+                }
+
+                // Execute the function body
+                return interpreter.executeBlock(data.body.?, environment);
+            },
+        }
+    }
+};
+
 pub const Callable = struct {
     arity: u32,
-    call: CallableFunction,
+    call: CallableNativeFunction,
 };
 
 pub const VariableValue = union(enum) {
@@ -115,7 +152,7 @@ pub const VariableValue = union(enum) {
         }
     }
 
-    pub fn nativeFunction(arity: u32, function: CallableFunction) VariableValue {
+    pub fn nativeFunction(arity: u32, function: CallableNativeFunction) VariableValue {
         return .{ .Function = .{ .arity = arity, .function = function } };
     }
 

@@ -107,6 +107,17 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) !
             std.debug.print(")", .{});
         },
 
+        .Function => |values| {
+            std.debug.print("function {s}(", .{values.name.lexeme});
+            for (values.parameters.items) |parameter| {
+                std.debug.print("{s}", .{parameter.lexeme});
+                if (parameter != values.parameters.items[values.parameters.items.len - 1]) {
+                    std.debug.print(", ", .{});
+                }
+            }
+            std.debug.print(") ", .{});
+            try self.printStatement(values.body, 1);
+        },
         .FunctionCall => |values| {
             try self.printExpression(values.callee);
             std.debug.print("(", .{});

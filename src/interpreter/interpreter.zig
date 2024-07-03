@@ -134,6 +134,12 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     return result.?;
 }
 
+pub fn enterNewEnvironment(self: *Interpreter) Environment {
+    const child = self.activeEnvironment.?.createChild();
+    self.activeEnvironment = &child;
+    return child;
+}
+
 fn interpret(self: *Interpreter, program: *const Program) !void {
     for (program.statements.items) |statement| {
         try self.interpretStatement(statement);
@@ -153,13 +159,8 @@ fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
             try self.activeEnvironment.?.define(values.name.lexeme, value);
         },
         .Block => |values| {
-            const oldEnvironment = self.activeEnvironment.?;
-
-            var childEnvironment = self.activeEnvironment.?.createChild();
+            var childEnvironment = self.enterNewEnvironment();
             defer childEnvironment.deinit();
-
-            self.activeEnvironment = &childEnvironment;
-            defer self.activeEnvironment = oldEnvironment;
 
             for (values.statements.items) |childStatement| {
                 try self.interpretStatement(childStatement);
@@ -386,6 +387,10 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) !Varia
             }
 
             return callable.call(self, argumentValues);
+        },
+        .Function => |values| {
+            const function = VariableValue.fromFunction(values, self.activeEnvironment.?, self.allocator);
+            return function;
         },
 
         .VariableAccess => |values| {

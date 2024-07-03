@@ -34,7 +34,7 @@ pub fn createChild(self: *Environment) Environment {
     };
 }
 
-pub fn deinit(self: *Environment) void {
+pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
@@ -43,6 +43,8 @@ pub fn deinit(self: *Environment) void {
         self.allocator.destroy(wrapper);
     }
     self.values.deinit(self.allocator);
+
+    if (self.parent != null) interpreter.activeEnvironment = self.parent;
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue) !void {
