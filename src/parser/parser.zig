@@ -286,6 +286,8 @@ fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
         };
     }
 
+    _ = try self.consume(TokenType.OpenCurly, "Expected '{' before function body");
+
     const body = try self.consumeBlockStatement();
 
     return Expression.function(self.allocator, parameters, body);

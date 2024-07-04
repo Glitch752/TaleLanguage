@@ -17,6 +17,7 @@ const ValueWrapper = struct {
 allocator: std.mem.Allocator,
 values: std.StringHashMapUnmanaged(*ValueWrapper),
 parent: ?*Environment = null,
+previous: ?*Environment = null,
 
 pub fn init(allocator: std.mem.Allocator) Environment {
     return .{
@@ -26,12 +27,8 @@ pub fn init(allocator: std.mem.Allocator) Environment {
     };
 }
 
-pub fn createChild(self: *Environment) Environment {
-    return .{
-        .allocator = self.allocator,
-        .values = std.StringHashMapUnmanaged(*ValueWrapper){},
-        .parent = self,
-    };
+pub fn createChild(self: *Environment, previous: *Environment) Environment {
+    return .{ .allocator = self.allocator, .values = std.StringHashMapUnmanaged(*ValueWrapper){}, .parent = self, .previous = previous };
 }
 
 pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
@@ -44,7 +41,11 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     }
     self.values.deinit(self.allocator);
 
-    if (self.parent != null) interpreter.activeEnvironment = self.parent;
+    if (self.parent != null) {
+        interpreter.activeEnvironment = self.previous;
+
+        self.allocator.destroy(self);
+    }
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue) !void {
@@ -86,4 +87,32 @@ pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !Variable
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
     return InterpreterError.RuntimeError;
+}
+
+pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]const u8 {
+    const buffer = try allocator.alloc(u8, count);
+    for (buffer, 0..) |_, i| {
+        buffer[i] = character;
+    }
+    return buffer;
+}
+pub fn printVariables(self: *Environment, interpreter: *Interpreter, indent: u32) !void {
+    const spaces = try repeat(indent, ' ', interpreter.allocator);
+    defer interpreter.allocator.free(spaces);
+
+    if (indent == 0) std.debug.print("---- Variables -----\n", .{});
+    var iter = self.values.iterator();
+    while (iter.next()) |entry| {
+        const wrapper = entry.value_ptr.*;
+        const name = wrapper.name;
+        const value = wrapper.value;
+
+        std.debug.print("{s}{s} = {s}\n", .{ spaces, name, try value.toString(interpreter.allocator) });
+    }
+
+    if (self.parent != null) {
+        std.debug.print("{s}->\n", .{spaces});
+        try self.parent.?.printVariables(interpreter, indent + 1);
+    }
+    if (indent == 0) std.debug.print("-----------\n", .{});
 }

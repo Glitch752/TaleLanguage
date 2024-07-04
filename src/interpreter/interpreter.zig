@@ -134,15 +134,17 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     return result.?;
 }
 
-pub fn enterNewEnvironment(self: *Interpreter) Environment {
-    var child = self.activeEnvironment.?.createChild();
-    self.activeEnvironment = &child;
+pub fn enterNewEnvironment(self: *Interpreter) !*Environment {
+    const child = try self.allocator.create(Environment);
+    child.* = self.activeEnvironment.?.createChild(self.activeEnvironment.?);
+    self.activeEnvironment = child;
     return child;
 }
 
-pub fn enterChildEnvironment(self: *Interpreter, parent: *Environment) Environment {
-    var child = parent.createChild();
-    self.activeEnvironment = &child;
+pub fn enterChildEnvironment(self: *Interpreter, parent: *Environment, previous: *Environment) !*Environment {
+    const child = try self.allocator.create(Environment);
+    child.* = parent.createChild(previous);
+    self.activeEnvironment = child;
     return child;
 }
 
@@ -165,7 +167,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void
             try self.activeEnvironment.?.define(values.name.lexeme, value);
         },
         .Block => |values| {
-            var childEnvironment = self.enterNewEnvironment();
+            var childEnvironment = try self.enterNewEnvironment();
             defer childEnvironment.deinit(self);
 
             for (values.statements.items) |childStatement| {

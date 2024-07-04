@@ -44,6 +44,10 @@ pub const Expression = union(enum) {
                 }
                 data.arguments.deinit();
             },
+            .Function => |data| {
+                data.parameters.deinit();
+                data.body.*.uninit(allocator);
+            },
 
             .VariableAssignment => |data| data.value.uninit(allocator),
             else => {},

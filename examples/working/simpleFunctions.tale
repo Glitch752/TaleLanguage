@@ -1,0 +1,12 @@
+let run = function(n) {
+    if (n >= 1) {
+        run(n - 1);
+        run(n - 1);
+        print(n);
+        print(" ");
+    }
+};
+
+let test = run;
+
+test(10);

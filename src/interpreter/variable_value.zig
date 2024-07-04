@@ -23,7 +23,7 @@ pub const CallableFunction = union(enum) {
         switch (self) {
             .Native => |data| return data(interpreter, arguments),
             .User => |data| {
-                var environment = interpreter.enterChildEnvironment(data.parentEnvironment);
+                var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
                 defer environment.deinit(interpreter);
 
                 // Check the number of arguments
