@@ -69,6 +69,12 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
             try self.printExpression(values.value);
             std.debug.print(";\n", .{});
         },
+        .Break => {
+            std.debug.print("break;\n", .{});
+        },
+        .Continue => {
+            std.debug.print("continue;\n", .{});
+        },
     }
 }
 

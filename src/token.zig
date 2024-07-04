@@ -46,6 +46,8 @@ pub const TokenType = enum {
     NullKeyword, // null
 
     ReturnKeyword, // return
+    BreakKeyword, // break
+    ContinueKeyword, // continue
     LetKeyword, // let
 
     // Literals
@@ -128,24 +130,29 @@ pub const Token = struct {
     }
 
     pub const keywordMap = std.ComptimeStringMap(TokenType, .{
-        // This comment is to prevent zigfmt from collapsing the lines
         .{ "function", TokenType.FunctionKeyword },
         .{ "if", TokenType.IfKeyword },
         .{ "else", TokenType.ElseKeyword },
-        .{ "for", TokenType.ForKeyword },
-        .{ "return", TokenType.ReturnKeyword },
+
         .{ "let", TokenType.LetKeyword },
+
+        .{ "for", TokenType.ForKeyword },
         .{ "while", TokenType.WhileKeyword },
+
         .{ "true", TokenType.TrueKeyword },
         .{ "false", TokenType.FalseKeyword },
         .{ "null", TokenType.NullKeyword },
+
         .{ "class", TokenType.ClassKeyword },
         .{ "super", TokenType.SuperKeyword },
         .{ "this", TokenType.ThisKeyword },
         .{ "extending", TokenType.ExtendingKeyword },
+
+        .{ "break", TokenType.BreakKeyword },
+        .{ "continue", TokenType.ContinueKeyword },
+        .{ "return", TokenType.ReturnKeyword },
     });
     pub const symbolMap = std.ComptimeStringMap(TokenType, .{
-        // This comment is to prevent zigfmt from collapsing the lines
         .{ "(", TokenType.OpenParen },
         .{ ")", TokenType.CloseParen },
         .{ "{", TokenType.OpenCurly },

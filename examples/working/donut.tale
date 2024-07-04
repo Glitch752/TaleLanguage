@@ -1,0 +1,27 @@
+let tmr1 = null;
+let tmr2 = null;
+let A = 1;
+let B = 1;
+
+let asciiframe = function() {
+    A = A + 0.07;
+    B = B + 0.03;
+
+    let sinA = sin(A);
+    let cosA = cos(A);
+    let sinB = sin(B);
+    let cosB = cos(B);
+
+    let output = "";
+
+    let j = 0; // J is theta
+    while(j < 6.28) {
+        let i = 0; // I is phi
+        while(i < 6.28) {
+
+
+            i = i + 0.02;
+        }
+        j = j + 0.07;
+    }
+}

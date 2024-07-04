@@ -203,6 +203,12 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
     if (self.matchToken(TokenType.ReturnKeyword)) {
         return try self.consumeReturnStatement();
     }
+    if (self.matchToken(TokenType.BreakKeyword)) {
+        return try self.consumeBreakStatement();
+    }
+    if (self.matchToken(TokenType.ContinueKeyword)) {
+        return try self.consumeContinueStatement();
+    }
 
     return try self.consumeExpressionStatement();
 }
@@ -216,6 +222,18 @@ fn consumeReturnStatement(self: *Parser) anyerror!*Statement {
     _ = try self.consume(TokenType.Semicolon, "Expected ';' after a return statement");
 
     return Statement.returnStatement(self.allocator, value);
+}
+
+fn consumeBreakStatement(self: *Parser) anyerror!*Statement {
+    _ = try self.consume(TokenType.Semicolon, "Expected ';' after a break statement");
+
+    return Statement.breakStatement(self.allocator);
+}
+
+fn consumeContinueStatement(self: *Parser) anyerror!*Statement {
+    _ = try self.consume(TokenType.Semicolon, "Expected ';' after a continue statement");
+
+    return Statement.continueStatement(self.allocator);
 }
 
 fn consumeIfStatement(self: *Parser) anyerror!*Statement {

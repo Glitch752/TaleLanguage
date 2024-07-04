@@ -80,6 +80,10 @@ pub const InterpreterError = error{
     RuntimeError,
     /// Used when returning from functions. Functions catch this and place the return value in `lastReturnValue`.
     Return,
+    /// Used when breaking out of loops. Loops catch this and break out of the loop.
+    Break,
+    /// Used when continuing in loops. Loops catch this and continue to the next iteration.
+    Continue,
 };
 
 allocator: std.mem.Allocator,
@@ -158,7 +162,7 @@ fn interpret(self: *Interpreter, program: *const Program) !void {
     }
 }
 
-pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void {
+pub fn interpretStatement(self: *Interpreter, statement: *const Statement) anyerror!void {
     switch (statement.*) {
         .Expression => |values| {
             const result = try self.interpretExpression(values.expression);
@@ -191,7 +195,11 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void
         },
         .While => |values| {
             while ((try self.interpretExpression(values.condition)).isTruthy()) {
-                try self.interpretStatement(values.body);
+                self.interpretStatement(values.body) catch |err| switch (err) {
+                    InterpreterError.Break => break,
+                    InterpreterError.Continue => continue,
+                    else => |value| return value,
+                };
             }
         },
 
@@ -199,6 +207,8 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void
             self.lastReturnValue = try self.interpretExpression(values.value);
             return InterpreterError.Return;
         },
+        .Break => return InterpreterError.Break,
+        .Continue => return InterpreterError.Continue,
     }
 }
 
