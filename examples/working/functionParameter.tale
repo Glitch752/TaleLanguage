@@ -1,0 +1,5 @@
+let applyFunction = function(f, x) {
+    return f(x);
+};
+
+print(applyFunction(function(x) { return x + 1; }, 5));

@@ -1,0 +1,22 @@
+let main = function() {
+    let run = function(n) {
+        let p = print;
+
+        let printWithSpace = function(n) {
+            p(n);
+            p(" ");
+        };
+
+        if (n >= 1) {
+            run(n - 1);
+            run(n - 1);
+            printWithSpace(n);
+        }
+    };
+    
+    let test = run;
+    
+    test(10);
+};
+
+main();

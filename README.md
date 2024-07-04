@@ -28,11 +28,11 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] Bitwise: `&`, `|`, `^`
     - We take the Javascript approach to bitwise operators: convert their operands to 32-bit signed integers before performing the operation
   - [X] Grouping: `()`
-- [ ] Simple control-flow constructs:
+- [X] Simple control-flow constructs:
   - [X] `if` statements, along with `else if` and `else`
   - [X] `while` loops
-  - [ ] `for` loops (only for iterating over arrays -- `for (let x . array) { ... }`) (I'm not sure if I should add a more general `for` loop or even condense both loops into one)
-  - [ ] `break` and `continue` statements
+  - [X] `for` loops (only for iterating over arrays -- `for (let x . array) { ... }`) (I'm not sure if I should add a more general `for` loop or even condense both loops into one)
+  - [X] `break` and `continue` statements
   - [X] `return` statements
 - [X] Block scoping: `{}`
 - [X] Comments: `//` and `/* */`

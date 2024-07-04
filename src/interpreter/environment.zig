@@ -18,6 +18,7 @@ allocator: std.mem.Allocator,
 values: std.StringHashMapUnmanaged(*ValueWrapper),
 parent: ?*Environment = null,
 previous: ?*Environment = null,
+deactive: bool = false,
 
 pub fn init(allocator: std.mem.Allocator) Environment {
     return .{
@@ -46,9 +47,12 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
 
         self.allocator.destroy(self);
     }
+
+    self.deactive = true;
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue) !void {
+    std.debug.print("Allocator: {any}", .{self.allocator});
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
