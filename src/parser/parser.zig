@@ -77,10 +77,19 @@ pub fn parse(self: *Parser) anyerror!Program {
     self.hasError = false;
 
     var program = Program.init(self.allocator);
+    errdefer program.deinit();
 
+    var hadError = false;
     while (!self.isAtEnd()) {
-        const declaration = self.consumeDeclarationAndSynchronize() orelse continue;
+        const declaration = self.consumeDeclarationAndSynchronize() orelse {
+            hadError = true;
+            continue;
+        };
         try program.addStatement(declaration);
+    }
+
+    if (hadError) {
+        return ParseErrorEnum.Unknown;
     }
 
     // We can't use matchToken here because it will detect we're at an EOF and return false
@@ -191,8 +200,22 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
     if (self.matchToken(TokenType.OpenCurly)) {
         return try self.consumeBlockStatement();
     }
+    if (self.matchToken(TokenType.ReturnKeyword)) {
+        return try self.consumeReturnStatement();
+    }
 
     return try self.consumeExpressionStatement();
+}
+
+fn consumeReturnStatement(self: *Parser) anyerror!*Statement {
+    const value = if (self.matchToken(TokenType.Semicolon))
+        try Expression.literal(self.allocator, TokenLiteral.Null)
+    else
+        try self.consumeExpression();
+
+    _ = try self.consume(TokenType.Semicolon, "Expected ';' after a return statement");
+
+    return Statement.returnStatement(self.allocator, value);
 }
 
 fn consumeIfStatement(self: *Parser) anyerror!*Statement {

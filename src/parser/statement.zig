@@ -11,6 +11,8 @@ pub const Statement = union(enum) {
     If: struct { condition: *const Expression, trueBranch: *const Statement, falseBranch: ?*const Statement },
     While: struct { condition: *const Expression, body: *const Statement },
 
+    Return: struct { value: *const Expression },
+
     pub fn uninit(self: *const Statement, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .Expression => |data| data.expression.uninit(allocator),
@@ -33,6 +35,8 @@ pub const Statement = union(enum) {
                 data.condition.uninit(allocator);
                 data.body.uninit(allocator);
             },
+
+            .Return => |data| data.value.uninit(allocator),
         }
 
         allocator.destroy(self);
@@ -62,6 +66,12 @@ pub const Statement = union(enum) {
     pub fn whileBlock(allocator: std.mem.Allocator, condition: *const Expression, body: *const Statement) !*Statement {
         const alloc = try allocator.create(Statement);
         alloc.* = .{ .While = .{ .condition = condition, .body = body } };
+        return alloc;
+    }
+
+    pub fn returnStatement(allocator: std.mem.Allocator, value: *const Expression) !*Statement {
+        const alloc = try allocator.create(Statement);
+        alloc.* = .{ .Return = .{ .value = value } };
         return alloc;
     }
 };

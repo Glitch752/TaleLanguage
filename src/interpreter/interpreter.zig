@@ -78,10 +78,14 @@ pub const RuntimeError = struct {
 
 pub const InterpreterError = error{
     RuntimeError,
+    /// Used when returning from functions. Functions catch this and place the return value in `lastReturnValue`.
+    Return,
 };
 
 allocator: std.mem.Allocator,
 runtimeError: ?RuntimeError = null,
+
+lastReturnValue: VariableValue = VariableValue.null(),
 
 originalBuffer: []const u8 = "",
 fileName: []const u8 = "",
@@ -189,6 +193,11 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) !void
             while ((try self.interpretExpression(values.condition)).isTruthy()) {
                 try self.interpretStatement(values.body);
             }
+        },
+
+        .Return => |values| {
+            self.lastReturnValue = try self.interpretExpression(values.value);
+            return InterpreterError.Return;
         },
     }
 }

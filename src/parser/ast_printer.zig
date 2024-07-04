@@ -63,6 +63,12 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
             std.debug.print(" \n", .{});
             try self.printStatement(values.body, indent + 1);
         },
+
+        .Return => |values| {
+            std.debug.print("return ", .{});
+            try self.printExpression(values.value);
+            std.debug.print(";\n", .{});
+        },
     }
 }
 

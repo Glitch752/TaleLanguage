@@ -7,7 +7,7 @@ let fibonacci = function(n) {
     }
 
     return fibonacci(n - 1) + fibonacci(n - 2);
-}
+};
 
 let main = function() {
     let i = 0;
@@ -16,6 +16,6 @@ let main = function() {
         print("\n");
         i = i + 1;
     }
-}
+};
 
 main();

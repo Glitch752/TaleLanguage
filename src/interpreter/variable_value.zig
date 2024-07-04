@@ -38,8 +38,12 @@ pub const CallableFunction = union(enum) {
                 }
 
                 // Execute the function body
-                try interpreter.interpretStatement(data.body);
-                // TODO: return values
+                interpreter.interpretStatement(data.body) catch |err| {
+                    switch (err) {
+                        InterpreterError.Return => return interpreter.lastReturnValue,
+                        else => return err,
+                    }
+                };
                 return VariableValue.null();
             },
         }
