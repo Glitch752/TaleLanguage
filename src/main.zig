@@ -2,6 +2,7 @@ const std = @import("std");
 
 const lexer = @import("lexer.zig");
 const parser = @import("./parser/parser.zig");
+const resolver = @import("./resolver/resolver.zig");
 const interpreter = @import("./interpreter/interpreter.zig");
 
 const args_parser = @import("args_parser.zig");
@@ -78,7 +79,7 @@ fn runFile(self: *Main) !void {
     const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
     defer self.allocator.free(buffer);
 
-    try self.run(filePath, buffer, false);
+    try self.run(filePath, buffer);
 
     if (self.hadError) {
         std.process.exit(65);
@@ -104,12 +105,12 @@ fn runRepl(self: *Main) !void {
             break;
         }
 
-        try self.run("repl", line, true);
+        try self.run("repl", line);
         self.hadError = false;
     }
 }
 
-fn run(self: *Main, fileName: []const u8, source: []const u8, allowEvaluatingExpressions: bool) !void {
+fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
     // LEXING -------------------------------------
     var sourceLexer = lexer.init(self.allocator, fileName, source);
     defer sourceLexer.deinit();
@@ -140,43 +141,26 @@ fn run(self: *Main, fileName: []const u8, source: []const u8, allowEvaluatingExp
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
     defer sourceParser.uninit();
 
-    if (allowEvaluatingExpressions and
-        tokens[tokens.len - 2].type != TokenType.Semicolon and
-        tokens[tokens.len - 2].type != TokenType.CloseCurly)
-    {
-        var expression = sourceParser.parseExpression() catch {
-            self.hadError = true;
-            return;
-        };
-        defer expression.uninit(self.allocator);
+    var program = sourceParser.parse() catch {
+        self.hadError = true;
+        return;
+    };
+    defer program.deinit();
 
-        if (self.args.?.flags.debugAST) {
-            const printer = ASTPrinter.init(self.allocator);
-            try printer.printExpression(expression);
-            std.debug.print("\n\n", .{});
-        }
+    var sourceResolver = resolver.init(&self.interpreter.?, source, fileName);
+    defer sourceResolver.deinit();
 
-        // INTERPRETING -------------------------------------
-        const result = self.interpreter.?.runExpression(expression, source, fileName) catch {
-            self.hadError = true;
-            return;
-        };
+    sourceResolver.resolveProgram(&program) catch {
+        self.hadError = true;
+        return;
+    };
 
-        std.debug.print("=> {s}\n", .{try result.toString(self.allocator)});
-    } else {
-        var program = sourceParser.parse() catch {
-            self.hadError = true;
-            return;
-        };
-        defer program.deinit();
-
-        if (self.args.?.flags.debugAST) {
-            const printer = ASTPrinter.init(self.allocator);
-            try printer.printProgram(&program);
-            std.debug.print("\n\n", .{});
-        }
-
-        // INTERPRETING -------------------------------------
-        try self.interpreter.?.run(&program, source, fileName);
+    if (self.args.?.flags.debugAST) {
+        const printer = ASTPrinter.init(self.allocator);
+        try printer.printProgram(&program);
+        std.debug.print("\n\n", .{});
     }
+
+    // INTERPRETING -------------------------------------
+    try self.interpreter.?.run(&program, source, fileName);
 }

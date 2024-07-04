@@ -93,6 +93,39 @@ pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !Variable
     return InterpreterError.RuntimeError;
 }
 
+fn ancestorAtDepth(self: *Environment, depth: u32) !*Environment {
+    var current = self;
+    var i = 0;
+    while (i < depth) {
+        if (current.parent == null) return null;
+        current = current.parent;
+        i += 1;
+    }
+    return current;
+}
+
+pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Interpreter) !VariableValue {
+    const environment = try self.ancestorAtDepth(depth);
+
+    const entry = environment.values.get(name.lexeme);
+    if (entry != null) return entry.?.value;
+
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
+    return InterpreterError.RuntimeError;
+}
+
+pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *Interpreter) !void {
+    const environment = try self.ancestorAtDepth(depth);
+
+    const pointer = environment.values.getPtr(name.lexeme);
+    if (pointer == null) {
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to assign to {s}, which is undefined.", .{name.lexeme});
+        return;
+    }
+
+    pointer.?.*.value = value;
+}
+
 pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]const u8 {
     const buffer = try allocator.alloc(u8, count);
     for (buffer, 0..) |_, i| {

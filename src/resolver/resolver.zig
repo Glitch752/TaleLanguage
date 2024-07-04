@@ -25,12 +25,19 @@ pub fn init(interpreter: *const Interpreter, originalBuffer: []const u8, fileNam
         .interpreter = interpreter,
         .originalBuffer = originalBuffer,
         .fileName = fileName,
+        .scopes = Scopes{},
     };
 }
 
-pub fn resolveProgram(self: *const Resolver, program: *const Program) !void {
+pub fn deinit(self: *Resolver) void {
+    while (self.scopes.len > 0) { // Should be empty, but just in case
+        self.endScope() catch unreachable;
+    }
+}
+
+pub fn resolveProgram(self: *Resolver, program: *const Program) !void {
     for (program.statements.items) |statement| {
-        try self.resolveStatement(statement, 1);
+        try self.resolveStatement(statement, false);
     }
 }
 
@@ -45,41 +52,41 @@ fn errorOn(self: *const Resolver, token: Token, message: []const u8, params: any
     errorContext(self.originalBuffer, self.fileName, token.position, token.position + token.lexeme.len, self.interpreter.allocator);
 }
 
-fn unknownError(self: *const Resolver, message: []const u8, params: anytype) !void {
+fn unknownError(self: *const Resolver, comptime message: []const u8, params: anytype) !void {
     const formattedMessage = try std.fmt.allocPrint(self.interpreter.allocator, message, params);
     defer self.interpreter.allocator.free(formattedMessage);
-    prettyError(formattedMessage);
+    try prettyError(formattedMessage);
 }
 
 fn beginScope(self: *Resolver) void {
     self.scopes.append(std.StringHashMapUnmanaged(bool){});
 }
 
-fn endScope(self: *Resolver) void {
+fn endScope(self: *Resolver) !void {
     const node = self.scopes.pop();
     if (node == null) {
-        self.unknownError("Tried to end a scope but no scope was found", .{});
+        try self.unknownError("Tried to end a scope but no scope was found", .{});
         return ResolverError.Unknown;
     }
 }
 
-fn declare(self: *const Resolver, name: Token) anyerror!void {
+fn declare(self: *Resolver, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, false);
+    try self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, false);
 }
 
-fn define(self: *const Resolver, name: Token) anyerror!void {
+fn define(self: *Resolver, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, true);
+    try self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, true);
 }
 
-fn resolve(self: *const Resolver, name: Token) anyerror!void {
+fn resolveLocal(self: *Resolver, expression: *const Expression, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
     var current = self.scopes.last.?;
     var index = self.scopes.len - 1;
     while (current != null) {
         if (current.data.get(name.lexeme) != null) {
-            self.interpreter.resolve(name, self.scopes.len - index - 1);
+            self.interpreter.resolve(expression, self.scopes.len - index - 1);
             return;
         }
         current = current.previous;
@@ -87,7 +94,7 @@ fn resolve(self: *const Resolver, name: Token) anyerror!void {
     }
 }
 
-fn resolveStatement(self: *const Resolver, statement: *const Statement, avoidDefiningBlockScope: bool) anyerror!void {
+fn resolveStatement(self: *Resolver, statement: *const Statement, avoidDefiningBlockScope: bool) anyerror!void {
     switch (statement.*) {
         .Expression => |values| {
             try self.resolveExpression(values.expression);
@@ -102,7 +109,7 @@ fn resolveStatement(self: *const Resolver, statement: *const Statement, avoidDef
             for (values.statements.items) |childStatement| {
                 try self.resolveStatement(childStatement, false);
             }
-            if (!avoidDefiningBlockScope) self.endScope();
+            if (!avoidDefiningBlockScope) try self.endScope();
         },
 
         .If => |values| {
@@ -125,14 +132,13 @@ fn resolveStatement(self: *const Resolver, statement: *const Statement, avoidDef
     }
 }
 
-fn resolveExpression(self: *const Resolver, expression: *const Expression) anyerror!void {
+fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!void {
     switch (expression.*) {
         .Grouping => |values| {
             try self.resolveExpression(values.expression);
         },
-        .Literal => |values| {
-            const str = try values.value.toString(self.allocator);
-            defer self.allocator.free(str);
+        .Literal => {
+            // Do nothing
         },
 
         .Binary => |values| {
@@ -152,16 +158,13 @@ fn resolveExpression(self: *const Resolver, expression: *const Expression) anyer
         },
 
         .Function => |values| {
-            try self.declare(self, values.name);
-            try self.define(self, values.name);
-
             self.beginScope();
             for (values.parameters.items) |parameter| {
-                try self.declare(self, parameter);
-                try self.define(self, parameter);
+                try self.declare(parameter);
+                try self.define(parameter);
             }
             try self.resolveStatement(values.body, true);
-            self.endScope();
+            try self.endScope();
         },
         .FunctionCall => |values| {
             try self.resolveExpression(values.callee);
@@ -175,11 +178,11 @@ fn resolveExpression(self: *const Resolver, expression: *const Expression) anyer
                 try self.errorOn(values.name, "Cannot read local variable in its own initializer", .{});
             }
 
-            try self.resolve(values.name);
+            try self.resolveLocal(expression, values.name);
         },
         .VariableAssignment => |values| {
             try self.resolveExpression(values.value);
-            try self.resolve(values.name);
+            try self.resolveLocal(expression, values.name);
         },
     }
 }

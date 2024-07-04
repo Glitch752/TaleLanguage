@@ -86,6 +86,19 @@ pub const InterpreterError = error{
     Continue,
 };
 
+pub const ExpressionContext = struct {
+    pub fn hash(self: @This(), s: *const Expression) u64 {
+        _ = self;
+        return @intFromPtr(s);
+    }
+    pub fn eql(self: @This(), a: *const Expression, b: *const Expression) bool {
+        _ = self;
+        return a == b;
+    }
+};
+
+pub const ExpressionHashmap = std.HashMapUnmanaged(*const Expression, u32, ExpressionContext, 80);
+
 allocator: std.mem.Allocator,
 runtimeError: ?RuntimeError = null,
 
@@ -97,15 +110,18 @@ fileName: []const u8 = "",
 rootEnvironment: Environment,
 activeEnvironment: ?*Environment = null,
 
+expressionDefinitionDepth: ExpressionHashmap,
+
 pub fn init(allocator: std.mem.Allocator) !Interpreter {
     var environment = Environment.init(allocator);
 
     try environment.define("print", VariableValue.nativeFunction(1, &natives.print));
 
-    return .{ .allocator = allocator, .rootEnvironment = environment };
+    return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = ExpressionHashmap{} };
 }
 
 pub fn deinit(self: *Interpreter) void {
+    self.expressionDefinitionDepth.deinit(self.allocator);
     self.rootEnvironment.deinit(self);
 }
 
@@ -142,6 +158,10 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     return result.?;
 }
 
+pub fn resolve(self: *Interpreter, expression: *const Expression, depth: u32) void {
+    self.expressionDefinitionDepth.put(expression, depth);
+}
+
 pub fn enterNewEnvironment(self: *Interpreter) !*Environment {
     const child = try self.allocator.create(Environment);
     child.* = self.activeEnvironment.?.createChild(self.activeEnvironment.?);
@@ -162,7 +182,7 @@ fn interpret(self: *Interpreter, program: *const Program) !void {
     }
 }
 
-pub fn interpretStatement(self: *Interpreter, statement: *const Statement) anyerror!void {
+pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoidDefiningBlockScope: bool) anyerror!void {
     switch (statement.*) {
         .Expression => |values| {
             const result = try self.interpretExpression(values.expression);
@@ -175,8 +195,8 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) anyer
             try self.activeEnvironment.?.define(values.name.lexeme, value);
         },
         .Block => |values| {
-            var childEnvironment = try self.enterNewEnvironment();
-            defer childEnvironment.deinit(self);
+            var childEnvironment = if (!avoidDefiningBlockScope) try self.enterNewEnvironment() else self.activeEnvironment.?;
+            defer if (!avoidDefiningBlockScope) childEnvironment.deinit(self);
 
             for (values.statements.items) |childStatement| {
                 try self.interpretStatement(childStatement);
@@ -210,6 +230,15 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement) anyer
         .Break => return InterpreterError.Break,
         .Continue => return InterpreterError.Continue,
     }
+}
+
+fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression) !VariableValue {
+    const depth = self.expressionDefinitionDepth.get(expression);
+    if (depth == null) {
+        return self.rootEnvironment.get(name);
+    }
+
+    return self.activeEnvironment.?.getAtDepth(name, depth, self);
 }
 
 fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
@@ -421,17 +450,25 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
         },
 
         .VariableAccess => |values| {
-            const variable = try self.activeEnvironment.?.get(values.name, self);
-            return variable;
+            return try self.lookUpVariable(values.name, expression);
         },
         .VariableAssignment => |values| {
             const value = try self.interpretExpression(values.value);
             defer value.deinit(self.allocator);
 
-            try self.activeEnvironment.?.assign(values.name, value, self);
-            if (self.runtimeError != null) {
-                return InterpreterError.RuntimeError;
+            const depth = self.expressionDefinitionDepth.get(expression);
+            if (depth == null) {
+                self.rootEnvironment.assign(values.name, value, self);
+                if (self.runtimeError != null) {
+                    return InterpreterError.RuntimeError;
+                }
+            } else {
+                self.activeEnvironment.?.assignAtDepth(values.name, value, depth.?, self);
+                if (self.runtimeError != null) {
+                    return InterpreterError.RuntimeError;
+                }
             }
+
             return value;
         },
     }
