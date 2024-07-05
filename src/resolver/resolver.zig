@@ -14,13 +14,13 @@ const Resolver = @This();
 
 const ResolverError = error{Unknown};
 
-interpreter: *const Interpreter,
+interpreter: *Interpreter,
 scopes: Scopes,
 
 originalBuffer: []const u8 = "",
 fileName: []const u8 = "",
 
-pub fn init(interpreter: *const Interpreter, originalBuffer: []const u8, fileName: []const u8) Resolver {
+pub fn init(interpreter: *Interpreter, originalBuffer: []const u8, fileName: []const u8) Resolver {
     return .{
         .interpreter = interpreter,
         .originalBuffer = originalBuffer,
@@ -41,15 +41,15 @@ pub fn resolveProgram(self: *Resolver, program: *const Program) !void {
     }
 }
 
-fn errorOn(self: *const Resolver, token: Token, message: []const u8, params: anytype) !void {
+fn errorOn(self: *const Resolver, token: Token, comptime message: []const u8, params: anytype) !void {
     const tokenString = try token.toString(self.interpreter.allocator);
     defer self.interpreter.allocator.free(tokenString);
 
     const formattedMessage = try std.fmt.allocPrint(self.interpreter.allocator, message, params);
     defer self.interpreter.allocator.free(formattedMessage);
-    prettyError(formattedMessage);
+    try prettyError(formattedMessage);
 
-    errorContext(self.originalBuffer, self.fileName, token.position, token.position + token.lexeme.len, self.interpreter.allocator);
+    try errorContext(self.originalBuffer, self.fileName, token.position, token.position + token.lexeme.len, self.interpreter.allocator);
 }
 
 fn unknownError(self: *const Resolver, comptime message: []const u8, params: anytype) !void {
@@ -58,8 +58,11 @@ fn unknownError(self: *const Resolver, comptime message: []const u8, params: any
     try prettyError(formattedMessage);
 }
 
-fn beginScope(self: *Resolver) void {
-    self.scopes.append(std.StringHashMapUnmanaged(bool){});
+fn beginScope(self: *Resolver) !void {
+    const newNode = try self.interpreter.allocator.create(Scopes.Node);
+    // Append handles updating previous and next
+    newNode.* = Scopes.Node{ .data = std.StringHashMapUnmanaged(bool){}, .prev = null, .next = null };
+    self.scopes.append(newNode);
 }
 
 fn endScope(self: *Resolver) !void {
@@ -68,6 +71,8 @@ fn endScope(self: *Resolver) !void {
         try self.unknownError("Tried to end a scope but no scope was found", .{});
         return ResolverError.Unknown;
     }
+    node.?.data.deinit(self.interpreter.allocator);
+    self.interpreter.allocator.destroy(node.?);
 }
 
 fn declare(self: *Resolver, name: Token) anyerror!void {
@@ -82,14 +87,17 @@ fn define(self: *Resolver, name: Token) anyerror!void {
 
 fn resolveLocal(self: *Resolver, expression: *const Expression, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    var current = self.scopes.last.?;
-    var index = self.scopes.len - 1;
+    var current: ?*Scopes.Node = self.scopes.last.?;
+    const scopeCount = @as(u32, @intCast(self.scopes.len));
+    var index = scopeCount - 1;
     while (current != null) {
-        if (current.data.get(name.lexeme) != null) {
-            self.interpreter.resolve(expression, self.scopes.len - index - 1);
+        if (current.?.data.get(name.lexeme) != null) {
+            try self.interpreter.resolve(expression, scopeCount - index - 1);
             return;
         }
-        current = current.previous;
+        if (index == 0) break;
+
+        current = current.?.prev;
         index -= 1;
     }
 }
@@ -105,7 +113,7 @@ fn resolveStatement(self: *Resolver, statement: *const Statement, avoidDefiningB
             try self.define(values.name);
         },
         .Block => |values| {
-            if (!avoidDefiningBlockScope) self.beginScope();
+            if (!avoidDefiningBlockScope) try self.beginScope();
             for (values.statements.items) |childStatement| {
                 try self.resolveStatement(childStatement, false);
             }
@@ -158,7 +166,7 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Function => |values| {
-            self.beginScope();
+            try self.beginScope();
             for (values.parameters.items) |parameter| {
                 try self.declare(parameter);
                 try self.define(parameter);

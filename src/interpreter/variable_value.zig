@@ -19,12 +19,33 @@ pub const CallableFunction = union(enum) {
         parentEnvironment: *Environment,
     },
 
+    pub fn deinit(self: CallableFunction, interpreter: *Interpreter) void {
+        switch (self) {
+            .User => |data| {
+                data.parentEnvironment.unreferenceAndDeinitIfNeeded(interpreter);
+            },
+            else => {},
+        }
+    }
+    /// This function technically doesn't do anything, but it's here to make it more clear what the
+    /// flow control is and make it easier to remember to change if the deinitialization logic changes.
+    pub fn deinitOnEnvironmentDrop(self: CallableFunction, interpreter: *Interpreter) void {
+        switch (self) {
+            .User => |data| {
+                // No need to deinitialize the parent environment since it's being deinitialized right now
+                _ = interpreter;
+                _ = data;
+            },
+            else => {},
+        }
+    }
+
     pub fn call(self: CallableFunction, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) !VariableValue {
         switch (self) {
             .Native => |data| return data(interpreter, arguments),
             .User => |data| {
                 var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
-                defer environment.deinit(interpreter);
+                defer environment.unreferenceAndDeinitIfNeeded(interpreter);
 
                 // Check the number of arguments
                 if (arguments.items.len != data.parameters.items.len) {
@@ -34,11 +55,11 @@ pub const CallableFunction = union(enum) {
 
                 // Bind the arguments to the scope
                 for (arguments.items, 0..) |argument, index| {
-                    try environment.define(data.parameters.items[index].lexeme, argument);
+                    try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
                 }
 
                 // Execute the function body
-                interpreter.interpretStatement(data.body) catch |err| {
+                interpreter.interpretStatement(data.body, true) catch |err| {
                     switch (err) {
                         InterpreterError.Return => return interpreter.lastReturnValue,
                         else => return err,
@@ -53,6 +74,7 @@ pub const CallableFunction = union(enum) {
         return .{ .Native = function };
     }
     pub fn user(function: FunctionExpression, parentEnvironment: *Environment) CallableFunction {
+        parentEnvironment.referenceCount += 1;
         return .{ .User = .{ .parameters = function.parameters, .body = function.body, .parentEnvironment = parentEnvironment } };
     }
 
@@ -88,11 +110,21 @@ pub const VariableValue = union(enum) {
 
     Null,
 
+    pub fn deinitOnEnvironmentDrop(self: VariableValue, interpreter: *Interpreter) void {
+        switch (self) {
+            .Function => |value| value.function.deinitOnEnvironmentDrop(interpreter),
+            else => {
+                self.deinit(interpreter);
+            },
+        }
+    }
+
     /// Deinitializes the value if it was allocated.
     /// Must be called before a string variable is discarded.
-    pub fn deinit(self: VariableValue, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: VariableValue, interpreter: *Interpreter) void {
         switch (self) {
-            .String => |value| if (value.allocated) allocator.free(value.string),
+            .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
+            .Function => |value| value.function.deinit(interpreter),
             else => {},
         }
     }

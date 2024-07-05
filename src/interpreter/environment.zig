@@ -20,6 +20,9 @@ parent: ?*Environment = null,
 previous: ?*Environment = null,
 deactive: bool = false,
 
+/// Poor man's reference counting
+referenceCount: usize = 1,
+
 pub fn init(allocator: std.mem.Allocator) Environment {
     return .{
         .allocator = allocator,
@@ -29,7 +32,22 @@ pub fn init(allocator: std.mem.Allocator) Environment {
 }
 
 pub fn createChild(self: *Environment, previous: *Environment) Environment {
+    self.referenceCount += 1;
     return .{ .allocator = self.allocator, .values = std.StringHashMapUnmanaged(*ValueWrapper){}, .parent = self, .previous = previous };
+}
+
+pub fn unreferenceAndDeinitIfNeeded(self: *Environment, interpreter: *Interpreter) void {
+    if (self.deactive) {
+        std.debug.panic("Tried to unreference an environment that is already deactive.", .{});
+    }
+    if (self.referenceCount == 0) {
+        std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
+    }
+
+    self.referenceCount -= 1;
+    if (self.referenceCount == 0) {
+        self.deinit(interpreter);
+    }
 }
 
 pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
@@ -37,13 +55,14 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
         self.allocator.free(wrapper.name);
-        wrapper.value.deinit(self.allocator);
+        wrapper.value.deinitOnEnvironmentDrop(interpreter);
         self.allocator.destroy(wrapper);
     }
     self.values.deinit(self.allocator);
 
     if (self.parent != null) {
         interpreter.activeEnvironment = self.previous;
+        self.parent.?.unreferenceAndDeinitIfNeeded(interpreter);
 
         self.allocator.destroy(self);
     }
@@ -51,17 +70,18 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     self.deactive = true;
 }
 
-pub fn define(self: *Environment, name: []const u8, value: VariableValue) !void {
-    std.debug.print("Allocator: {any}", .{self.allocator});
+pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*Interpreter) !void {
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
     const previousValue = try self.values.fetchPut(self.allocator, wrapper.name, wrapper);
 
     if (previousValue != null) {
+        if (interpreter == null) std.debug.panic("Tried to define a variable that already exists when the interpreter is not available.", .{});
+
         const prev = previousValue.?.value;
         self.allocator.free(prev.name);
-        prev.value.deinit(self.allocator);
+        prev.value.deinit(interpreter.?);
         self.allocator.destroy(prev);
     }
 }
@@ -82,6 +102,7 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
 }
 
 pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !VariableValue {
+    std.debug.print("Values: {any}", .{self.values});
     const entry = self.values.get(name.lexeme);
     if (entry != null) return entry.?.value;
 
@@ -95,10 +116,10 @@ pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !Variable
 
 fn ancestorAtDepth(self: *Environment, depth: u32) !*Environment {
     var current = self;
-    var i = 0;
+    var i: u32 = 0;
     while (i < depth) {
-        if (current.parent == null) return null;
-        current = current.parent;
+        if (current.parent == null) std.debug.panic("Tried to access an ancestor at depth {d}, but the environment only has {d} ancestors.", .{ depth, i });
+        current = current.parent.?;
         i += 1;
     }
     return current;
