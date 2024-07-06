@@ -23,18 +23,11 @@ pub const CallableFunction = union(enum) {
         switch (self) {
             .User => |data| {
                 data.parentEnvironment.unreferenceAndDeinitIfNeeded(interpreter);
-            },
-            else => {},
-        }
-    }
-    /// This function technically doesn't do anything, but it's here to make it more clear what the
-    /// flow control is and make it easier to remember to change if the deinitialization logic changes.
-    pub fn deinitOnEnvironmentDrop(self: CallableFunction, interpreter: *Interpreter) void {
-        switch (self) {
-            .User => |data| {
-                // No need to deinitialize the parent environment since it's being deinitialized right now
-                _ = interpreter;
-                _ = data;
+
+                for (data.parameters.items) |parameter| {
+                    interpreter.allocator.free(parameter.lexeme);
+                }
+                data.parameters.deinit();
             },
             else => {},
         }
@@ -55,6 +48,7 @@ pub const CallableFunction = union(enum) {
 
                 // Bind the arguments to the scope
                 for (arguments.items, 0..) |argument, index| {
+                    std.debug.print("Name: {any}\n", .{data.parameters.items[index]});
                     try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
                 }
 
@@ -73,9 +67,14 @@ pub const CallableFunction = union(enum) {
     pub fn native(function: CallableNativeFunction) CallableFunction {
         return .{ .Native = function };
     }
-    pub fn user(function: FunctionExpression, parentEnvironment: *Environment) CallableFunction {
+    pub fn user(function: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
+        var parameters = std.ArrayList(Token).init(allocator);
+        for (function.parameters.items) |parameter| {
+            try parameters.append(try parameter.clone(allocator));
+        }
+
         parentEnvironment.referenceCount += 1;
-        return .{ .User = .{ .parameters = function.parameters, .body = function.body, .parentEnvironment = parentEnvironment } };
+        return .{ .User = .{ .parameters = parameters, .body = function.body, .parentEnvironment = parentEnvironment } };
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {
@@ -109,15 +108,6 @@ pub const VariableValue = union(enum) {
     },
 
     Null,
-
-    pub fn deinitOnEnvironmentDrop(self: VariableValue, interpreter: *Interpreter) void {
-        switch (self) {
-            .Function => |value| value.function.deinitOnEnvironmentDrop(interpreter),
-            else => {
-                self.deinit(interpreter);
-            },
-        }
-    }
 
     /// Deinitializes the value if it was allocated.
     /// Must be called before a string variable is discarded.
@@ -214,8 +204,8 @@ pub const VariableValue = union(enum) {
     pub fn nativeFunction(arity: u32, function: CallableNativeFunction) VariableValue {
         return .{ .Function = .{ .arity = arity, .function = CallableFunction.native(function) } };
     }
-    pub fn fromFunction(function: FunctionExpression, activeEnvironment: *Environment) VariableValue {
-        return .{ .Function = .{ .arity = @intCast(function.parameters.items.len), .function = CallableFunction.user(function, activeEnvironment) } };
+    pub fn fromFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .Function = .{ .arity = @intCast(function.parameters.items.len), .function = try CallableFunction.user(function, activeEnvironment, allocator) } };
     }
 
     pub fn @"null"() VariableValue {

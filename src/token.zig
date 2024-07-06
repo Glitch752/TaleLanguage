@@ -104,6 +104,11 @@ pub const Token = struct {
         return .{ .type = @"type", .lexeme = lexeme, .literal = literal, .position = position };
     }
 
+    pub fn clone(self: Token, allocator: std.mem.Allocator) !Token {
+        const lexeme = try allocator.dupe(u8, self.lexeme);
+        return .{ .type = self.type, .lexeme = lexeme, .literal = self.literal, .position = self.position };
+    }
+
     pub fn deinit(self: *const Token, allocator: std.mem.Allocator) void {
         switch (self.literal) {
             .StringLiteral => allocator.free(self.literal.StringLiteral),

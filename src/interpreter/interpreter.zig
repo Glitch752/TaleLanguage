@@ -86,19 +86,6 @@ pub const InterpreterError = error{
     Continue,
 };
 
-pub const ExpressionContext = struct {
-    pub fn hash(self: @This(), s: *const Expression) u64 {
-        _ = self;
-        return @intFromPtr(s);
-    }
-    pub fn eql(self: @This(), a: *const Expression, b: *const Expression) bool {
-        _ = self;
-        return a == b;
-    }
-};
-
-pub const ExpressionHashmap = std.HashMapUnmanaged(*const Expression, u32, ExpressionContext, 80);
-
 allocator: std.mem.Allocator,
 runtimeError: ?RuntimeError = null,
 
@@ -110,19 +97,22 @@ fileName: []const u8 = "",
 rootEnvironment: Environment,
 activeEnvironment: ?*Environment = null,
 
-expressionDefinitionDepth: ExpressionHashmap,
+expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 
 pub fn init(allocator: std.mem.Allocator) !Interpreter {
     var environment = Environment.init(allocator);
 
     try environment.define("print", VariableValue.nativeFunction(1, &natives.print), null);
 
-    return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = ExpressionHashmap{} };
+    var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
+    try expressionDepths.put(allocator, 0, 1);
+
+    return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = expressionDepths };
 }
 
 pub fn deinit(self: *Interpreter) void {
-    self.expressionDefinitionDepth.deinit(self.allocator);
     self.rootEnvironment.deinit(self);
+    self.expressionDefinitionDepth.deinit(self.allocator);
 }
 
 pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
@@ -158,8 +148,8 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     return result.?;
 }
 
-pub fn resolve(self: *Interpreter, expression: *const Expression, depth: u32) !void {
-    try self.expressionDefinitionDepth.put(self.allocator, expression, depth);
+pub fn resolve(self: *Interpreter, expressionId: u32, depth: u32) !void {
+    try self.expressionDefinitionDepth.put(self.allocator, expressionId, depth);
 }
 
 pub fn enterNewEnvironment(self: *Interpreter) !*Environment {
@@ -190,7 +180,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
         },
         .Let => |values| {
             const value = try self.interpretExpression(values.initializer);
-            defer value.deinit(self);
+            errdefer value.deinit(self);
 
             try self.activeEnvironment.?.define(values.name.lexeme, value, self);
         },
@@ -233,7 +223,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
 }
 
 fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression) !VariableValue {
-    const depth = self.expressionDefinitionDepth.get(expression);
+    const depth = self.expressionDefinitionDepth.get(expression.id);
     if (depth == null) {
         return self.rootEnvironment.get(name, self);
     }
@@ -242,7 +232,7 @@ fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression
 }
 
 fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
-    switch (expression.*) {
+    switch (expression.*.value) {
         .Grouping => |values| {
             return self.interpretExpression(values.expression);
         },
@@ -437,7 +427,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             for (values.arguments.items) |argument| {
                 const value = try self.interpretExpression(argument);
-                defer value.deinit(self);
+                errdefer value.deinit(self);
 
                 try argumentValues.append(value);
             }
@@ -445,7 +435,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             return callable.call(self, argumentValues);
         },
         .Function => |values| {
-            const function = VariableValue.fromFunction(values, self.activeEnvironment.?);
+            const function = try VariableValue.fromFunction(values, self.activeEnvironment.?, self.allocator);
             return function;
         },
 
@@ -454,9 +444,9 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
         },
         .VariableAssignment => |values| {
             const value = try self.interpretExpression(values.value);
-            defer value.deinit(self);
+            errdefer value.deinit(self);
 
-            const depth = self.expressionDefinitionDepth.get(expression);
+            const depth = self.expressionDefinitionDepth.get(expression.id);
             if (depth == null) {
                 try self.rootEnvironment.assign(values.name, value, self);
                 if (self.runtimeError != null) {

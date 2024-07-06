@@ -5,23 +5,28 @@ const std = @import("std");
 
 pub const FunctionExpression = struct { parameters: std.ArrayList(Token), body: *const Statement };
 
-pub const Expression = union(enum) {
-    Grouping: struct { expression: *const Expression },
-    Literal: struct { value: TokenLiteral },
+var globalId: u32 = 0;
 
-    Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
-    Unary: struct { operator: Token, right: *const Expression },
-    Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
-    Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
+pub const Expression = struct {
+    id: u32,
+    value: union(enum) {
+        Grouping: struct { expression: *const Expression },
+        Literal: struct { value: TokenLiteral },
 
-    FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
-    Function: FunctionExpression,
+        Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
+        Unary: struct { operator: Token, right: *const Expression },
+        Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
+        Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
 
-    VariableAccess: struct { name: Token },
-    VariableAssignment: struct { name: Token, value: *const Expression },
+        FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
+        Function: FunctionExpression,
+
+        VariableAccess: struct { name: Token },
+        VariableAssignment: struct { name: Token, value: *const Expression },
+    },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
-        switch (self.*) {
+        switch (self.*.value) {
             .Binary => |data| {
                 data.left.uninit(allocator);
                 data.right.uninit(allocator);
@@ -56,55 +61,65 @@ pub const Expression = union(enum) {
     }
     pub fn grouping(allocator: std.mem.Allocator, expression: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Grouping = .{ .expression = expression } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Grouping = .{ .expression = expression } } };
         return alloc;
     }
     pub fn literal(allocator: std.mem.Allocator, value: TokenLiteral) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Literal = .{ .value = value } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Literal = .{ .value = value } } };
         return alloc;
     }
 
     pub fn unary(allocator: std.mem.Allocator, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Unary = .{ .operator = operator, .right = right } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Unary = .{ .operator = operator, .right = right } } };
         return alloc;
     }
     pub fn binary(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Binary = .{ .left = left, .operator = operator, .right = right } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Binary = .{ .left = left, .operator = operator, .right = right } } };
         return alloc;
     }
     pub fn logical(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Logical = .{ .left = left, .operator = operator, .right = right } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Logical = .{ .left = left, .operator = operator, .right = right } } };
         return alloc;
     }
     pub fn bitwise(allocator: std.mem.Allocator, left: *const Expression, operator: Token, right: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Bitwise = .{ .left = left, .operator = operator, .right = right } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Bitwise = .{ .left = left, .operator = operator, .right = right } } };
         return alloc;
     }
 
     pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression)) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } } };
         return alloc;
     }
     pub fn function(allocator: std.mem.Allocator, parameters: std.ArrayList(Token), body: *const Statement) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .Function = .{ .parameters = parameters, .body = body } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Function = .{ .parameters = parameters, .body = body } } };
         return alloc;
     }
 
     pub fn variableAccess(allocator: std.mem.Allocator, name: Token) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .VariableAccess = .{ .name = name } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .VariableAccess = .{ .name = name } } };
         return alloc;
     }
     pub fn variableAssignment(allocator: std.mem.Allocator, name: Token, value: *const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
-        alloc.* = .{ .VariableAssignment = .{ .name = name, .value = value } };
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .VariableAssignment = .{ .name = name, .value = value } } };
         return alloc;
     }
 };

@@ -79,7 +79,7 @@ pub fn printStatement(self: *const ASTPrinter, statement: *const Statement, inde
 }
 
 pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) anyerror!void {
-    switch (expression.*) {
+    switch (expression.*.value) {
         .Grouping => |values| {
             std.debug.print("[", .{});
             try self.printExpression(values.expression);

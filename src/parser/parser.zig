@@ -343,7 +343,7 @@ fn consumeAssignment(self: *Parser) anyerror!*Expression {
         const equals = self.peekPrevious(); // Used for error reporting
         const value = try self.consumeAssignment();
 
-        switch (expression.*) {
+        switch (expression.*.value) {
             .VariableAccess => |access| {
                 expression.uninit(self.allocator);
                 const variable = access.name;

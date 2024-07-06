@@ -66,10 +66,16 @@ fn beginScope(self: *Resolver) !void {
 }
 
 fn endScope(self: *Resolver) !void {
-    const node = self.scopes.pop();
+    var node = self.scopes.pop();
     if (node == null) {
         try self.unknownError("Tried to end a scope but no scope was found", .{});
         return ResolverError.Unknown;
+    }
+
+    var iter = node.?.data.iterator();
+    while (iter.next()) |entry| {
+        const key = entry.key_ptr.*;
+        self.interpreter.allocator.free(key);
     }
     node.?.data.deinit(self.interpreter.allocator);
     self.interpreter.allocator.destroy(node.?);
@@ -77,12 +83,21 @@ fn endScope(self: *Resolver) !void {
 
 fn declare(self: *Resolver, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    try self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, false);
+    const duplicatedName = try self.interpreter.allocator.dupe(u8, name.lexeme);
+    const last = try self.scopes.last.?.data.fetchPut(self.interpreter.allocator, duplicatedName, false);
+    if (last != null) {
+        try self.errorOn(name, "Variable with this name already declared in this scope", .{});
+    }
 }
 
 fn define(self: *Resolver, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    try self.scopes.last.?.data.put(self.interpreter.allocator, name.lexeme, true);
+    const pointer = self.scopes.last.?.data.getPtr(name.lexeme);
+    if (pointer == null) {
+        try self.unknownError("Tried to define a variable that was not declared", .{});
+        return ResolverError.Unknown;
+    }
+    pointer.?.* = true;
 }
 
 fn resolveLocal(self: *Resolver, expression: *const Expression, name: Token) anyerror!void {
@@ -92,7 +107,7 @@ fn resolveLocal(self: *Resolver, expression: *const Expression, name: Token) any
     var index = scopeCount - 1;
     while (current != null) {
         if (current.?.data.get(name.lexeme) != null) {
-            try self.interpreter.resolve(expression, scopeCount - index - 1);
+            try self.interpreter.resolve(expression.id, scopeCount - index - 1);
             return;
         }
         if (index == 0) break;
@@ -141,7 +156,7 @@ fn resolveStatement(self: *Resolver, statement: *const Statement, avoidDefiningB
 }
 
 fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!void {
-    switch (expression.*) {
+    switch (expression.*.value) {
         .Grouping => |values| {
             try self.resolveExpression(values.expression);
         },
