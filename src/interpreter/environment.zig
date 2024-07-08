@@ -18,7 +18,6 @@ allocator: std.mem.Allocator,
 values: std.StringHashMapUnmanaged(*ValueWrapper),
 parent: ?*Environment = null,
 previous: ?*Environment = null,
-deactive: bool = false,
 
 /// Poor man's reference counting
 referenceCount: usize = 1,
@@ -37,9 +36,6 @@ pub fn createChild(self: *Environment, previous: *Environment) Environment {
 }
 
 pub fn unreferenceAndDeinitIfNeeded(self: *Environment, interpreter: *Interpreter) void {
-    if (self.deactive) {
-        std.debug.panic("Tried to unreference an environment that is already deactive.", .{});
-    }
     if (self.referenceCount == 0) {
         std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
     }
@@ -69,13 +65,9 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
 
         self.allocator.destroy(self);
     }
-
-    self.deactive = true;
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*Interpreter) !void {
-    if (self.deactive) std.debug.panic("Tried to access a deactive environment.", .{});
-
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
@@ -92,8 +84,6 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
 }
 
 pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
-    if (self.deactive) std.debug.panic("Tried to access a deactive environment.", .{});
-
     const pointer = self.values.getPtr(name.lexeme);
     if (pointer == null) {
         if (self.parent != null) {
@@ -109,8 +99,6 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
 }
 
 pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !VariableValue {
-    if (self.deactive) std.debug.panic("Tried to access a deactive environment.", .{});
-
     const entry = self.values.get(name.lexeme);
     if (entry != null) return entry.?.value;
 
@@ -134,8 +122,6 @@ fn ancestorAtDepth(self: *Environment, depth: u32) !*Environment {
 }
 
 pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Interpreter) !VariableValue {
-    if (self.deactive) std.debug.panic("Tried to access a deactive environment.", .{});
-
     const environment = try self.ancestorAtDepth(depth);
 
     const entry = environment.values.get(name.lexeme);
@@ -146,8 +132,6 @@ pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Int
 }
 
 pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *Interpreter) !void {
-    if (self.deactive) std.debug.panic("Tried to access a deactive environment.", .{});
-
     const environment = try self.ancestorAtDepth(depth);
 
     const pointer = environment.values.getPtr(name.lexeme);

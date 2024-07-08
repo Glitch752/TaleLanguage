@@ -2,12 +2,12 @@
 
 let isMultipleOfFactory = function(n) {
     let otherNumber = n;
-    // return function(m) {
-    //     return m % otherNumber == 0;
-    // };
+    return function(m) {
+        return m % otherNumber == 0;
+    };
 };
 
-// let isMultipleOf3 = isMultipleOfFactory(3);
+let isMultipleOf3 = isMultipleOfFactory(3);
 // let isMultipleOf5 = isMultipleOfFactory(5);
 
 // let i = 1;

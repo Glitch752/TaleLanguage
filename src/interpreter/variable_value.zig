@@ -8,8 +8,11 @@ const RuntimeError = @import("./interpreter.zig").RuntimeError;
 const Environment = @import("./environment.zig").Environment;
 const InterpreterError = @import("./interpreter.zig").InterpreterError;
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
+const NativeError = @import("./natives.zig").NativeError;
 
-pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) VariableValue;
+pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) NativeError!VariableValue;
+
+var functionId: u32 = 0;
 
 pub const CallableFunction = union(enum) {
     Native: CallableNativeFunction,
@@ -17,25 +20,30 @@ pub const CallableFunction = union(enum) {
         parameters: std.ArrayList(Token),
         body: *const Statement,
         parentEnvironment: *Environment,
+        /// For debugging.
+        id: u32,
     },
 
     pub fn deinit(self: CallableFunction, interpreter: *Interpreter) void {
         switch (self) {
             .User => |data| {
-                data.parentEnvironment.unreferenceAndDeinitIfNeeded(interpreter);
+                std.debug.print("Deinit function {d}: {any}\n", .{ data.id, data.parameters.items });
 
-                for (data.parameters.items) |parameter| {
-                    interpreter.allocator.free(parameter.lexeme);
-                }
-                data.parameters.deinit();
+                // for (data.parameters.items) |parameter| {
+                //     interpreter.allocator.free(parameter.lexeme);
+                // }
+                // data.parameters.deinit();
+
+                // data.parentEnvironment.unreferenceAndDeinitIfNeeded(interpreter);
+                _ = interpreter;
             },
             else => {},
         }
     }
 
-    pub fn call(self: CallableFunction, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) !VariableValue {
+    pub fn call(self: CallableFunction, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
         switch (self) {
-            .Native => |data| return data(interpreter, arguments),
+            .Native => |data| return try data(interpreter, arguments),
             .User => |data| {
                 var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
                 defer environment.unreferenceAndDeinitIfNeeded(interpreter);
@@ -73,8 +81,9 @@ pub const CallableFunction = union(enum) {
             try parameters.append(try parameter.clone(allocator));
         }
 
+        functionId += 1;
         parentEnvironment.referenceCount += 1;
-        return .{ .User = .{ .parameters = parameters, .body = function.body, .parentEnvironment = parentEnvironment } };
+        return .{ .User = .{ .parameters = parameters, .body = function.body, .parentEnvironment = parentEnvironment, .id = functionId } };
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {
@@ -89,7 +98,7 @@ pub const Callable = struct {
     arity: u32,
     function: CallableFunction,
 
-    pub fn call(self: Callable, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) !VariableValue {
+    pub fn call(self: Callable, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
         return try self.function.call(interpreter, arguments);
     }
 };

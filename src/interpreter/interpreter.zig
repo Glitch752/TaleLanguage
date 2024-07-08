@@ -13,6 +13,7 @@ const prettyError = @import("../errors.zig").prettyError;
 const errorContext = @import("../errors.zig").errorContext;
 
 const natives = @import("./natives.zig");
+const NativeError = @import("./natives.zig").NativeError;
 
 pub const Interpreter = @This();
 
@@ -103,6 +104,15 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
     var environment = Environment.init(allocator);
 
     try environment.define("print", VariableValue.nativeFunction(1, &natives.print), null);
+    try environment.define("sin", VariableValue.nativeFunction(1, &natives.sin), null);
+    try environment.define("cos", VariableValue.nativeFunction(1, &natives.cos), null);
+    try environment.define("tan", VariableValue.nativeFunction(1, &natives.tan), null);
+    try environment.define("exp", VariableValue.nativeFunction(1, &natives.exp), null);
+    try environment.define("exp2", VariableValue.nativeFunction(1, &natives.exp2), null);
+    try environment.define("log", VariableValue.nativeFunction(1, &natives.log), null);
+    try environment.define("log2", VariableValue.nativeFunction(1, &natives.log2), null);
+    try environment.define("log10", VariableValue.nativeFunction(1, &natives.log10), null);
+    try environment.define("floor", VariableValue.nativeFunction(1, &natives.floor), null);
 
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
@@ -432,7 +442,15 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 try argumentValues.append(value);
             }
 
-            return callable.call(self, argumentValues);
+            return callable.call(self, argumentValues) catch |err| switch (err) {
+                NativeError.InvalidOperand => {
+                    self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
+                    return InterpreterError.RuntimeError;
+                },
+                else => {
+                    return err;
+                },
+            };
         },
         .Function => |values| {
             const function = try VariableValue.fromFunction(values, self.activeEnvironment.?, self.allocator);
