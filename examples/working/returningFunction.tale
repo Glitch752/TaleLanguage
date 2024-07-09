@@ -7,20 +7,26 @@ let isMultipleOfFactory = function(n) {
     };
 };
 
-let isMultipleOf3 = isMultipleOfFactory(3);
+let a = 10;
+let b = 20;
+
+// let isMultipleOf3 = isMultipleOfFactory(3);
 // let isMultipleOf5 = isMultipleOfFactory(5);
 
 // let i = 1;
 // while (i <= 100) {
-//     if (isMultipleOf3(i) && isMultipleOf5(i)) {
-//         print("FizzBuzz");
-//     } else if (isMultipleOf3(i)) {
-//         print("Fizz");
-//     } else if (isMultipleOf5(i)) {
-//         print("Buzz");
-//     } else {
-//         print(i);
-//     }
-//     print("\n");
-//     i = i + 1;
+    // if (isMultipleOf3(i) && isMultipleOf5(i)) {
+    //     print("FizzBuzz");
+    // } else
+    // if (isMultipleOf3(i)) {
+    //     print("Fizz");
+    // }
+    // else if (isMultipleOf5(i)) {
+    //     print("Buzz");
+    // }
+    // else {
+    //     print(i);
+    // }
+    // print("\n");
+    // i = i + 1;
 // }

@@ -35,24 +35,39 @@ pub fn createChild(self: *Environment, previous: *Environment) Environment {
     return .{ .allocator = self.allocator, .values = std.StringHashMapUnmanaged(*ValueWrapper){}, .parent = self, .previous = previous };
 }
 
-pub fn unreferenceAndDeinitIfNeeded(self: *Environment, interpreter: *Interpreter) void {
-    if (self.referenceCount == 0) {
-        std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
-    }
+pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
+    if (self.referenceCount == 0) std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
 
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
-        if (self.parent == null) {
-            std.debug.panic("Tried to deinit the root environment.", .{});
-        }
+        if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
         self.deinit(interpreter);
     }
 }
 
+pub fn exit(self: *Environment, interpreter: *Interpreter) void {
+    if (self.referenceCount == 0) std.debug.panic("Tried to exit an environment that has 0 references.", .{});
+
+    self.referenceCount -= 1;
+    if (self.referenceCount == 0) {
+        if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
+        self.deinit(interpreter);
+    }
+
+    if (self.parent != null) {
+        interpreter.activeEnvironment = self.previous;
+    }
+}
+
 pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
+    if (self.parent == null) {
+        std.debug.print("Root environment on deinit: {any}\n", .{self.values.count()});
+    }
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
+        if (self.parent == null) std.debug.print("Deinit root variable {any}\n", .{entry.value_ptr});
         const wrapper = entry.value_ptr.*;
+        if (self.parent == null) std.debug.print("Deinit root variable {s}\n", .{wrapper.name});
         self.allocator.free(wrapper.name);
         wrapper.value.deinit(interpreter);
         self.allocator.destroy(wrapper);
@@ -60,9 +75,7 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     self.values.deinit(self.allocator);
 
     if (self.parent != null) {
-        interpreter.activeEnvironment = self.previous;
-        self.parent.?.unreferenceAndDeinitIfNeeded(interpreter);
-
+        self.parent.?.unreference(interpreter);
         self.allocator.destroy(self);
     }
 }
@@ -71,6 +84,7 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
+
     const previousValue = try self.values.fetchPut(self.allocator, wrapper.name, wrapper);
 
     if (previousValue != null) {
@@ -127,7 +141,7 @@ pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Int
     const entry = environment.values.get(name.lexeme);
     if (entry != null) return entry.?.value;
 
-    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s} at depth {d}, which is undefined.", .{ name.lexeme, depth });
     return InterpreterError.RuntimeError;
 }
 

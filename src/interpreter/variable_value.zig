@@ -29,13 +29,12 @@ pub const CallableFunction = union(enum) {
             .User => |data| {
                 std.debug.print("Deinit function {d}: {any}\n", .{ data.id, data.parameters.items });
 
-                // for (data.parameters.items) |parameter| {
-                //     interpreter.allocator.free(parameter.lexeme);
-                // }
-                // data.parameters.deinit();
+                for (data.parameters.items) |parameter| {
+                    interpreter.allocator.free(parameter.lexeme);
+                }
+                data.parameters.deinit();
 
-                // data.parentEnvironment.unreferenceAndDeinitIfNeeded(interpreter);
-                _ = interpreter;
+                data.parentEnvironment.unreference(interpreter);
             },
             else => {},
         }
@@ -46,7 +45,7 @@ pub const CallableFunction = union(enum) {
             .Native => |data| return try data(interpreter, arguments),
             .User => |data| {
                 var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
-                defer environment.unreferenceAndDeinitIfNeeded(interpreter);
+                defer environment.exit(interpreter);
 
                 // Check the number of arguments
                 if (arguments.items.len != data.parameters.items.len) {
@@ -56,7 +55,7 @@ pub const CallableFunction = union(enum) {
 
                 // Bind the arguments to the scope
                 for (arguments.items, 0..) |argument, index| {
-                    std.debug.print("Name: {any}\n", .{data.parameters.items[index]});
+                    std.debug.print("Defining parameter: {s}\n", .{data.parameters.items[index].lexeme});
                     try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
                 }
 
@@ -232,5 +231,84 @@ pub const VariableValue = union(enum) {
             .Null => return std.fmt.allocPrint(allocator, "null", .{}),
             .Function => |value| return value.function.toString(allocator),
         }
+    }
+};
+
+/// Essentially a wrapper around VariableValue.
+pub const ExpressionInterpretResult = struct {
+    value: VariableValue,
+    /// A value is an immediate value if it requires
+    /// deinitialization after it is no longer needed.
+    /// This doesn't happen, for example, on variable
+    /// access. This probably isn't the best way to
+    /// structure this, but it works for now.
+    immediateValue: bool,
+
+    pub fn deinit(self: *ExpressionInterpretResult, interpreter: *Interpreter) void {
+        if (self.immediateValue) {
+            self.value.deinit(interpreter);
+        }
+    }
+
+    pub fn isNumber(self: *const ExpressionInterpretResult) bool {
+        return self.value.isNumber();
+    }
+    pub fn asNumber(self: *const ExpressionInterpretResult) f64 {
+        return self.value.asNumber();
+    }
+
+    pub fn isString(self: *const ExpressionInterpretResult) bool {
+        return self.value.isString();
+    }
+    pub fn asString(self: *const ExpressionInterpretResult) []const u8 {
+        return self.value.asString();
+    }
+
+    pub fn isBoolean(self: *const ExpressionInterpretResult) bool {
+        return self.value.isBoolean();
+    }
+    pub fn asBoolean(self: *const ExpressionInterpretResult) bool {
+        return self.value.asBoolean();
+    }
+
+    pub fn isCallable(self: *const ExpressionInterpretResult) bool {
+        return self.value.isCallable();
+    }
+    pub fn asCallable(self: *const ExpressionInterpretResult) Callable {
+        return self.value.asCallable();
+    }
+
+    pub fn isTruthy(self: *const ExpressionInterpretResult) bool {
+        return self.value.isTruthy();
+    }
+
+    pub fn fromImmediateValue(value: VariableValue) ExpressionInterpretResult {
+        return ExpressionInterpretResult{ .value = value, .immediateValue = true };
+    }
+    pub fn fromNonImmediateValue(value: VariableValue) ExpressionInterpretResult {
+        return ExpressionInterpretResult{ .value = value, .immediateValue = false };
+    }
+
+    pub fn fromLiteral(value: TokenLiteral) ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromLiteral(value));
+    }
+    pub fn fromNumber(value: f64) ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromNumber(value));
+    }
+    pub fn fromString(value: []const u8, allocated: bool) ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromString(value, allocated));
+    }
+    pub fn fromBoolean(value: bool) ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromBoolean(value));
+    }
+    pub fn fromFunction(value: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.fromFunction(value, activeEnvironment, allocator));
+    }
+    pub fn @"null"() ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(VariableValue.null());
+    }
+
+    pub fn isEqual(self: ExpressionInterpretResult, other: ExpressionInterpretResult) bool {
+        return self.value.isEqual(other.value);
     }
 };
