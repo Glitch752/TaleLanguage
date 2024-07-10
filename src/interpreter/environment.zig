@@ -14,8 +14,10 @@ const ValueWrapper = struct {
     name: []const u8,
 };
 
+const ValueMap = std.StringHashMapUnmanaged(*ValueWrapper);
+
 allocator: std.mem.Allocator,
-values: std.StringHashMapUnmanaged(*ValueWrapper),
+values: ValueMap,
 parent: ?*Environment = null,
 previous: ?*Environment = null,
 
@@ -25,14 +27,14 @@ referenceCount: usize = 1,
 pub fn init(allocator: std.mem.Allocator) Environment {
     return .{
         .allocator = allocator,
-        .values = std.StringHashMapUnmanaged(*ValueWrapper){},
+        .values = ValueMap{},
         .parent = null,
     };
 }
 
 pub fn createChild(self: *Environment, previous: *Environment) Environment {
     self.referenceCount += 1;
-    return .{ .allocator = self.allocator, .values = std.StringHashMapUnmanaged(*ValueWrapper){}, .parent = self, .previous = previous };
+    return .{ .allocator = self.allocator, .values = ValueMap{}, .parent = self, .previous = previous };
 }
 
 pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
@@ -60,14 +62,9 @@ pub fn exit(self: *Environment, interpreter: *Interpreter) void {
 }
 
 pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
-    if (self.parent == null) {
-        std.debug.print("Root environment on deinit: {any}\n", .{self.values.count()});
-    }
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
-        if (self.parent == null) std.debug.print("Deinit root variable {any}\n", .{entry.value_ptr});
         const wrapper = entry.value_ptr.*;
-        if (self.parent == null) std.debug.print("Deinit root variable {s}\n", .{wrapper.name});
         self.allocator.free(wrapper.name);
         wrapper.value.deinit(interpreter);
         self.allocator.destroy(wrapper);
@@ -85,7 +82,8 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
 
-    const previousValue = try self.values.fetchPut(self.allocator, wrapper.name, wrapper);
+    try self.values.ensureUnusedCapacity(self.allocator, 2);
+    const previousValue = self.values.fetchPutAssumeCapacity(wrapper.name, wrapper);
 
     if (previousValue != null) {
         if (interpreter == null) std.debug.panic("Tried to define a variable that already exists when the interpreter is not available.", .{});

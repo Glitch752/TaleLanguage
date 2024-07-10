@@ -190,9 +190,6 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
             defer result.deinit(self);
         },
         .Let => |values| {
-            // std.debug.print("Defining variable {s}; active environment variables:\n", .{values.name.lexeme});
-            // try self.activeEnvironment.?.printVariables(self, 0);
-
             var value = try self.interpretExpression(values.initializer);
             // Don't deinit unless there's an error -- we want to keep the value since we're storing it
             errdefer value.deinit(self);

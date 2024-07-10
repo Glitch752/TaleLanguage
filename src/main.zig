@@ -25,7 +25,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     var astInterpreter = try interpreter.init(allocator);
-    defer astInterpreter.deinit();
+    errdefer astInterpreter.deinit();
 
     var instance = Main{
         .allocator = allocator,
@@ -59,7 +59,7 @@ pub fn entry(self: *Main) !void {
 }
 
 pub fn deinit(self: *Main) void {
-    _ = self;
+    self.interpreter.?.deinit();
 }
 
 fn runFile(self: *Main) !void {
