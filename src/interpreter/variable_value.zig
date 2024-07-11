@@ -27,8 +27,6 @@ pub const CallableFunction = union(enum) {
     pub fn deinit(self: CallableFunction, interpreter: *Interpreter) void {
         switch (self) {
             .User => |data| {
-                std.debug.print("Deinit function {d}: {any}\n", .{ data.id, data.parameters.items });
-
                 for (data.parameters.items) |parameter| {
                     interpreter.allocator.free(parameter.lexeme);
                 }
@@ -55,7 +53,6 @@ pub const CallableFunction = union(enum) {
 
                 // Bind the arguments to the scope
                 for (arguments.items, 0..) |argument, index| {
-                    std.debug.print("Defining parameter: {s}\n", .{data.parameters.items[index].lexeme});
                     try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
                 }
 

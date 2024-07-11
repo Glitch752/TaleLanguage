@@ -50,14 +50,14 @@ pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
 pub fn exit(self: *Environment, interpreter: *Interpreter) void {
     if (self.referenceCount == 0) std.debug.panic("Tried to exit an environment that has 0 references.", .{});
 
+    if (self.parent != null) {
+        interpreter.activeEnvironment = self.previous;
+    }
+
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
         if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
         self.deinit(interpreter);
-    }
-
-    if (self.parent != null) {
-        interpreter.activeEnvironment = self.previous;
     }
 }
 

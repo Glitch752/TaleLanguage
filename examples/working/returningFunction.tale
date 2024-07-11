@@ -1,5 +1,3 @@
-// This is an example of a program that doesn't work with our current memory management strategy.
-
 let isMultipleOfFactory = function(n) {
     let otherNumber = n;
     return function(m) {
@@ -7,26 +5,24 @@ let isMultipleOfFactory = function(n) {
     };
 };
 
-let a = 10;
-let b = 20;
+let isMultipleOf3 = isMultipleOfFactory(3);
+let isMultipleOf5 = isMultipleOfFactory(5);
 
-// let isMultipleOf3 = isMultipleOfFactory(3);
-// let isMultipleOf5 = isMultipleOfFactory(5);
+let iterations = 100;
 
-// let i = 1;
-// while (i <= 100) {
-    // if (isMultipleOf3(i) && isMultipleOf5(i)) {
-    //     print("FizzBuzz");
-    // } else
-    // if (isMultipleOf3(i)) {
-    //     print("Fizz");
-    // }
-    // else if (isMultipleOf5(i)) {
-    //     print("Buzz");
-    // }
-    // else {
-    //     print(i);
-    // }
-    // print("\n");
-    // i = i + 1;
-// }
+let i = 1;
+while (i <= iterations) {
+    if (isMultipleOf3(i) && isMultipleOf5(i)) {
+        print("FizzBuzz");
+    } else if (isMultipleOf3(i)) {
+        print("Fizz");
+    } else if (isMultipleOf5(i)) {
+        print("Buzz");
+    } else {
+        print(i);
+    }
+    
+    i = i + 1;
+
+    if(i <= iterations) print(", ");
+}
