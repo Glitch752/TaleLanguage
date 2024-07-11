@@ -35,6 +35,7 @@ pub const TokenType = enum {
     SuperKeyword, // super
     ThisKeyword, // this
     ExtendingKeyword, // extending
+    StaticKeyword, // static
 
     IfKeyword, // if
     ElseKeyword, // else
@@ -152,6 +153,7 @@ pub const Token = struct {
         .{ "super", TokenType.SuperKeyword },
         .{ "this", TokenType.ThisKeyword },
         .{ "extending", TokenType.ExtendingKeyword },
+        .{ "static", TokenType.StaticKeyword },
 
         .{ "break", TokenType.BreakKeyword },
         .{ "continue", TokenType.ContinueKeyword },

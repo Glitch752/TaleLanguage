@@ -16,7 +16,7 @@ I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/)
 # The language
 The language, Tale, is not very well-defined yet -- I'm mostly experimenting with different ideas. However, here are the characteristics I'm aiming for:
 - [X] Dynamic typing (for now)
-- [ ] First-class functions
+- [X] First-class functions
 - [X] C-derived syntax
 - [ ] Garbage collection
 - [X] Simple primatives: Booleans, doubles, strings, functions, and null (I'm not sure if arrays or classes should go here)

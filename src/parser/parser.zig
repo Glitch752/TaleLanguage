@@ -11,6 +11,9 @@ const Expression = @import("./expression.zig").Expression;
 const Statement = @import("./statement.zig").Statement;
 const ASTPrinter = @import("./ast_printer.zig").ASTPrinter;
 
+const ClassMethod = @import("./expression.zig").ClassMethod;
+const FunctionExpression = @import("./expression.zig").FunctionExpression;
+
 const Parser = @This();
 
 const prettyError = @import("../errors.zig").prettyError;
@@ -295,11 +298,41 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
     if (self.matchToken(TokenType.FunctionKeyword)) {
         return try self.consumeFunctionExpression();
     }
+    if (self.matchToken(TokenType.ClassKeyword)) {
+        return try self.consumeClassExpression();
+    }
 
     return try self.consumeAssignment();
 }
 
+fn consumeClassExpression(self: *Parser) anyerror!*Expression {
+    var methods = std.ArrayList(ClassMethod).init(self.allocator);
+
+    // TODO: Inheritance
+
+    _ = try self.consume(TokenType.OpenCurly, "Expected '{' after 'class'");
+    while (!self.matchToken(TokenType.CloseCurly) and !self.isAtEnd()) {
+        const method = try self.consumeClassMethod();
+        try methods.append(method);
+    }
+
+    return Expression.class(self.allocator, methods);
+}
+
+fn consumeClassMethod(self: *Parser) anyerror!ClassMethod {
+    const static = self.matchToken(TokenType.StaticKeyword);
+    const name = try self.consume(TokenType.Identifier, "Expected method name");
+    const function = try self.consumeFunctionExpressionInner();
+
+    return ClassMethod.new(static, name, function);
+}
+
 fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
+    const functionExpression = try consumeFunctionExpressionInner(self);
+    return Expression.function(self.allocator, functionExpression);
+}
+
+fn consumeFunctionExpressionInner(self: *Parser) anyerror!FunctionExpression {
     var parameters = std.ArrayList(Token).init(self.allocator);
 
     _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'function'");
@@ -331,7 +364,7 @@ fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
 
     const body = try self.consumeBlockStatement();
 
-    return Expression.function(self.allocator, parameters, body);
+    return .{ .parameters = parameters, .body = body };
 }
 
 fn consumeAssignment(self: *Parser) anyerror!*Expression {

@@ -142,6 +142,26 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) a
             std.debug.print(")", .{});
         },
 
+        .Class => |values| {
+            std.debug.print("class {{", .{});
+            for (values.methods.items) |method| {
+                if (method.static) {
+                    std.debug.print("static {s}(", .{method.name.lexeme});
+                } else {
+                    std.debug.print("{s}(", .{method.name.lexeme});
+                }
+                for (method.function.parameters.items, 0..) |parameter, index| {
+                    std.debug.print("{s}", .{parameter.lexeme});
+                    if (index != method.function.parameters.items.len - 1) {
+                        std.debug.print(", ", .{});
+                    }
+                }
+                std.debug.print(") ", .{});
+                try self.printStatement(method.function.body, 1);
+            }
+            std.debug.print("}}", .{});
+        },
+
         .VariableAccess => |values| {
             std.debug.print("{s}", .{values.name.lexeme});
         },

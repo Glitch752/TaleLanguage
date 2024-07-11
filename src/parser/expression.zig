@@ -5,6 +5,17 @@ const std = @import("std");
 
 pub const FunctionExpression = struct { parameters: std.ArrayList(Token), body: *const Statement };
 
+pub const ClassExpression = struct { methods: std.ArrayList(ClassMethod) };
+pub const ClassMethod = struct {
+    static: bool,
+    name: Token,
+    function: FunctionExpression,
+
+    pub fn new(static: bool, name: Token, function: FunctionExpression) ClassMethod {
+        return .{ .static = static, .name = name, .function = function };
+    }
+};
+
 var globalId: u32 = 0;
 
 pub const Expression = struct {
@@ -20,6 +31,8 @@ pub const Expression = struct {
 
         FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
         Function: FunctionExpression,
+
+        Class: ClassExpression,
 
         VariableAccess: struct { name: Token },
         VariableAssignment: struct { name: Token, value: *const Expression },
@@ -103,10 +116,17 @@ pub const Expression = struct {
         alloc.* = .{ .id = globalId, .value = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } } };
         return alloc;
     }
-    pub fn function(allocator: std.mem.Allocator, parameters: std.ArrayList(Token), body: *const Statement) !*Expression {
+    pub fn function(allocator: std.mem.Allocator, functionExpression: FunctionExpression) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
-        alloc.* = .{ .id = globalId, .value = .{ .Function = .{ .parameters = parameters, .body = body } } };
+        alloc.* = .{ .id = globalId, .value = .{ .Function = functionExpression } };
+        return alloc;
+    }
+
+    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayList(ClassMethod)) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods } } };
         return alloc;
     }
 

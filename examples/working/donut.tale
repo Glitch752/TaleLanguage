@@ -25,3 +25,9 @@ let asciiframe = function() {
         j = j + 0.07;
     }
 }
+
+let frame = 0;
+while(frame < 10) {
+    asciiframe();
+    frame = frame + 1;
+}

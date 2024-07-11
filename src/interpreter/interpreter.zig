@@ -459,6 +459,12 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             return function;
         },
 
+        .Class => |values| {
+            // TODO
+            _ = values;
+            std.debug.panic("TODO: Class values", .{});
+        },
+
         .VariableAccess => |values| {
             return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(values.name, expression));
         },

@@ -196,6 +196,11 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             }
         },
 
+        .Class => |values| {
+            _ = values;
+            std.debug.panic("TODO: Class resolving", .{});
+        },
+
         .VariableAccess => |values| {
             if (self.scopes.len > 0 and self.scopes.last.?.data.get(values.name.lexeme) == false) {
                 try self.errorOn(values.name, "Cannot read local variable in its own initializer", .{});
