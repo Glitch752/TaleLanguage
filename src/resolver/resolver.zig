@@ -197,8 +197,8 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Class => |values| {
+            // We don't resolve the body yet
             _ = values;
-            std.debug.panic("TODO: Class resolving", .{});
         },
 
         .VariableAccess => |values| {

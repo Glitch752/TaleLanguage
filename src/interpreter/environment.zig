@@ -1,9 +1,9 @@
 const std = @import("std");
 const VariableValue = @import("./variable_value.zig").VariableValue;
 
-const RuntimeError = @import("./interpreter.zig").RuntimeError;
+const RuntimeError = @import("./interpreterError.zig").RuntimeError;
+const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 const Interpreter = @import("./interpreter.zig").Interpreter;
-const InterpreterError = @import("./interpreter.zig").InterpreterError;
 
 const Token = @import("../token.zig").Token;
 

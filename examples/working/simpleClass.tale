@@ -1,0 +1,21 @@
+let TestClass = class {
+    constructor(param) {
+        let self = this;
+        self.number = param;
+    }
+
+    printNumber() {
+        print(this.number);
+        print("\n");
+    }
+
+    addNumber(addend) {
+        this.number = this.number + addend;
+    }
+};
+
+let test = TestClass(5);
+
+test.printNumber(); // 5
+test.addNumber(10);
+test.printNumber(); // 15

@@ -44,17 +44,17 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
     - Functions hold a reference to the environment in which they were created -- commonly referred to as a closure
   - [X] Calling: `add(5, 3);` (`add` is a variable containing a function)
 - [ ] Classes
-  - [ ] Declaration: `let Point = class { let constructor = function(x, y) { this.x = x; this.y = y; } }`
+  - [ ] Declaration: `let Point = class { constructor(x, y) { this.x = x; this.y = y; } }`
     - The `constructor` method is called when the class is instantiated
   - [ ] Instantiation: `let p = Point(5, 3);`
   - [ ] Field access: `p.x`, `p.z = 5;` (creates a new field)
-  - [ ] Single inheritance: `let Point3D = class extending Point { let constructor = function(x, y, z) { super.constructor(x, y); this.z = z; } }`
+  - [ ] Single inheritance: `let Point3D = class extending Point { constructor(x, y, z) { super.constructor(x, y); this.z = z; } }`
     - Constructors are inherited just like any other method
   - [ ] Method access: `p.method()` (Just another function)
   - [ ] Static:
-    - [ ] Methods: `let Point = class { let static method() { return 5; } }`
+    - [ ] Methods: `let Point = class { static method() { return 5; } }`
       - Access: `Point.method()` (No `this` reference)
-    - [ ] Fields: `let Point = class { let static x = 5; }`
+    - [ ] Fields: `let Point = class { static x = 5; }`
       - Access: `Point.x`
 - [ ] Extremely simple standard library, globally accessible as `Std` (for now):
   - [X] `print` function: `Std.print("Hello, world!");`

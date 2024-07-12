@@ -32,8 +32,6 @@ pub const TokenType = enum {
     FunctionKeyword, // function
     ClassKeyword, // class
 
-    SuperKeyword, // super
-    ThisKeyword, // this
     ExtendingKeyword, // extending
     StaticKeyword, // static
 
@@ -150,8 +148,6 @@ pub const Token = struct {
         .{ "null", TokenType.NullKeyword },
 
         .{ "class", TokenType.ClassKeyword },
-        .{ "super", TokenType.SuperKeyword },
-        .{ "this", TokenType.ThisKeyword },
         .{ "extending", TokenType.ExtendingKeyword },
         .{ "static", TokenType.StaticKeyword },
 

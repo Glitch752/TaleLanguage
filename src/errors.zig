@@ -63,14 +63,14 @@ pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, l
     }
 
     const line = buffer[lineStart..lineEnd];
-    const column = position - lineStart;
+    const column = position - lineStart + 1;
 
     try stderr.print("{s}:{d}:{d}\n", .{ fileName, lines, column });
 
     const lineString = try std.fmt.allocPrint(allocator, "{d}", .{lines});
     defer allocator.free(lineString);
 
-    const caretSpaces = try repeat(column + lineString.len + 3, ' ', allocator);
+    const caretSpaces = try repeat(column + lineString.len + 2, ' ', allocator);
     defer allocator.free(caretSpaces);
 
     const carets = try repeat(length, '^', allocator);
