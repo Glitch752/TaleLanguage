@@ -18,28 +18,52 @@ let asciiframe = function() {
     let k = 0;
     while(k < 1760) {
         zBuffer = zBuffer + " ";
-    //     if(k % 80 == 79) {
-    //         output = output + "\n";
-    //     } else {
-    //         output = output + " ";
-    //     }
+        if(k % 80 == 79) {
+            output = output + "\n";
+        } else {
+            output = output + " ";
+        }
         k = k + 1;
     }
 
     let j = 0; // J is theta
     while(j < 6.28) {
+        let jSin = sin(j);
+        let jCos = cos(j);
+
         let i = 0; // I is phi
         while(i < 6.28) {
+            let iSin = sin(i);
+            let iCos = cos(i);
 
+            let h = jCos + 2;
+            let d = 1 / (iSin * h * sinA + jSin * cosA + 5);
+            let t = iSin * h * cosA - jSin * sinA;
+
+            let x = floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
+            let y = floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
+
+            let o = x + 80 * y;
+
+            let depthChar = substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", floor(d * 100), floor(d * 100) + 1);
+            if(y < 22 && y >= 0 && x >= 0 && x < 79 && intChar(depthChar) > intChar(substring(zBuffer, o, o + 1))) {
+                let N = 8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB);
+
+                zBuffer = substring(zBuffer, 0, o) + depthChar + substring(zBuffer, o + 1, length(zBuffer));
+                let idx = 0;
+                if(N > 0) idx = N;
+
+                output = substring(output, 0, o) + substring(".,-~:;=!*#$@", idx, idx + 1) + substring(output, o + 1, length(output));
+            }
 
             i = i + 0.02;
         }
         j = j + 0.07;
     }
+
+    print(output);
 };
 
-let frame = 0;
-while(frame < 1) {
+while(true) {
     asciiframe();
-    frame = frame + 1;
 }

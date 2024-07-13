@@ -1,2 +1,3 @@
 let TestClass = class {};
 let test = TestClass();
+print(test);

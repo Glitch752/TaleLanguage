@@ -5,7 +5,7 @@ const NativeError = @import("./natives.zig").NativeError;
 const Token = @import("../token.zig").Token;
 const Statement = @import("../parser/statement.zig").Statement;
 const Environment = @import("./environment.zig").Environment;
-const Class = @import("./class_value.zig").Class;
+const ClassType = @import("./class_value.zig").ClassType;
 
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const ClassExpression = @import("../parser/expression.zig").ClassExpression;
@@ -26,8 +26,9 @@ pub const CallableFunction = union(enum) {
         /// For debugging.
         id: u32,
     },
-    Class: struct {
-        class: Class,
+    /// NOTE: This isn't a class instance, but a class type.
+    ClassType: struct {
+        class: *ClassType,
         parentEnvironment: *Environment,
         /// For debugging.
         id: u32,
@@ -43,9 +44,9 @@ pub const CallableFunction = union(enum) {
 
                 data.parentEnvironment.unreference(interpreter);
             },
-            .Class => {
-                self.Class.class.deinit(interpreter.allocator);
-                self.Class.parentEnvironment.unreference(interpreter);
+            .ClassType => {
+                self.ClassType.class.unreference(interpreter.allocator);
+                self.ClassType.parentEnvironment.unreference(interpreter);
             },
             else => {},
         }
@@ -78,10 +79,8 @@ pub const CallableFunction = union(enum) {
                 };
                 return VariableValue.null();
             },
-            .Class => |data| {
-                _ = data;
-                // TODO
-                return VariableValue.null();
+            .ClassType => |data| {
+                return try VariableValue.newClassInstance(data.class, interpreter.allocator);
             },
         }
     }
@@ -99,10 +98,10 @@ pub const CallableFunction = union(enum) {
         parentEnvironment.referenceCount += 1;
         return .{ .User = .{ .parameters = parameters, .body = function.body, .parentEnvironment = parentEnvironment, .id = functionId } };
     }
-    pub fn class(expression: ClassExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
+    pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
         functionId += 1;
         parentEnvironment.referenceCount += 1;
-        return .{ .Class = .{ .class = try Class.new(expression, allocator), .parentEnvironment = parentEnvironment, .id = functionId } };
+        return .{ .ClassType = .{ .class = try ClassType.new(expression, allocator), .parentEnvironment = parentEnvironment, .id = functionId } };
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {

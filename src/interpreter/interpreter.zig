@@ -44,6 +44,9 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
     try environment.define("log2", VariableValue.nativeFunction(1, &natives.log2), null);
     try environment.define("log10", VariableValue.nativeFunction(1, &natives.log10), null);
     try environment.define("floor", VariableValue.nativeFunction(1, &natives.floor), null);
+    try environment.define("substring", VariableValue.nativeFunction(3, &natives.substring), null);
+    try environment.define("intChar", VariableValue.nativeFunction(1, &natives.intChar), null);
+    try environment.define("length", VariableValue.nativeFunction(1, &natives.length), null);
 
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
@@ -221,9 +224,6 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                             right.asString(),
                         });
 
-                        left.deinit(self);
-                        right.deinit(self);
-
                         return ExpressionInterpretResult.fromString(mergedString, true);
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must both be numbers or strings", .{});
@@ -364,14 +364,26 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
-            defer argumentValues.deinit();
+            var argumentResults = std.ArrayList(ExpressionInterpretResult).init(self.allocator);
+            defer {
+                for (argumentResults.items) |value| {
+                    var val = value;
+                    val.deinit(self);
+                }
+                argumentResults.deinit();
+            }
 
             for (values.arguments.items) |argument| {
                 var value = try self.interpretExpression(argument);
                 errdefer value.deinit(self);
 
-                try argumentValues.append(value.value);
+                try argumentResults.append(value);
+            }
+
+            var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
+            defer argumentValues.deinit();
+            for (argumentResults.items) |result| {
+                try argumentValues.append(result.value);
             }
 
             return ExpressionInterpretResult.fromImmediateValue(callable.call(self, argumentValues) catch |err| switch (err) {
@@ -390,12 +402,13 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
         },
 
         .Class => |values| {
-            const class = try ExpressionInterpretResult.newClass(values, self.activeEnvironment.?, self.allocator);
+            const class = try ExpressionInterpretResult.newClassType(values, self.activeEnvironment.?, self.allocator);
             return class;
         },
 
         .VariableAccess => |values| {
-            return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(values.name, expression));
+            const value = try self.lookUpVariable(values.name, expression);
+            return ExpressionInterpretResult.fromNonImmediateValue(value);
         },
         .VariableAssignment => |values| {
             var value = try self.interpretExpression(values.value);
@@ -415,6 +428,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 }
             }
 
+            value.immediateValue = false;
             return value;
         },
     }

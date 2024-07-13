@@ -12,7 +12,8 @@ const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFun
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const ClassExpression = @import("../parser/expression.zig").ClassExpression;
 
-const ClassValue = @import("./class_value.zig").ClassValue;
+const ClassInstance = @import("./class_value.zig").ClassInstance;
+const ClassType = @import("./class_value.zig").ClassType;
 
 pub const VariableValue = union(enum) {
     Number: f64,
@@ -27,7 +28,9 @@ pub const VariableValue = union(enum) {
         function: CallableFunction,
     },
 
-    Class: struct { value: *ClassValue },
+    /// NOTE: This isn't a class instance, but a class type.
+    ClassType: struct { class: CallableFunction },
+    ClassInstance: struct { instance: *ClassInstance },
 
     Null,
 
@@ -37,7 +40,8 @@ pub const VariableValue = union(enum) {
         switch (self.*) {
             .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
             .Function => self.Function.function.deinit(interpreter),
-            .Class => |value| value.value.deinit(interpreter),
+            .ClassType => self.ClassType.class.deinit(interpreter),
+            .ClassInstance => self.ClassInstance.instance.unreference(interpreter),
             else => {},
         }
     }
@@ -70,13 +74,21 @@ pub const VariableValue = union(enum) {
     }
 
     pub fn isCallable(self: VariableValue) bool {
-        return self == .Function;
+        return self == .Function or self == .ClassType;
     }
     pub fn asCallable(self: VariableValue) Callable {
-        return .{
-            .arity = self.Function.arity,
-            .function = self.Function.function,
-        };
+        switch (self) {
+            .Function => |value| return .{
+                .arity = value.arity,
+                .function = value.function,
+            },
+            .ClassType => |value| return .{
+                .arity = value.class.ClassType.class.getArity(),
+                .function = value.class,
+            },
+            else => std.debug.panic("Tried to get a callable from a non-callable value.", .{}),
+        }
+        return;
     }
 
     // Type coercion
@@ -131,8 +143,11 @@ pub const VariableValue = union(enum) {
         return .{ .Function = .{ .arity = @intCast(function.parameters.items.len), .function = try CallableFunction.user(function, activeEnvironment, allocator) } };
     }
 
-    pub fn newClass(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Class = .{ .value = try ClassValue.new(allocator, class, activeEnvironment) } };
+    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .ClassType = .{ .class = try CallableFunction.classType(class, activeEnvironment, allocator) } };
+    }
+    pub fn newClassInstance(classType: *ClassType, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .ClassInstance = .{ .instance = try ClassInstance.new(allocator, classType) } };
     }
 
     pub fn @"null"() VariableValue {
@@ -149,6 +164,8 @@ pub const VariableValue = union(enum) {
             .Boolean => return if (self.Boolean) std.fmt.allocPrint(allocator, "true", .{}) else std.fmt.allocPrint(allocator, "false", .{}),
             .Null => return std.fmt.allocPrint(allocator, "null", .{}),
             .Function => |value| return value.function.toString(allocator),
+            .ClassType => |value| return value.class.ClassType.class.toString(allocator),
+            .ClassInstance => |value| return value.instance.toString(allocator),
         }
     }
 };
@@ -223,8 +240,11 @@ pub const ExpressionInterpretResult = struct {
     pub fn newFunction(value: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
         return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newFunction(value, activeEnvironment, allocator));
     }
-    pub fn newClass(value: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newClass(value, activeEnvironment, allocator));
+    pub fn newClassType(value: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newClassType(value, activeEnvironment, allocator));
+    }
+    pub fn newClassInstance(value: *ClassInstance, allocator: std.mem.Allocator) !ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassInstance(value, allocator));
     }
     pub fn @"null"() ExpressionInterpretResult {
         return ExpressionInterpretResult.fromImmediateValue(VariableValue.null());

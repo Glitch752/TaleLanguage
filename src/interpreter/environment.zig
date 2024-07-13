@@ -107,6 +107,8 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
         return;
     }
 
+    pointer.?.*.value.deinit(interpreter);
+
     pointer.?.*.value = value;
 }
 
@@ -151,6 +153,8 @@ pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, dept
         interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to assign to {s}, which is undefined.", .{name.lexeme});
         return;
     }
+
+    pointer.?.*.value.deinit(interpreter);
 
     pointer.?.*.value = value;
 }

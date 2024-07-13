@@ -7,47 +7,80 @@ const CallableFunction = @import("./callable_value.zig").CallableFunction;
 
 const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 
-pub const ClassValue = struct {
+pub const ClassInstance = struct {
     referenceCount: usize,
-    callable: CallableFunction,
+    classType: *ClassType,
 
-    pub fn new(allocator: std.mem.Allocator, class: ClassExpression, activeEnvironment: *Environment) !*ClassValue {
-        const value = try allocator.create(ClassValue);
+    pub fn new(allocator: std.mem.Allocator, classType: *ClassType) !*ClassInstance {
+        const value = try allocator.create(ClassInstance);
         value.* = .{
             .referenceCount = 1,
-            .callable = try CallableFunction.class(class, activeEnvironment, allocator),
+            .classType = classType,
         };
+        classType.referenceCount += 1;
         return value;
     }
 
-    pub fn deinit(self: *ClassValue, interpreter: *Interpreter) void {
+    pub fn unreference(self: *ClassInstance, interpreter: *Interpreter) void {
         self.referenceCount -= 1;
         if (self.referenceCount == 0) {
-            self.callable.deinit(interpreter);
+            // TODO
+            self.classType.unreference(interpreter.allocator);
             interpreter.allocator.destroy(self);
         }
     }
+
+    pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {
+        _ = self;
+        return std.fmt.allocPrint(allocator, "<instance <class>>", .{});
+    }
 };
 
-pub const Class = struct {
+/// NOTE: This isn't a class instance, but a class type.
+pub const ClassType = struct {
+    referenceCount: usize,
     methods: std.ArrayListUnmanaged(ClassMethod),
 
-    pub fn new(expression: ClassExpression, allocator: std.mem.Allocator) !Class {
+    pub fn new(expression: ClassExpression, allocator: std.mem.Allocator) !*ClassType {
         var array = std.ArrayListUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
             try array.append(allocator, ClassMethod.new(method.static, try method.name.clone(allocator)));
         }
-        return .{ .methods = array };
+
+        const value = try allocator.create(ClassType);
+        value.* = .{
+            .referenceCount = 1,
+            .methods = array,
+        };
+        return value;
     }
 
-    pub fn deinit(self: *Class, allocator: std.mem.Allocator) void {
-        for (self.methods.items) |method| {
-            method.deinit(allocator);
+    pub fn unreference(self: *ClassType, allocator: std.mem.Allocator) void {
+        self.referenceCount -= 1;
+
+        if (self.referenceCount == 0) {
+            for (self.methods.items) |method| {
+                method.deinit(allocator);
+            }
+            self.methods.deinit(allocator);
+
+            allocator.destroy(self);
         }
-        self.methods.deinit(allocator);
+    }
+
+    pub fn getArity(self: *const ClassType) u32 {
+        // TODO: Return constructor arity
+        _ = self;
+        return 0;
+    }
+
+    pub fn toString(self: *const ClassType, allocator: std.mem.Allocator) ![]const u8 {
+        _ = self;
+        return std.fmt.allocPrint(allocator, "<class>", .{});
     }
 };
 
+/// NOTE: This exists on a class type, not a class instance.
 pub const ClassMethod = struct {
     static: bool,
     name: Token,

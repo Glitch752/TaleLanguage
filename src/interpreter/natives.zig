@@ -3,7 +3,7 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const Interpreter = @import("./interpreter.zig").Interpreter;
 
 /// TODO: Payload
-pub const NativeError = error{InvalidOperand};
+pub const NativeError = error{ InvalidOperand, Unknown };
 
 /// NOTE: Having all these globals is not the end goal, but they're provided to allow testing out more complex programs.
 /// Arity: 1
@@ -17,7 +17,9 @@ pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
         .String => |value| std.debug.print("{s}", .{value.string}),
         .Boolean => |value| std.debug.print("{s}", .{if (value) "true" else "false"}),
         .Null => std.debug.print("null", .{}),
-        else => {},
+        .ClassType => std.debug.print("<class>", .{}),
+        .Function => std.debug.print("<function>", .{}),
+        .ClassInstance => std.debug.print("<instance>", .{}),
     }
 
     return .Null;
@@ -156,4 +158,60 @@ pub fn floor(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
     }
 
     return NativeError.InvalidOperand;
+}
+
+// Arity: 3
+pub fn substring(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    const string = arguments.items[0];
+    const start = arguments.items[1];
+    const end = arguments.items[2];
+
+    if (string != .String or start != .Number or end != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringBytes = string.asString();
+    const startNumber: u32 = @intFromFloat(start.asNumber());
+    const endNumber: u32 = @intFromFloat(end.asNumber());
+
+    if (startNumber >= stringBytes.len or endNumber > stringBytes.len or startNumber > endNumber) {
+        return NativeError.InvalidOperand;
+    }
+
+    const newString = interpreter.allocator.dupe(u8, stringBytes[startNumber..endNumber]) catch return NativeError.Unknown;
+    return VariableValue.fromString(newString, true);
+}
+
+// Arity: 1
+pub fn intChar(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    const string = arguments.items[0];
+
+    if (string != .String) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringBytes = string.asString();
+
+    if (stringBytes.len != 1) {
+        return NativeError.InvalidOperand;
+    }
+
+    _ = interpreter;
+
+    return VariableValue.fromNumber(@floatFromInt(@as(u32, @intCast(stringBytes[0]))));
+}
+
+// Arity: 1
+pub fn length(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    const string = arguments.items[0];
+
+    if (string != .String) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringBytes = string.asString();
+
+    _ = interpreter;
+
+    return VariableValue.fromNumber(@floatFromInt(@as(u32, @intCast(stringBytes.len))));
 }
