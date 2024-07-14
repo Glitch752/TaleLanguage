@@ -431,5 +431,13 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             value.immediateValue = false;
             return value;
         },
+
+        .PropertyAccess => |values| {
+            var object = try self.interpretExpression(values.object);
+            defer object.deinit(self);
+
+            // TODO
+            return ExpressionInterpretResult.null();
+        },
     }
 }

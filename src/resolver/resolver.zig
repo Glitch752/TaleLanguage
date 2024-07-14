@@ -212,5 +212,9 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             try self.resolveExpression(values.value);
             try self.resolveLocal(expression, values.name);
         },
+
+        .PropertyAccess => |values| {
+            try self.resolveExpression(values.object);
+        },
     }
 }

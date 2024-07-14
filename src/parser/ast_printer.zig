@@ -169,5 +169,10 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) a
             std.debug.print("{s} = ", .{values.name.lexeme});
             try self.printExpression(values.value);
         },
+
+        .PropertyAccess => |values| {
+            try self.printExpression(values.object);
+            std.debug.print(".{s}", .{values.name.lexeme});
+        },
     }
 }

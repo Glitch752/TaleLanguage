@@ -306,14 +306,14 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeClassExpression(self: *Parser) anyerror!*Expression {
-    var methods = std.ArrayList(ClassMethod).init(self.allocator);
+    var methods = std.ArrayListUnmanaged(ClassMethod){};
 
     // TODO: Inheritance
 
     _ = try self.consume(TokenType.OpenCurly, "Expected '{' after 'class'");
     while (!self.matchToken(TokenType.CloseCurly) and !self.isAtEnd()) {
         const method = try self.consumeClassMethod();
-        try methods.append(method);
+        try methods.append(self.allocator, method);
     }
 
     return Expression.class(self.allocator, methods);
@@ -333,7 +333,7 @@ fn consumeFunctionExpression(self: *Parser) anyerror!*Expression {
 }
 
 fn consumeFunctionExpressionInner(self: *Parser) anyerror!FunctionExpression {
-    var parameters = std.ArrayList(Token).init(self.allocator);
+    var parameters = std.ArrayListUnmanaged(Token){};
 
     _ = try self.consume(TokenType.OpenParen, "Expected '(' after 'function'");
     if (!self.matchToken(TokenType.CloseParen)) {
@@ -347,7 +347,7 @@ fn consumeFunctionExpressionInner(self: *Parser) anyerror!FunctionExpression {
                 self.errorOccured("Expected parameter name");
                 return ParseErrorEnum.Unknown;
             };
-            try parameters.append(parameter);
+            try parameters.append(self.allocator, parameter);
 
             if (!self.matchToken(TokenType.Comma)) {
                 break;
@@ -554,17 +554,28 @@ fn consumeUnary(self: *Parser) anyerror!*Expression {
 fn consumeFunctionCall(self: *Parser) anyerror!*Expression {
     var expression = try self.consumePrimary();
 
-    while (self.matchToken(TokenType.OpenParen)) {
-        expression = try self.finishFunctionCall(expression);
+    while (true) {
+        if (self.matchToken(TokenType.OpenParen)) {
+            expression = try self.finishFunctionCall(expression);
+        } else if (self.matchToken(TokenType.Dot)) {
+            expression = try self.consumePropertyAccess(expression);
+        } else {
+            break;
+        }
     }
 
     return expression;
 }
 
+fn consumePropertyAccess(self: *Parser, object: *Expression) anyerror!*Expression {
+    const property = try self.consume(TokenType.Identifier, "Expected property name after '.'");
+    return Expression.propertyAccess(self.allocator, object, property);
+}
+
 fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
     const startToken = self.peekPrevious();
 
-    var arguments = std.ArrayList(*const Expression).init(self.allocator);
+    var arguments = std.ArrayListUnmanaged(*const Expression){};
 
     if (!self.matchToken(TokenType.CloseParen)) {
         while (true) {
@@ -574,7 +585,7 @@ fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
             }
 
             const argument = try self.consumeExpression();
-            try arguments.append(argument);
+            try arguments.append(self.allocator, argument);
 
             if (!self.matchToken(TokenType.Comma)) {
                 break;

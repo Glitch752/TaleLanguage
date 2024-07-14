@@ -3,9 +3,26 @@ const TokenLiteral = @import("../token.zig").TokenLiteral;
 const Statement = @import("./statement.zig").Statement;
 const std = @import("std");
 
-pub const FunctionExpression = struct { parameters: std.ArrayList(Token), body: *const Statement };
+pub const FunctionExpression = struct {
+    parameters: std.ArrayListUnmanaged(Token),
+    body: *const Statement,
 
-pub const ClassExpression = struct { methods: std.ArrayList(ClassMethod) };
+    pub fn deinit(self: *const FunctionExpression, allocator: std.mem.Allocator) void {
+        allocator.free(self.parameters.allocatedSlice());
+        self.body.uninit(allocator);
+    }
+};
+
+pub const ClassExpression = struct {
+    methods: std.ArrayListUnmanaged(ClassMethod),
+
+    pub fn deinit(self: *const ClassExpression, allocator: std.mem.Allocator) void {
+        for (self.methods.items) |method| {
+            method.deinit(allocator);
+        }
+        allocator.free(self.methods.allocatedSlice());
+    }
+};
 pub const ClassMethod = struct {
     static: bool,
     name: Token,
@@ -13,6 +30,10 @@ pub const ClassMethod = struct {
 
     pub fn new(static: bool, name: Token, function: FunctionExpression) ClassMethod {
         return .{ .static = static, .name = name, .function = function };
+    }
+
+    pub fn deinit(self: *const ClassMethod, allocator: std.mem.Allocator) void {
+        self.function.deinit(allocator);
     }
 };
 
@@ -29,13 +50,15 @@ pub const Expression = struct {
         Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
         Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
 
-        FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression) },
+        FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayListUnmanaged(*const Expression) },
         Function: FunctionExpression,
 
         Class: ClassExpression,
 
         VariableAccess: struct { name: Token },
         VariableAssignment: struct { name: Token, value: *const Expression },
+
+        PropertyAccess: struct { object: *const Expression, name: Token },
     },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
@@ -60,14 +83,13 @@ pub const Expression = struct {
                 for (data.arguments.items) |argument| {
                     argument.*.uninit(allocator);
                 }
-                data.arguments.deinit();
+                allocator.free(data.arguments.allocatedSlice());
             },
-            .Function => |data| {
-                data.parameters.deinit();
-                data.body.*.uninit(allocator);
-            },
-
+            .Function => |functionExpression| functionExpression.deinit(allocator),
             .VariableAssignment => |data| data.value.uninit(allocator),
+
+            .PropertyAccess => |data| data.object.uninit(allocator),
+            .Class => |classExpression| classExpression.deinit(allocator),
             else => {},
         }
         allocator.destroy(self);
@@ -110,7 +132,7 @@ pub const Expression = struct {
         return alloc;
     }
 
-    pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, startToken: Token, arguments: std.ArrayList(*const Expression)) !*Expression {
+    pub fn functionCall(allocator: std.mem.Allocator, callee: *const Expression, startToken: Token, arguments: std.ArrayListUnmanaged(*const Expression)) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .FunctionCall = .{ .callee = callee, .startToken = startToken, .arguments = arguments } } };
@@ -123,7 +145,7 @@ pub const Expression = struct {
         return alloc;
     }
 
-    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayList(ClassMethod)) !*Expression {
+    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassMethod)) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods } } };
@@ -140,6 +162,13 @@ pub const Expression = struct {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .VariableAssignment = .{ .name = name, .value = value } } };
+        return alloc;
+    }
+
+    pub fn propertyAccess(allocator: std.mem.Allocator, object: *const Expression, name: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .PropertyAccess = .{ .object = object, .name = name } } };
         return alloc;
     }
 };
