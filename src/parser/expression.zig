@@ -59,6 +59,7 @@ pub const Expression = struct {
         VariableAssignment: struct { name: Token, value: *const Expression },
 
         PropertyAccess: struct { object: *const Expression, name: Token },
+        PropertyAssignment: struct { object: *const Expression, name: Token, value: *const Expression },
     },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
@@ -89,6 +90,11 @@ pub const Expression = struct {
             .VariableAssignment => |data| data.value.uninit(allocator),
 
             .PropertyAccess => |data| data.object.uninit(allocator),
+            .PropertyAssignment => |data| {
+                data.object.uninit(allocator);
+                data.value.uninit(allocator);
+            },
+
             .Class => |classExpression| classExpression.deinit(allocator),
             else => {},
         }
@@ -169,6 +175,12 @@ pub const Expression = struct {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .PropertyAccess = .{ .object = object, .name = name } } };
+        return alloc;
+    }
+    pub fn propertyAssignment(allocator: std.mem.Allocator, object: *const Expression, name: Token, value: *const Expression) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .PropertyAssignment = .{ .object = object, .name = name, .value = value } } };
         return alloc;
     }
 };

@@ -91,6 +91,20 @@ pub const VariableValue = union(enum) {
         return;
     }
 
+    pub fn isClassType(self: VariableValue) bool {
+        return self == .ClassType;
+    }
+    pub fn asClassType(self: VariableValue) *ClassType {
+        return self.ClassType.class.ClassType.class;
+    }
+
+    pub fn isClassInstance(self: VariableValue) bool {
+        return self == .ClassInstance;
+    }
+    pub fn asClassInstance(self: VariableValue) *ClassInstance {
+        return self.ClassInstance.instance;
+    }
+
     // Type coercion
     pub fn isTruthy(self: VariableValue) bool {
         switch (self) {
@@ -212,6 +226,20 @@ pub const ExpressionInterpretResult = struct {
     }
     pub fn asCallable(self: *const ExpressionInterpretResult) Callable {
         return self.value.asCallable();
+    }
+
+    pub fn isClassType(self: *const ExpressionInterpretResult) bool {
+        return self.value.isClassType();
+    }
+    pub fn asClassType(self: *const ExpressionInterpretResult) *ClassType {
+        return self.value.asClassType();
+    }
+
+    pub fn isClassInstance(self: *const ExpressionInterpretResult) bool {
+        return self.value.isClassInstance();
+    }
+    pub fn asClassInstance(self: *const ExpressionInterpretResult) *ClassInstance {
+        return self.value.asClassInstance();
     }
 
     pub fn isTruthy(self: *const ExpressionInterpretResult) bool {

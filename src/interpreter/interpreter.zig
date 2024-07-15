@@ -436,8 +436,33 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             var object = try self.interpretExpression(values.object);
             defer object.deinit(self);
 
-            // TODO
-            return ExpressionInterpretResult.null();
+            if (!object.isClassInstance()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances", .{});
+                return InterpreterError.RuntimeError;
+            }
+
+            const instance = object.asClassInstance();
+            return ExpressionInterpretResult.fromNonImmediateValue(try instance.get(values.name, self));
+        },
+        .PropertyAssignment => |values| {
+            var object = try self.interpretExpression(values.object);
+            defer object.deinit(self);
+
+            if (!object.isClassInstance()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances", .{});
+                return InterpreterError.RuntimeError;
+            }
+
+            const instance = object.asClassInstance();
+            var value = try self.interpretExpression(values.value);
+
+            try instance.set(values.name, value.value, self);
+            if (self.runtimeError != null) {
+                return InterpreterError.RuntimeError;
+            }
+
+            value.immediateValue = false;
+            return value;
         },
     }
 }

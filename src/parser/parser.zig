@@ -382,6 +382,10 @@ fn consumeAssignment(self: *Parser) anyerror!*Expression {
                 const variable = access.name;
                 return Expression.variableAssignment(self.allocator, variable, value);
             },
+            .PropertyAccess => |access| {
+                self.allocator.destroy(expression); // Don't uninit the entire tree, just the single node
+                return Expression.propertyAssignment(self.allocator, access.object, access.name, value);
+            },
             else => {},
         }
 

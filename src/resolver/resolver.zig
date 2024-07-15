@@ -216,5 +216,9 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         .PropertyAccess => |values| {
             try self.resolveExpression(values.object);
         },
+        .PropertyAssignment => |values| {
+            try self.resolveExpression(values.object);
+            try self.resolveExpression(values.value);
+        },
     }
 }
