@@ -1,6 +1,7 @@
 const std = @import("std");
 const Statement = @import("../parser/statement.zig").Statement;
 const Expression = @import("../parser/expression.zig").Expression;
+const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const Program = @import("../parser/program.zig").Program;
 const Interpreter = @import("../interpreter/interpreter.zig").Interpreter;
 const Token = @import("../token.zig").Token;
@@ -181,13 +182,7 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Function => |values| {
-            try self.beginScope();
-            for (values.parameters.items) |parameter| {
-                try self.declare(parameter);
-                try self.define(parameter);
-            }
-            try self.resolveStatement(values.body, true);
-            try self.endScope();
+            try self.resolveFunction(values);
         },
         .FunctionCall => |values| {
             try self.resolveExpression(values.callee);
@@ -197,8 +192,10 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Class => |values| {
-            // We don't resolve the body yet
-            _ = values;
+            // Classes don't have a separate scope, but they don't define their method names either.
+            for (values.methods.items) |method| {
+                try self.resolveFunction(method.function);
+            }
         },
 
         .VariableAccess => |values| {
@@ -221,4 +218,14 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             try self.resolveExpression(values.value);
         },
     }
+}
+
+fn resolveFunction(self: *Resolver, values: FunctionExpression) anyerror!void {
+    try self.beginScope();
+    for (values.parameters.items) |parameter| {
+        try self.declare(parameter);
+        try self.define(parameter);
+    }
+    try self.resolveStatement(values.body, true);
+    try self.endScope();
 }

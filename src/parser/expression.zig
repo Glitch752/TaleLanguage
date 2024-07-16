@@ -14,7 +14,7 @@ pub const FunctionExpression = struct {
 };
 
 pub const ClassExpression = struct {
-    methods: std.ArrayListUnmanaged(ClassMethod),
+    methods: std.ArrayListUnmanaged(ClassExpressionMethod),
 
     pub fn deinit(self: *const ClassExpression, allocator: std.mem.Allocator) void {
         for (self.methods.items) |method| {
@@ -23,16 +23,16 @@ pub const ClassExpression = struct {
         allocator.free(self.methods.allocatedSlice());
     }
 };
-pub const ClassMethod = struct {
+pub const ClassExpressionMethod = struct {
     static: bool,
     name: Token,
     function: FunctionExpression,
 
-    pub fn new(static: bool, name: Token, function: FunctionExpression) ClassMethod {
+    pub fn new(static: bool, name: Token, function: FunctionExpression) ClassExpressionMethod {
         return .{ .static = static, .name = name, .function = function };
     }
 
-    pub fn deinit(self: *const ClassMethod, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *const ClassExpressionMethod, allocator: std.mem.Allocator) void {
         self.function.deinit(allocator);
     }
 };
@@ -151,7 +151,7 @@ pub const Expression = struct {
         return alloc;
     }
 
-    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassMethod)) !*Expression {
+    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassExpressionMethod)) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods } } };

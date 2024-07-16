@@ -17,6 +17,7 @@ pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(Variab
 
 var functionId: u32 = 0;
 
+// TODO: Pass functions by reference?
 pub const CallableFunction = union(enum) {
     Native: CallableNativeFunction,
     User: struct {
@@ -26,10 +27,17 @@ pub const CallableFunction = union(enum) {
         /// For debugging.
         id: u32,
     },
+    /// Similar to normal user functions, but has some distinct calling characteristics (notably `this`).
+    ClassMethod: struct {
+        parameters: std.ArrayList(Token),
+        body: *const Statement,
+        parentEnvironment: *Environment,
+        /// For debugging.
+        id: u32,
+    },
     /// NOTE: This isn't a class instance, but a class type.
     ClassType: struct {
         class: *ClassType,
-        parentEnvironment: *Environment,
         /// For debugging.
         id: u32,
     },
@@ -45,8 +53,7 @@ pub const CallableFunction = union(enum) {
                 data.parentEnvironment.unreference(interpreter);
             },
             .ClassType => {
-                self.ClassType.class.unreference(interpreter.allocator);
-                self.ClassType.parentEnvironment.unreference(interpreter);
+                self.ClassType.class.unreference(interpreter);
             },
             else => {},
         }
@@ -56,6 +63,30 @@ pub const CallableFunction = union(enum) {
         switch (self) {
             .Native => |data| return try data(interpreter, arguments),
             .User => |data| {
+                var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
+                defer environment.exit(interpreter);
+
+                // Check the number of arguments
+                if (arguments.items.len != data.parameters.items.len) {
+                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, data.parameters.items[0], "Expected {d} arguments but got {d}.", .{ data.parameters.items.len, arguments.items.len });
+                    return InterpreterError.RuntimeError;
+                }
+
+                // Bind the arguments to the scope
+                for (arguments.items, 0..) |argument, index| {
+                    try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
+                }
+
+                // Execute the function body
+                interpreter.interpretStatement(data.body, true) catch |err| {
+                    switch (err) {
+                        InterpreterError.Return => return interpreter.lastReturnValue,
+                        else => return err,
+                    }
+                };
+                return VariableValue.null();
+            },
+            .ClassMethod => |data| {
                 var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
                 defer environment.exit(interpreter);
 
@@ -100,8 +131,12 @@ pub const CallableFunction = union(enum) {
     }
     pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
         functionId += 1;
+        return .{ .ClassType = .{ .class = try ClassType.new(parentEnvironment, expression, allocator), .id = functionId } };
+    }
+    pub fn classMethod(expression: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
+        functionId += 1;
         parentEnvironment.referenceCount += 1;
-        return .{ .ClassType = .{ .class = try ClassType.new(expression, allocator), .parentEnvironment = parentEnvironment, .id = functionId } };
+        return .{ .ClassMethod = .{ .parameters = std.ArrayList(Token).init(allocator), .body = expression.body, .parentEnvironment = parentEnvironment, .id = functionId } };
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {

@@ -32,7 +32,7 @@ pub const ClassInstance = struct {
         self.referenceCount -= 1;
         if (self.referenceCount == 0) {
             // TODO
-            self.classType.unreference(interpreter.allocator);
+            self.classType.unreference(interpreter);
 
             var iter = self.fieldValues.iterator();
             while (iter.next()) |entry| {
@@ -51,11 +51,9 @@ pub const ClassInstance = struct {
     }
 
     pub fn get(self: *const ClassInstance, name: Token, interpreter: *Interpreter) !VariableValue {
-        for (self.classType.methods.items) |method| {
-            if (std.mem.eql(u8, method.name.lexeme, name.lexeme)) {
-                // TODO
-                std.debug.panic("TODO: Implement method lookup", .{});
-            }
+        const method = self.classType.methods.get(name.lexeme);
+        if (method != null) {
+            std.debug.panic("TODO: Implement method calls on class instances", .{});
         }
 
         const property = self.fieldValues.get(name.lexeme);
@@ -68,11 +66,9 @@ pub const ClassInstance = struct {
     }
 
     pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
-        for (self.classType.methods.items) |method| {
-            if (std.mem.eql(u8, method.name.lexeme, name.lexeme)) {
-                interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
-                return InterpreterError.RuntimeError;
-            }
+        if (self.classType.methods.contains(name.lexeme)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
+            return InterpreterError.RuntimeError;
         }
 
         const duplicatedName = try interpreter.allocator.dupe(u8, name.lexeme);
@@ -83,32 +79,41 @@ pub const ClassInstance = struct {
 /// NOTE: This isn't a class instance, but a class type.
 pub const ClassType = struct {
     referenceCount: usize,
-    methods: std.ArrayListUnmanaged(ClassMethod),
+    methods: std.StringHashMapUnmanaged(ClassMethod),
+    parentEnvironment: *Environment,
 
-    pub fn new(expression: ClassExpression, allocator: std.mem.Allocator) !*ClassType {
-        var array = std.ArrayListUnmanaged(ClassMethod){};
+    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator) !*ClassType {
+        var methods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
-            try array.append(allocator, ClassMethod.new(method.static, try method.name.clone(allocator)));
+            const function = try CallableFunction.classMethod(method.function, parentEnvironment, allocator);
+            const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
+            try methods.put(allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(allocator), function));
         }
 
         const value = try allocator.create(ClassType);
+
+        parentEnvironment.referenceCount += 1;
         value.* = .{
             .referenceCount = 1,
-            .methods = array,
+            .methods = methods,
+            .parentEnvironment = parentEnvironment,
         };
         return value;
     }
 
-    pub fn unreference(self: *ClassType, allocator: std.mem.Allocator) void {
+    pub fn unreference(self: *ClassType, interpreter: *Interpreter) void {
         self.referenceCount -= 1;
+        self.parentEnvironment.unreference(interpreter);
 
         if (self.referenceCount == 0) {
-            for (self.methods.items) |method| {
-                method.deinit(allocator);
+            var iterator = self.methods.iterator();
+            while (iterator.next()) |method| {
+                method.value_ptr.deinit(interpreter);
+                interpreter.allocator.free(method.key_ptr.*);
             }
-            self.methods.deinit(allocator);
+            self.methods.deinit(interpreter.allocator);
 
-            allocator.destroy(self);
+            interpreter.allocator.destroy(self);
         }
     }
 
@@ -128,12 +133,15 @@ pub const ClassType = struct {
 pub const ClassMethod = struct {
     static: bool,
     name: Token,
+    function: CallableFunction,
 
-    pub fn new(static: bool, name: Token) ClassMethod {
-        return .{ .static = static, .name = name };
+    pub fn new(static: bool, name: Token, function: CallableFunction) ClassMethod {
+        return .{ .static = static, .name = name, .function = function };
     }
 
-    pub fn deinit(self: *const ClassMethod, allocator: std.mem.Allocator) void {
-        self.name.deinit(allocator);
+    pub fn deinit(self: *ClassMethod, interpreter: *Interpreter) void {
+        self.name.deinit(interpreter.allocator);
+        interpreter.allocator.free(self.name.lexeme);
+        self.function.deinit(interpreter);
     }
 };

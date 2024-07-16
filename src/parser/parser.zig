@@ -11,7 +11,7 @@ const Expression = @import("./expression.zig").Expression;
 const Statement = @import("./statement.zig").Statement;
 const ASTPrinter = @import("./ast_printer.zig").ASTPrinter;
 
-const ClassMethod = @import("./expression.zig").ClassMethod;
+const ClassMethod = @import("./expression.zig").ClassExpressionMethod;
 const FunctionExpression = @import("./expression.zig").FunctionExpression;
 
 const Parser = @This();
