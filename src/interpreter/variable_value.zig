@@ -43,6 +43,15 @@ pub const VariableValue = union(enum) {
         }
     }
 
+    pub fn copy(self: VariableValue) VariableValue {
+        switch (self) {
+            .Function => |value| return .{ .Function = value.copy() },
+            .ClassType => |value| return .{ .ClassType = .{ .class = value.class.copy() } },
+            .ClassInstance => |value| return .{ .ClassInstance = .{ .instance = value.instance.copy() } },
+            else => return self,
+        }
+    }
+
     // Accessors and type checks
 
     pub fn isNumber(self: VariableValue) bool {
@@ -150,8 +159,13 @@ pub const VariableValue = union(enum) {
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
         return .{ .ClassType = .{ .class = try CallableFunction.classType(class, activeEnvironment, allocator) } };
     }
-    pub fn newClassInstance(classType: *ClassType, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .ClassInstance = .{ .instance = try ClassInstance.new(allocator, classType) } };
+    pub fn newClassInstance(classType: *ClassType, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
+        return .{ .ClassInstance = .{ .instance = try ClassInstance.new(interpreter, classType, callToken, arguments) } };
+    }
+
+    pub fn classInstance(instance: *ClassInstance) VariableValue {
+        instance.referenceCount += 1;
+        return .{ .ClassInstance = .{ .instance = instance } };
     }
 
     pub fn @"null"() VariableValue {
@@ -188,6 +202,10 @@ pub const ExpressionInterpretResult = struct {
         if (self.immediateValue) {
             self.value.deinit(interpreter);
         }
+    }
+
+    pub fn copy(self: ExpressionInterpretResult) ExpressionInterpretResult {
+        return ExpressionInterpretResult{ .value = self.value.copy(), .immediateValue = self.immediateValue };
     }
 
     pub fn isNumber(self: *const ExpressionInterpretResult) bool {
@@ -259,10 +277,10 @@ pub const ExpressionInterpretResult = struct {
         return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newFunction(value, activeEnvironment, allocator));
     }
     pub fn newClassType(value: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newClassType(value, activeEnvironment, allocator));
+        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassType(value, activeEnvironment, allocator));
     }
-    pub fn newClassInstance(value: *ClassInstance, allocator: std.mem.Allocator) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassInstance(value, allocator));
+    pub fn newClassInstance(value: *ClassInstance, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !ExpressionInterpretResult {
+        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassInstance(value, interpreter, callToken, arguments));
     }
     pub fn @"null"() ExpressionInterpretResult {
         return ExpressionInterpretResult.fromImmediateValue(VariableValue.null());

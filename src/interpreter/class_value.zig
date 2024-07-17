@@ -14,25 +14,38 @@ const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 pub const ClassInstance = struct {
     referenceCount: usize,
     classType: *ClassType,
+    environment: *Environment,
 
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    pub fn new(allocator: std.mem.Allocator, classType: *ClassType) !*ClassInstance {
-        const value = try allocator.create(ClassInstance);
+    pub fn new(interpreter: *Interpreter, classType: *ClassType, callToken: Token, arguments: std.ArrayList(VariableValue)) !*ClassInstance {
+        const value = try interpreter.allocator.create(ClassInstance);
+        const allocatedEnvironment = try interpreter.allocator.create(Environment);
+        allocatedEnvironment.* = classType.parentEnvironment.createChild(classType.parentEnvironment);
+
         value.* = .{
             .referenceCount = 1,
             .classType = classType,
+            .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
         };
         classType.referenceCount += 1;
+
+        // try allocatedEnvironment.define("this", VariableValue.classInstance(value), interpreter);
+        // TODO: Implement super once inheritance is implemented
+
+        const constructorMethod = classType.methods.get("constructor");
+        if (constructorMethod != null) {
+            const boundConstructor = constructorMethod.?.function.bindToClass(value);
+            _ = try boundConstructor.call(interpreter, callToken, arguments); // Return value is ignored
+        }
+
         return value;
     }
 
     pub fn unreference(self: *ClassInstance, interpreter: *Interpreter) void {
         self.referenceCount -= 1;
         if (self.referenceCount == 0) {
-            // TODO
-            std.debug.print("Parent reference count: {d}\n", .{self.classType.referenceCount});
             self.classType.unreference(interpreter);
 
             var iter = self.fieldValues.iterator();
@@ -42,8 +55,15 @@ pub const ClassInstance = struct {
             }
             self.fieldValues.deinit(interpreter.allocator);
 
+            self.environment.unreference(interpreter);
+
             interpreter.allocator.destroy(self);
         }
+    }
+
+    pub fn copy(self: *ClassInstance) *ClassInstance {
+        self.referenceCount += 1;
+        return self;
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {
@@ -54,7 +74,11 @@ pub const ClassInstance = struct {
     pub fn get(self: *const ClassInstance, name: Token, interpreter: *Interpreter) !VariableValue {
         const method = self.classType.methods.get(name.lexeme);
         if (method != null) {
-            std.debug.panic("TODO: Implement method calls on class instances", .{});
+            if (method.?.static) {
+                std.debug.panic("TODO: Implement static method calls on class instances", .{});
+            } else {
+                std.debug.panic("TODO: Implement method calls on class instances", .{});
+            }
         }
 
         const property = self.fieldValues.get(name.lexeme);
@@ -86,7 +110,7 @@ pub const ClassType = struct {
     pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator) !*ClassType {
         var methods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
-            const function = try CallableFunction.classMethod(method.function, parentEnvironment, allocator);
+            const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
             const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
             try methods.put(allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(allocator), function));
         }
@@ -108,7 +132,6 @@ pub const ClassType = struct {
         }
 
         self.referenceCount -= 1;
-        self.parentEnvironment.unreference(interpreter);
 
         if (self.referenceCount == 0) {
             var iterator = self.methods.iterator();
@@ -117,6 +140,8 @@ pub const ClassType = struct {
                 interpreter.allocator.free(method.key_ptr.*);
             }
             self.methods.deinit(interpreter.allocator);
+
+            self.parentEnvironment.unreference(interpreter);
 
             interpreter.allocator.destroy(self);
         }

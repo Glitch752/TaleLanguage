@@ -6,6 +6,7 @@ const Token = @import("../token.zig").Token;
 const Statement = @import("../parser/statement.zig").Statement;
 const Environment = @import("./environment.zig").Environment;
 const ClassType = @import("./class_value.zig").ClassType;
+const ClassInstance = @import("./class_value.zig").ClassInstance;
 
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const ClassExpression = @import("../parser/expression.zig").ClassExpression;
@@ -14,6 +15,13 @@ const RuntimeError = @import("./interpreterError.zig").RuntimeError;
 const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 
 pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) NativeError!VariableValue;
+const UserFunction = struct {
+    parameters: std.ArrayListUnmanaged(Token),
+    body: *const Statement,
+    parentEnvironment: *Environment,
+    /// For debugging.
+    id: u32,
+};
 
 var functionId: u32 = 0;
 
@@ -23,21 +31,13 @@ pub const CallableFunction = union(enum) {
         arity: u32,
         body: CallableNativeFunction,
     },
-    User: struct {
-        parameters: std.ArrayListUnmanaged(Token),
-        body: *const Statement,
-        parentEnvironment: *Environment,
-        /// For debugging.
-        id: u32,
-    },
+    User: UserFunction,
     /// Similar to normal user functions, but has some distinct calling characteristics (notably `this`).
-    ClassMethod: struct {
-        parameters: std.ArrayListUnmanaged(Token),
-        body: *const Statement,
-        parentEnvironment: *Environment,
-        /// For debugging.
-        id: u32,
+    BoundClassMethod: struct {
+        method: UserFunction,
+        classInstance: *ClassInstance,
     },
+
     /// NOTE: This isn't a class instance, but a class type.
     ClassType: struct {
         class: *ClassType,
@@ -45,11 +45,25 @@ pub const CallableFunction = union(enum) {
         id: u32,
     },
 
+    pub fn copy(self: CallableFunction) CallableFunction {
+        switch (self) {
+            .ClassType => self.ClassType.class.referenceCount += 1,
+            .User => self.User.parentEnvironment.referenceCount += 1,
+            .BoundClassMethod => {
+                self.BoundClassMethod.classInstance.referenceCount += 1;
+                self.BoundClassMethod.method.parentEnvironment.referenceCount += 1;
+            },
+            else => {},
+        }
+        return self;
+    }
+
     pub fn deinit(self: *CallableFunction, interpreter: *Interpreter) void {
         switch (self.*) {
             .User => |data| {
                 for (data.parameters.items) |parameter| {
                     interpreter.allocator.free(parameter.lexeme);
+                    parameter.deinit(interpreter.allocator);
                 }
                 self.*.User.parameters.deinit(interpreter.allocator);
 
@@ -58,13 +72,9 @@ pub const CallableFunction = union(enum) {
             .ClassType => {
                 self.ClassType.class.unreference(interpreter);
             },
-            .ClassMethod => |data| {
-                for (data.parameters.items) |parameter| {
-                    interpreter.allocator.free(parameter.lexeme);
-                }
-                self.*.ClassMethod.parameters.deinit(interpreter.allocator);
-
-                data.parentEnvironment.unreference(interpreter);
+            .BoundClassMethod => {
+                self.BoundClassMethod.classInstance.unreference(interpreter);
+                self.BoundClassMethod.method.parentEnvironment.unreference(interpreter);
             },
             else => {},
         }
@@ -74,7 +84,7 @@ pub const CallableFunction = union(enum) {
         switch (self) {
             .Native => |data| return data.arity,
             .User => |data| return @intCast(data.parameters.items.len),
-            .ClassMethod => |data| return @intCast(data.parameters.items.len),
+            .BoundClassMethod => return @intCast(self.BoundClassMethod.method.parameters.items.len),
             .ClassType => return self.ClassType.class.getArity(),
         }
     }
@@ -91,55 +101,18 @@ pub const CallableFunction = union(enum) {
                 return try data.body(interpreter, arguments);
             },
             .User => |data| {
-                var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
-                defer environment.exit(interpreter);
-
-                // Check the number of arguments
-                if (arguments.items.len != data.parameters.items.len) {
-                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, callToken, "Expected {d} arguments but got {d}.", .{ data.parameters.items.len, arguments.items.len });
-                    return InterpreterError.RuntimeError;
-                }
-
-                // Bind the arguments to the scope
-                for (arguments.items, 0..) |argument, index| {
-                    try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
-                }
-
-                // Execute the function body
-                interpreter.interpretStatement(data.body, true) catch |err| {
-                    switch (err) {
-                        InterpreterError.Return => return interpreter.lastReturnValue,
-                        else => return err,
-                    }
-                };
-                return VariableValue.null();
+                return try callUserFunction(interpreter, callToken, data, arguments);
             },
-            .ClassMethod => |data| {
-                var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
-                defer environment.exit(interpreter);
+            .BoundClassMethod => |data| {
+                const previousEnvironment = interpreter.activeEnvironment;
 
-                // Check the number of arguments
-                if (arguments.items.len != data.parameters.items.len) {
-                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, data.parameters.items[0], "Expected {d} arguments but got {d}.", .{ data.parameters.items.len, arguments.items.len });
-                    return InterpreterError.RuntimeError;
-                }
+                interpreter.activeEnvironment = data.classInstance.environment;
+                defer interpreter.activeEnvironment = previousEnvironment;
 
-                // Bind the arguments to the scope
-                for (arguments.items, 0..) |argument, index| {
-                    try environment.define(data.parameters.items[index].lexeme, argument, interpreter);
-                }
-
-                // Execute the function body
-                interpreter.interpretStatement(data.body, true) catch |err| {
-                    switch (err) {
-                        InterpreterError.Return => return interpreter.lastReturnValue,
-                        else => return err,
-                    }
-                };
-                return VariableValue.null();
+                return try callUserFunction(interpreter, callToken, data.method, arguments);
             },
             .ClassType => |data| {
-                return try VariableValue.newClassInstance(data.class, interpreter.allocator);
+                return try VariableValue.newClassInstance(data.class, interpreter, callToken, arguments);
             },
         }
     }
@@ -161,15 +134,12 @@ pub const CallableFunction = union(enum) {
         functionId += 1;
         return .{ .ClassType = .{ .class = try ClassType.new(parentEnvironment, expression, allocator), .id = functionId } };
     }
-    pub fn classMethod(expression: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
-        var parameters = std.ArrayListUnmanaged(Token){};
-        for (expression.parameters.items) |parameter| {
-            try parameters.append(allocator, try parameter.clone(allocator));
-        }
 
-        functionId += 1;
-        parentEnvironment.referenceCount += 1;
-        return .{ .ClassMethod = .{ .parameters = parameters, .body = expression.body, .parentEnvironment = parentEnvironment, .id = functionId } };
+    pub fn bindToClass(self: *const CallableFunction, classInstance: *ClassInstance) CallableFunction {
+        switch (self.*) {
+            .User => return .{ .BoundClassMethod = .{ .method = self.copy().User, .classInstance = classInstance } },
+            else => std.debug.panic("Tried to bind a non-class method to a class instance", .{}),
+        }
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {
@@ -179,3 +149,28 @@ pub const CallableFunction = union(enum) {
         }
     }
 };
+
+fn callUserFunction(interpreter: *Interpreter, callToken: Token, function: UserFunction, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+    var environment = try interpreter.enterChildEnvironment(function.parentEnvironment, interpreter.activeEnvironment.?);
+    defer environment.exit(interpreter);
+
+    // Check the number of arguments
+    if (arguments.items.len != function.parameters.items.len) {
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, callToken, "Expected {d} arguments but got {d}.", .{ function.parameters.items.len, arguments.items.len });
+        return InterpreterError.RuntimeError;
+    }
+
+    // Bind the arguments to the scope
+    for (arguments.items, 0..) |argument, index| {
+        try environment.define(function.parameters.items[index].lexeme, argument, interpreter);
+    }
+
+    // Execute the function body
+    interpreter.interpretStatement(function.body, true) catch |err| {
+        switch (err) {
+            InterpreterError.Return => return interpreter.lastReturnValue,
+            else => return err,
+        }
+    };
+    return VariableValue.null();
+}

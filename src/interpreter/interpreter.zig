@@ -124,10 +124,9 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
         },
         .Let => |values| {
             var value = try self.interpretExpression(values.initializer);
-            // Don't deinit unless there's an error -- we want to keep the value since we're storing it
-            errdefer value.deinit(self);
+            defer value.deinit(self);
 
-            try self.activeEnvironment.?.define(values.name.lexeme, value.value, self);
+            try self.activeEnvironment.?.define(values.name.lexeme, value.value.copy(), self);
         },
         .Block => |values| {
             var childEnvironment = if (!avoidDefiningBlockScope) try self.enterNewEnvironment() else self.activeEnvironment.?;
@@ -377,7 +376,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 var value = try self.interpretExpression(argument);
                 errdefer value.deinit(self);
 
-                try argumentResults.append(value);
+                try argumentResults.append(value.copy());
             }
 
             var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
@@ -406,7 +405,8 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             defer environment.exit(self);
 
             const class = try ExpressionInterpretResult.newClassType(values, environment, self.allocator);
-            try environment.define("this", class.value, self);
+            // We don't copy the value when defining the class here because we can't create a loop of references
+            try environment.define("this", class.value, self); // "this" is defined here because static methods should access the class type itself
             // TODO: Implement super once inheritance is added
             return class;
         },

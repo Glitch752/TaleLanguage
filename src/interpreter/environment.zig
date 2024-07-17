@@ -47,6 +47,7 @@ pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
     }
 }
 
+/// Exit is like unreference, but also returns to the previous environment
 pub fn exit(self: *Environment, interpreter: *Interpreter) void {
     if (self.referenceCount == 0) std.debug.panic("Tried to exit an environment that has 0 references.", .{});
 
@@ -65,8 +66,11 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
+        if (!std.mem.eql(u8, wrapper.name, "this") and !std.mem.eql(u8, wrapper.name, "super")) { // A special case feels a bit hacky, but I can't find an easier way to do this
+            wrapper.value.deinit(interpreter);
+        }
         self.allocator.free(wrapper.name);
-        wrapper.value.deinit(interpreter);
+
         self.allocator.destroy(wrapper);
     }
     self.values.deinit(self.allocator);
