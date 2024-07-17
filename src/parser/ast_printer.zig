@@ -161,6 +161,8 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) a
             }
             std.debug.print("}}", .{});
         },
+        .This => std.debug.print("this", .{}),
+        .Super => std.debug.print("super", .{}),
 
         .VariableAccess => |values| {
             std.debug.print("{s}", .{values.name.lexeme});

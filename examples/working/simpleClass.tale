@@ -1,5 +1,6 @@
 let TestClass = class {
     constructor(param) {
+        print("TestClass constructor\n");
         let self = this;
         self.number = param;
     }
@@ -15,7 +16,9 @@ let TestClass = class {
 };
 
 let test = TestClass(5);
+test.number = 3;
 print(test.number);
+print("\n");
 
 // test.printNumber(); // 5
 // test.addNumber(10);

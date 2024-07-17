@@ -359,8 +359,8 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             const callable = callee.asCallable();
 
-            if (values.arguments.items.len != callable.arity) {
-                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.arity, values.arguments.items.len });
+            if (values.arguments.items.len != callable.getArity()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.getArity(), values.arguments.items.len });
                 return InterpreterError.RuntimeError;
             }
 
@@ -386,7 +386,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 try argumentValues.append(result.value);
             }
 
-            return ExpressionInterpretResult.fromImmediateValue(callable.call(self, argumentValues) catch |err| switch (err) {
+            return ExpressionInterpretResult.fromImmediateValue(callable.call(self, values.startToken, argumentValues) catch |err| switch (err) {
                 NativeError.InvalidOperand => {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
                     return InterpreterError.RuntimeError;
@@ -402,9 +402,16 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
         },
 
         .Class => |values| {
-            const class = try ExpressionInterpretResult.newClassType(values, self.activeEnvironment.?, self.allocator);
+            const environment = try self.enterNewEnvironment();
+            defer environment.exit(self);
+
+            const class = try ExpressionInterpretResult.newClassType(values, environment, self.allocator);
+            try environment.define("this", class.value, self);
+            // TODO: Implement super once inheritance is added
             return class;
         },
+        .This => |token| return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
+        .Super => |token| return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
 
         .VariableAccess => |values| {
             const value = try self.lookUpVariable(values.name, expression);

@@ -631,6 +631,13 @@ fn consumePrimary(self: *Parser) anyerror!*Expression {
         return Expression.variableAccess(self.allocator, self.peekPrevious());
     }
 
+    if (self.matchToken(TokenType.ThisKeyword)) {
+        return Expression.this(self.allocator, self.peekPrevious());
+    }
+    if (self.matchToken(TokenType.SuperKeyword)) {
+        return Expression.super(self.allocator, self.peekPrevious());
+    }
+
     const err = ParseError.consumeFailed(self, "Expected expression", self.peek());
     err.print(self.allocator);
     return ParseErrorEnum.Unknown;

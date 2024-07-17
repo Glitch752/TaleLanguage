@@ -19,9 +19,12 @@ var functionId: u32 = 0;
 
 // TODO: Pass functions by reference?
 pub const CallableFunction = union(enum) {
-    Native: CallableNativeFunction,
+    Native: struct {
+        arity: u32,
+        body: CallableNativeFunction,
+    },
     User: struct {
-        parameters: std.ArrayList(Token),
+        parameters: std.ArrayListUnmanaged(Token),
         body: *const Statement,
         parentEnvironment: *Environment,
         /// For debugging.
@@ -29,7 +32,7 @@ pub const CallableFunction = union(enum) {
     },
     /// Similar to normal user functions, but has some distinct calling characteristics (notably `this`).
     ClassMethod: struct {
-        parameters: std.ArrayList(Token),
+        parameters: std.ArrayListUnmanaged(Token),
         body: *const Statement,
         parentEnvironment: *Environment,
         /// For debugging.
@@ -48,27 +51,52 @@ pub const CallableFunction = union(enum) {
                 for (data.parameters.items) |parameter| {
                     interpreter.allocator.free(parameter.lexeme);
                 }
-                data.parameters.deinit();
+                self.*.User.parameters.deinit(interpreter.allocator);
 
                 data.parentEnvironment.unreference(interpreter);
             },
             .ClassType => {
                 self.ClassType.class.unreference(interpreter);
             },
+            .ClassMethod => |data| {
+                for (data.parameters.items) |parameter| {
+                    interpreter.allocator.free(parameter.lexeme);
+                }
+                self.*.ClassMethod.parameters.deinit(interpreter.allocator);
+
+                data.parentEnvironment.unreference(interpreter);
+            },
             else => {},
         }
     }
 
-    pub fn call(self: CallableFunction, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+    pub fn getArity(self: CallableFunction) u32 {
         switch (self) {
-            .Native => |data| return try data(interpreter, arguments),
+            .Native => |data| return data.arity,
+            .User => |data| return @intCast(data.parameters.items.len),
+            .ClassMethod => |data| return @intCast(data.parameters.items.len),
+            .ClassType => return self.ClassType.class.getArity(),
+        }
+    }
+
+    pub fn call(self: CallableFunction, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+        switch (self) {
+            .Native => |data| {
+                // Check the number of arguments
+                if (arguments.items.len != data.arity) {
+                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, callToken, "Expected {d} arguments but got {d}.", .{ arguments.items.len, data.arity });
+                    return InterpreterError.RuntimeError;
+                }
+
+                return try data.body(interpreter, arguments);
+            },
             .User => |data| {
                 var environment = try interpreter.enterChildEnvironment(data.parentEnvironment, interpreter.activeEnvironment.?);
                 defer environment.exit(interpreter);
 
                 // Check the number of arguments
                 if (arguments.items.len != data.parameters.items.len) {
-                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, data.parameters.items[0], "Expected {d} arguments but got {d}.", .{ data.parameters.items.len, arguments.items.len });
+                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, callToken, "Expected {d} arguments but got {d}.", .{ data.parameters.items.len, arguments.items.len });
                     return InterpreterError.RuntimeError;
                 }
 
@@ -116,13 +144,13 @@ pub const CallableFunction = union(enum) {
         }
     }
 
-    pub fn native(function: CallableNativeFunction) CallableFunction {
-        return .{ .Native = function };
+    pub fn native(arity: u32, function: CallableNativeFunction) CallableFunction {
+        return .{ .Native = .{ .arity = arity, .body = function } };
     }
     pub fn user(function: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
-        var parameters = std.ArrayList(Token).init(allocator);
+        var parameters = std.ArrayListUnmanaged(Token){};
         for (function.parameters.items) |parameter| {
-            try parameters.append(try parameter.clone(allocator));
+            try parameters.append(allocator, try parameter.clone(allocator));
         }
 
         functionId += 1;
@@ -134,9 +162,14 @@ pub const CallableFunction = union(enum) {
         return .{ .ClassType = .{ .class = try ClassType.new(parentEnvironment, expression, allocator), .id = functionId } };
     }
     pub fn classMethod(expression: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
+        var parameters = std.ArrayListUnmanaged(Token){};
+        for (expression.parameters.items) |parameter| {
+            try parameters.append(allocator, try parameter.clone(allocator));
+        }
+
         functionId += 1;
         parentEnvironment.referenceCount += 1;
-        return .{ .ClassMethod = .{ .parameters = std.ArrayList(Token).init(allocator), .body = expression.body, .parentEnvironment = parentEnvironment, .id = functionId } };
+        return .{ .ClassMethod = .{ .parameters = parameters, .body = expression.body, .parentEnvironment = parentEnvironment, .id = functionId } };
     }
 
     pub fn toString(self: CallableFunction, allocator: std.mem.Allocator) ![]const u8 {
@@ -144,14 +177,5 @@ pub const CallableFunction = union(enum) {
             .Native => return std.fmt.allocPrint(allocator, "<native function>", .{}),
             .User => return std.fmt.allocPrint(allocator, "<function>", .{}),
         }
-    }
-};
-
-pub const Callable = struct {
-    arity: u32,
-    function: CallableFunction,
-
-    pub fn call(self: Callable, interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
-        return try self.function.call(interpreter, arguments);
     }
 };

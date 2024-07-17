@@ -76,6 +76,8 @@ fn endScope(self: *Resolver) !void {
     var iter = node.?.data.iterator();
     while (iter.next()) |entry| {
         const key = entry.key_ptr.*;
+        if (std.mem.eql(u8, key, "this") or std.mem.eql(u8, key, "super")) continue; // A special case is a bit hacky, but it's fine
+
         self.interpreter.allocator.free(key);
     }
     node.?.data.deinit(self.interpreter.allocator);
@@ -192,11 +194,18 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Class => |values| {
-            // Classes don't have a separate scope, but they don't define their method names either.
+            try self.beginScope();
+            try self.scopes.last.?.data.put(self.interpreter.allocator, "this", true);
+            try self.scopes.last.?.data.put(self.interpreter.allocator, "super", true);
+
             for (values.methods.items) |method| {
                 try self.resolveFunction(method.function);
             }
+
+            try self.endScope();
         },
+        .This => {},
+        .Super => {},
 
         .VariableAccess => |values| {
             if (self.scopes.len > 0 and self.scopes.last.?.data.get(values.name.lexeme) == false) {

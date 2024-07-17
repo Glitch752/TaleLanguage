@@ -23,10 +23,7 @@ pub const VariableValue = union(enum) {
     },
     Boolean: bool,
 
-    Function: struct {
-        arity: u32,
-        function: CallableFunction,
-    },
+    Function: CallableFunction,
 
     /// NOTE: This isn't a class instance, but a class type.
     ClassType: struct { class: CallableFunction },
@@ -39,7 +36,7 @@ pub const VariableValue = union(enum) {
     pub fn deinit(self: *VariableValue, interpreter: *Interpreter) void {
         switch (self.*) {
             .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
-            .Function => self.Function.function.deinit(interpreter),
+            .Function => self.Function.deinit(interpreter),
             .ClassType => self.ClassType.class.deinit(interpreter),
             .ClassInstance => self.ClassInstance.instance.unreference(interpreter),
             else => {},
@@ -76,19 +73,12 @@ pub const VariableValue = union(enum) {
     pub fn isCallable(self: VariableValue) bool {
         return self == .Function or self == .ClassType;
     }
-    pub fn asCallable(self: VariableValue) Callable {
+    pub fn asCallable(self: VariableValue) CallableFunction {
         switch (self) {
-            .Function => |value| return .{
-                .arity = value.arity,
-                .function = value.function,
-            },
-            .ClassType => |value| return .{
-                .arity = value.class.ClassType.class.getArity(),
-                .function = value.class,
-            },
-            else => std.debug.panic("Tried to get a callable from a non-callable value.", .{}),
+            .Function => |value| return value,
+            .ClassType => |value| return value.class,
+            else => std.debug.panic("Tried to access non-callable variable as a callable", .{}),
         }
-        return;
     }
 
     pub fn isClassType(self: VariableValue) bool {
@@ -151,10 +141,10 @@ pub const VariableValue = union(enum) {
     }
 
     pub fn nativeFunction(arity: u32, function: CallableNativeFunction) VariableValue {
-        return .{ .Function = .{ .arity = arity, .function = CallableFunction.native(function) } };
+        return .{ .Function = CallableFunction.native(arity, function) };
     }
     pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Function = .{ .arity = @intCast(function.parameters.items.len), .function = try CallableFunction.user(function, activeEnvironment, allocator) } };
+        return .{ .Function = try CallableFunction.user(function, activeEnvironment, allocator) };
     }
 
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
@@ -177,7 +167,7 @@ pub const VariableValue = union(enum) {
             .String => |value| return std.fmt.allocPrint(allocator, "{s}", .{value.string}),
             .Boolean => return if (self.Boolean) std.fmt.allocPrint(allocator, "true", .{}) else std.fmt.allocPrint(allocator, "false", .{}),
             .Null => return std.fmt.allocPrint(allocator, "null", .{}),
-            .Function => |value| return value.function.toString(allocator),
+            .Function => |value| return value.toString(allocator),
             .ClassType => |value| return value.class.ClassType.class.toString(allocator),
             .ClassInstance => |value| return value.instance.toString(allocator),
         }
@@ -224,7 +214,7 @@ pub const ExpressionInterpretResult = struct {
     pub fn isCallable(self: *const ExpressionInterpretResult) bool {
         return self.value.isCallable();
     }
-    pub fn asCallable(self: *const ExpressionInterpretResult) Callable {
+    pub fn asCallable(self: *const ExpressionInterpretResult) CallableFunction {
         return self.value.asCallable();
     }
 

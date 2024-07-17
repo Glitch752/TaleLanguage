@@ -32,6 +32,7 @@ pub const ClassInstance = struct {
         self.referenceCount -= 1;
         if (self.referenceCount == 0) {
             // TODO
+            std.debug.print("Parent reference count: {d}\n", .{self.classType.referenceCount});
             self.classType.unreference(interpreter);
 
             var iter = self.fieldValues.iterator();
@@ -102,6 +103,10 @@ pub const ClassType = struct {
     }
 
     pub fn unreference(self: *ClassType, interpreter: *Interpreter) void {
+        if (self.referenceCount == 0) {
+            std.debug.panic("Unreferencing a class type with a reference count of 0", .{});
+        }
+
         self.referenceCount -= 1;
         self.parentEnvironment.unreference(interpreter);
 
@@ -118,9 +123,13 @@ pub const ClassType = struct {
     }
 
     pub fn getArity(self: *const ClassType) u32 {
-        // TODO: Return constructor arity
-        _ = self;
-        return 0;
+        const constructorMethod = self.methods.get("constructor");
+
+        if (constructorMethod == null) {
+            return 0;
+        }
+
+        return constructorMethod.?.getArity();
     }
 
     pub fn toString(self: *const ClassType, allocator: std.mem.Allocator) ![]const u8 {
@@ -143,5 +152,9 @@ pub const ClassMethod = struct {
         self.name.deinit(interpreter.allocator);
         interpreter.allocator.free(self.name.lexeme);
         self.function.deinit(interpreter);
+    }
+
+    pub fn getArity(self: *const ClassMethod) u32 {
+        return self.function.getArity();
     }
 };

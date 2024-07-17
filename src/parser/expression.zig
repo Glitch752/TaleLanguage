@@ -54,6 +54,8 @@ pub const Expression = struct {
         Function: FunctionExpression,
 
         Class: ClassExpression,
+        This: Token,
+        Super: Token,
 
         VariableAccess: struct { name: Token },
         VariableAssignment: struct { name: Token, value: *const Expression },
@@ -155,6 +157,18 @@ pub const Expression = struct {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods } } };
+        return alloc;
+    }
+    pub fn this(allocator: std.mem.Allocator, token: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .This = token } };
+        return alloc;
+    }
+    pub fn super(allocator: std.mem.Allocator, token: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .Super = token } };
         return alloc;
     }
 
