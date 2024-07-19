@@ -15,6 +15,14 @@ const ClassExpression = @import("../parser/expression.zig").ClassExpression;
 const ClassInstance = @import("./class_value.zig").ClassInstance;
 const ClassType = @import("./class_value.zig").ClassType;
 
+const RCSP = @import("../rcsp.zig");
+fn ReferenceCountedVariable(comptime T: type) type {
+    return RCSP.RcSharedPointer(T, RCSP.NonAtomic);
+}
+
+const RCSPCallable = ReferenceCountedVariable(CallableFunction);
+const RCSPClassInstance = ReferenceCountedVariable(ClassInstance);
+
 pub const VariableValue = union(enum) {
     Number: f64,
     String: struct {
@@ -23,11 +31,17 @@ pub const VariableValue = union(enum) {
     },
     Boolean: bool,
 
-    Function: CallableFunction,
+    Function: RCSPCallable,
 
     /// NOTE: This isn't a class instance, but a class type.
-    ClassType: struct { class: CallableFunction },
-    ClassInstance: struct { instance: *ClassInstance },
+    ClassType: RCSPCallable,
+    ClassInstance: RCSPClassInstance,
+
+    WeakReference: union(enum) {
+        Function: RCSPCallable.Weak,
+        ClassType: RCSPCallable.Weak,
+        ClassInstance: RCSPClassInstance.Weak,
+    },
 
     Null,
 
@@ -43,11 +57,21 @@ pub const VariableValue = union(enum) {
         }
     }
 
-    pub fn copy(self: VariableValue) VariableValue {
+    pub fn takeReference(self: VariableValue) VariableValue {
         switch (self) {
-            .Function => |value| return .{ .Function = value.copy() },
-            .ClassType => |value| return .{ .ClassType = .{ .class = value.class.copy() } },
-            .ClassInstance => |value| return .{ .ClassInstance = .{ .instance = value.instance.copy() } },
+            .Function => |value| return .{ .Function = value.strongClone() },
+            .ClassType => |value| return .{ .ClassType = value.strongClone() },
+            .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
+            else => return self,
+        }
+    }
+
+    /// Takes a weak reference to the inner value.
+    pub fn takeWeakReference(self: VariableValue) VariableValue {
+        switch (self) {
+            .Function => |value| return .{ .WeakReference = .{ .Function = value.weakClone() } },
+            .ClassType => |value| return .{ .WeakReference = .{ .ClassType = value.weakClone() } },
+            .ClassInstance => |value| return .{ .WeakReference = .{ .ClassInstance = value.weakClone() } },
             else => return self,
         }
     }
@@ -82,10 +106,17 @@ pub const VariableValue = union(enum) {
     pub fn isCallable(self: VariableValue) bool {
         return self == .Function or self == .ClassType;
     }
-    pub fn asCallable(self: VariableValue) CallableFunction {
+    pub fn asCallable(self: VariableValue) RCSPCallable {
         switch (self) {
-            .Function => |value| return value,
-            .ClassType => |value| return value.class,
+            .Function => |value| return value.strongClone(),
+            .ClassType => |value| return value.strongClone(),
+            .WeakReference => |value| {
+                switch (value) {
+                    .Function => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deallocated", .{}),
+                    .ClassType => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deallocated", .{}),
+                    else => std.debug.panic("Tried to access non-callable weakly-referenced variable as a callable", .{}),
+                }
+            },
             else => std.debug.panic("Tried to access non-callable variable as a callable", .{}),
         }
     }
@@ -94,7 +125,7 @@ pub const VariableValue = union(enum) {
         return self == .ClassType;
     }
     pub fn asClassType(self: VariableValue) *ClassType {
-        return self.ClassType.class.ClassType.class;
+        return self.ClassType.strongClone().ptr().ClassType.class;
     }
 
     pub fn isClassInstance(self: VariableValue) bool {
@@ -149,18 +180,18 @@ pub const VariableValue = union(enum) {
         }
     }
 
-    pub fn nativeFunction(arity: u32, function: CallableNativeFunction) VariableValue {
-        return .{ .Function = CallableFunction.native(arity, function) };
+    pub fn nativeFunction(arity: u32, function: CallableNativeFunction, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .Function = try RCSPCallable.init(CallableFunction.native(arity, function), allocator) };
     }
     pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Function = try CallableFunction.user(function, activeEnvironment, allocator) };
+        return .{ .Function = try RCSPCallable.init(try CallableFunction.user(function, activeEnvironment, allocator), allocator) };
     }
 
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .ClassType = .{ .class = try CallableFunction.classType(class, activeEnvironment, allocator) } };
+        return .{ .ClassType = try RCSPCallable.init(try CallableFunction.classType(class, activeEnvironment, allocator), allocator) };
     }
     pub fn newClassInstance(classType: *ClassType, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
-        return .{ .ClassInstance = .{ .instance = try ClassInstance.new(interpreter, classType, callToken, arguments) } };
+        return .{ .ClassInstance = try RCSPClassInstance.init(try ClassInstance.new(interpreter, classType, callToken, arguments), interpreter.allocator) };
     }
 
     pub fn classInstance(instance: *ClassInstance) VariableValue {
@@ -185,108 +216,5 @@ pub const VariableValue = union(enum) {
             .ClassType => |value| return value.class.ClassType.class.toString(allocator),
             .ClassInstance => |value| return value.instance.toString(allocator),
         }
-    }
-};
-
-/// Essentially a wrapper around VariableValue.
-pub const ExpressionInterpretResult = struct {
-    value: VariableValue,
-    /// A value is an immediate value if it requires
-    /// deinitialization after it is no longer needed.
-    /// This doesn't happen, for example, on variable
-    /// access. This probably isn't the best way to
-    /// structure this, but it works for now.
-    immediateValue: bool,
-
-    pub fn deinit(self: *ExpressionInterpretResult, interpreter: *Interpreter) void {
-        if (self.immediateValue) {
-            self.value.deinit(interpreter);
-        }
-    }
-
-    pub fn copy(self: ExpressionInterpretResult) ExpressionInterpretResult {
-        return ExpressionInterpretResult{ .value = self.value.copy(), .immediateValue = self.immediateValue };
-    }
-
-    pub fn isNumber(self: *const ExpressionInterpretResult) bool {
-        return self.value.isNumber();
-    }
-    pub fn asNumber(self: *const ExpressionInterpretResult) f64 {
-        return self.value.asNumber();
-    }
-
-    pub fn isString(self: *const ExpressionInterpretResult) bool {
-        return self.value.isString();
-    }
-    pub fn asString(self: *const ExpressionInterpretResult) []const u8 {
-        return self.value.asString();
-    }
-
-    pub fn isBoolean(self: *const ExpressionInterpretResult) bool {
-        return self.value.isBoolean();
-    }
-    pub fn asBoolean(self: *const ExpressionInterpretResult) bool {
-        return self.value.asBoolean();
-    }
-
-    pub fn isCallable(self: *const ExpressionInterpretResult) bool {
-        return self.value.isCallable();
-    }
-    pub fn asCallable(self: *const ExpressionInterpretResult) CallableFunction {
-        return self.value.asCallable();
-    }
-
-    pub fn isClassType(self: *const ExpressionInterpretResult) bool {
-        return self.value.isClassType();
-    }
-    pub fn asClassType(self: *const ExpressionInterpretResult) *ClassType {
-        return self.value.asClassType();
-    }
-
-    pub fn isClassInstance(self: *const ExpressionInterpretResult) bool {
-        return self.value.isClassInstance();
-    }
-    pub fn asClassInstance(self: *const ExpressionInterpretResult) *ClassInstance {
-        return self.value.asClassInstance();
-    }
-
-    pub fn isTruthy(self: *const ExpressionInterpretResult) bool {
-        return self.value.isTruthy();
-    }
-
-    pub fn fromImmediateValue(value: VariableValue) ExpressionInterpretResult {
-        return ExpressionInterpretResult{ .value = value, .immediateValue = true };
-    }
-    pub fn fromNonImmediateValue(value: VariableValue) ExpressionInterpretResult {
-        return ExpressionInterpretResult{ .value = value, .immediateValue = false };
-    }
-
-    pub fn fromLiteral(value: TokenLiteral) ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromLiteral(value));
-    }
-    pub fn fromNumber(value: f64) ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromNumber(value));
-    }
-    pub fn fromString(value: []const u8, allocated: bool) ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromString(value, allocated));
-    }
-    pub fn fromBoolean(value: bool) ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(VariableValue.fromBoolean(value));
-    }
-    pub fn newFunction(value: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromNonImmediateValue(try VariableValue.newFunction(value, activeEnvironment, allocator));
-    }
-    pub fn newClassType(value: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassType(value, activeEnvironment, allocator));
-    }
-    pub fn newClassInstance(value: *ClassInstance, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(try VariableValue.newClassInstance(value, interpreter, callToken, arguments));
-    }
-    pub fn @"null"() ExpressionInterpretResult {
-        return ExpressionInterpretResult.fromImmediateValue(VariableValue.null());
-    }
-
-    pub fn isEqual(self: ExpressionInterpretResult, other: ExpressionInterpretResult) bool {
-        return self.value.isEqual(other.value);
     }
 };

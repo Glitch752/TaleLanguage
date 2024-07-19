@@ -12,13 +12,13 @@ const CallableFunction = @import("./callable_value.zig").CallableFunction;
 const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 
 pub const ClassInstance = struct {
-    referenceCount: usize,
+    referenceCount: usize, // TODO: Change to RCSP
     classType: *ClassType,
     environment: *Environment,
 
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    pub fn new(interpreter: *Interpreter, classType: *ClassType, callToken: Token, arguments: std.ArrayList(VariableValue)) !*ClassInstance {
+    pub fn new(interpreter: *Interpreter, classType: *ClassType, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstance {
         const value = try interpreter.allocator.create(ClassInstance);
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
         allocatedEnvironment.* = classType.parentEnvironment.createChild(classType.parentEnvironment);
@@ -40,13 +40,13 @@ pub const ClassInstance = struct {
             _ = try boundConstructor.call(interpreter, callToken, arguments); // Return value is ignored
         }
 
-        return value;
+        return value.*;
     }
 
-    pub fn unreference(self: *ClassInstance, interpreter: *Interpreter) void {
+    pub fn deinit(self: *ClassInstance, interpreter: *Interpreter) void {
         self.referenceCount -= 1;
         if (self.referenceCount == 0) {
-            self.classType.unreference(interpreter);
+            self.classType.deinit(interpreter);
 
             var iter = self.fieldValues.iterator();
             while (iter.next()) |entry| {
@@ -103,7 +103,7 @@ pub const ClassInstance = struct {
 
 /// NOTE: This isn't a class instance, but a class type.
 pub const ClassType = struct {
-    referenceCount: usize,
+    referenceCount: usize, // TODO: Change to RCSP
     methods: std.StringHashMapUnmanaged(ClassMethod),
     parentEnvironment: *Environment,
 
@@ -126,7 +126,7 @@ pub const ClassType = struct {
         return value;
     }
 
-    pub fn unreference(self: *ClassType, interpreter: *Interpreter) void {
+    pub fn deinit(self: *ClassType, interpreter: *Interpreter) void {
         if (self.referenceCount == 0) {
             std.debug.panic("Unreferencing a class type with a reference count of 0", .{});
         }
@@ -141,7 +141,7 @@ pub const ClassType = struct {
             }
             self.methods.deinit(interpreter.allocator);
 
-            self.parentEnvironment.unreference(interpreter);
+            self.parentEnvironment.deinit(interpreter);
 
             interpreter.allocator.destroy(self);
         }

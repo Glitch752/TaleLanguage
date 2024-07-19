@@ -8,7 +8,6 @@ const Environment = @import("./environment.zig").Environment;
 const Token = @import("../token.zig").Token;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
 const VariableValue = @import("./variable_value.zig").VariableValue;
-const ExpressionInterpretResult = @import("./variable_value.zig").ExpressionInterpretResult;
 
 const RuntimeError = @import("./interpreterError.zig").RuntimeError;
 const InterpreterError = @import("./interpreterError.zig").InterpreterError;
@@ -34,19 +33,19 @@ expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 pub fn init(allocator: std.mem.Allocator) !Interpreter {
     var environment = Environment.init(allocator);
 
-    try environment.define("print", VariableValue.nativeFunction(1, &natives.print), null);
-    try environment.define("sin", VariableValue.nativeFunction(1, &natives.sin), null);
-    try environment.define("cos", VariableValue.nativeFunction(1, &natives.cos), null);
-    try environment.define("tan", VariableValue.nativeFunction(1, &natives.tan), null);
-    try environment.define("exp", VariableValue.nativeFunction(1, &natives.exp), null);
-    try environment.define("exp2", VariableValue.nativeFunction(1, &natives.exp2), null);
-    try environment.define("log", VariableValue.nativeFunction(1, &natives.log), null);
-    try environment.define("log2", VariableValue.nativeFunction(1, &natives.log2), null);
-    try environment.define("log10", VariableValue.nativeFunction(1, &natives.log10), null);
-    try environment.define("floor", VariableValue.nativeFunction(1, &natives.floor), null);
-    try environment.define("substring", VariableValue.nativeFunction(3, &natives.substring), null);
-    try environment.define("intChar", VariableValue.nativeFunction(1, &natives.intChar), null);
-    try environment.define("length", VariableValue.nativeFunction(1, &natives.length), null);
+    try environment.define("print", try VariableValue.nativeFunction(1, &natives.print, allocator), null);
+    try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin, allocator), null);
+    try environment.define("cos", try VariableValue.nativeFunction(1, &natives.cos, allocator), null);
+    try environment.define("tan", try VariableValue.nativeFunction(1, &natives.tan, allocator), null);
+    try environment.define("exp", try VariableValue.nativeFunction(1, &natives.exp, allocator), null);
+    try environment.define("exp2", try VariableValue.nativeFunction(1, &natives.exp2, allocator), null);
+    try environment.define("log", try VariableValue.nativeFunction(1, &natives.log, allocator), null);
+    try environment.define("log2", try VariableValue.nativeFunction(1, &natives.log2, allocator), null);
+    try environment.define("log10", try VariableValue.nativeFunction(1, &natives.log10, allocator), null);
+    try environment.define("floor", try VariableValue.nativeFunction(1, &natives.floor, allocator), null);
+    try environment.define("substring", try VariableValue.nativeFunction(3, &natives.substring, allocator), null);
+    try environment.define("intChar", try VariableValue.nativeFunction(1, &natives.intChar, allocator), null);
+    try environment.define("length", try VariableValue.nativeFunction(1, &natives.length, allocator), null);
 
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
@@ -175,13 +174,13 @@ fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression
     return self.activeEnvironment.?.getAtDepth(name, depth.?, self);
 }
 
-fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!ExpressionInterpretResult {
+fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
     switch (expression.*.value) {
         .Grouping => |values| {
             return self.interpretExpression(values.expression);
         },
         .Literal => |values| {
-            return ExpressionInterpretResult.fromLiteral(values.value);
+            return VariableValue.fromLiteral(values.value);
         },
 
         .Binary => |values| {
@@ -194,28 +193,28 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             switch (values.operator.type) {
                 .Minus => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(left.asNumber() - right.asNumber());
+                        return VariableValue.fromNumber(left.asNumber() - right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Slash => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(left.asNumber() / right.asNumber());
+                        return VariableValue.fromNumber(left.asNumber() / right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Star => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(left.asNumber() * right.asNumber());
+                        return VariableValue.fromNumber(left.asNumber() * right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Plus => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(left.asNumber() + right.asNumber());
+                        return VariableValue.fromNumber(left.asNumber() + right.asNumber());
                     }
                     if (left.isString() and right.isString()) {
                         const mergedString = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{
@@ -223,14 +222,14 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                             right.asString(),
                         });
 
-                        return ExpressionInterpretResult.fromString(mergedString, true);
+                        return VariableValue.fromString(mergedString, true);
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must both be numbers or strings", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .Percent => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(@mod(left.asNumber(), right.asNumber()));
+                        return VariableValue.fromNumber(@mod(left.asNumber(), right.asNumber()));
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
@@ -238,38 +237,38 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
                 .GreaterThan => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromBoolean(left.asNumber() > right.asNumber());
+                        return VariableValue.fromBoolean(left.asNumber() > right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .GreaterThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromBoolean(left.asNumber() >= right.asNumber());
+                        return VariableValue.fromBoolean(left.asNumber() >= right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .LessThan => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromBoolean(left.asNumber() < right.asNumber());
+                        return VariableValue.fromBoolean(left.asNumber() < right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
                 .LessThanEqual => {
                     if (left.isNumber() and right.isNumber()) {
-                        return ExpressionInterpretResult.fromBoolean(left.asNumber() <= right.asNumber());
+                        return VariableValue.fromBoolean(left.asNumber() <= right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operands must be numbers", .{});
                     return InterpreterError.RuntimeError;
                 },
 
                 .Equality => {
-                    return ExpressionInterpretResult.fromBoolean(left.isEqual(right));
+                    return VariableValue.fromBoolean(left.isEqual(right));
                 },
                 .NotEqual => {
-                    return ExpressionInterpretResult.fromBoolean(!left.isEqual(right));
+                    return VariableValue.fromBoolean(!left.isEqual(right));
                 },
 
                 else => {
@@ -283,7 +282,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 .Minus => {
                     var right = try self.interpretExpression(values.right);
                     if (right.isNumber()) {
-                        return ExpressionInterpretResult.fromNumber(-right.asNumber());
+                        return VariableValue.fromNumber(-right.asNumber());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operand must be a number", .{});
                     return InterpreterError.RuntimeError;
@@ -291,13 +290,13 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 .Negate => {
                     var right = try self.interpretExpression(values.right);
                     if (right.isBoolean()) {
-                        return ExpressionInterpretResult.fromBoolean(!right.isTruthy());
+                        return VariableValue.fromBoolean(!right.isTruthy());
                     }
                     self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operand must be a boolean", .{});
                     return InterpreterError.RuntimeError;
                 },
                 else => {
-                    return ExpressionInterpretResult.null();
+                    return VariableValue.null();
                 },
             }
         },
@@ -337,9 +336,9 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             const rightInt = @as(u64, @intFromFloat(right.asNumber()));
 
             switch (value.operator.type) {
-                .BitwiseAnd => return ExpressionInterpretResult.fromNumber(@as(f64, @floatFromInt(leftInt & rightInt))),
-                .BitwiseOr => return ExpressionInterpretResult.fromNumber(@as(f64, @floatFromInt(leftInt | rightInt))),
-                .BitwiseXor => return ExpressionInterpretResult.fromNumber(@as(f64, @floatFromInt(leftInt ^ rightInt))),
+                .BitwiseAnd => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt & rightInt))),
+                .BitwiseOr => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt | rightInt))),
+                .BitwiseXor => return VariableValue.fromNumber(@as(f64, @floatFromInt(leftInt ^ rightInt))),
                 else => {
                     self.runtimeError = RuntimeError.tokenError(self, value.operator, "Unknown operator", .{});
                     return InterpreterError.RuntimeError;
@@ -356,14 +355,15 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            const callable = callee.asCallable();
+            var callable = callee.asCallable();
+            defer _ = callable.deinit();
 
-            if (values.arguments.items.len != callable.getArity()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.getArity(), values.arguments.items.len });
+            if (values.arguments.items.len != callable.ptr().getArity()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.ptr().getArity(), values.arguments.items.len });
                 return InterpreterError.RuntimeError;
             }
 
-            var argumentResults = std.ArrayList(ExpressionInterpretResult).init(self.allocator);
+            var argumentResults = std.ArrayList(VariableValue).init(self.allocator);
             defer {
                 for (argumentResults.items) |value| {
                     var val = value;
@@ -376,16 +376,16 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 var value = try self.interpretExpression(argument);
                 errdefer value.deinit(self);
 
-                try argumentResults.append(value.copy());
+                try argumentResults.append(value.takeReference());
             }
 
             var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
             defer argumentValues.deinit();
             for (argumentResults.items) |result| {
-                try argumentValues.append(result.value);
+                try argumentValues.append(result);
             }
 
-            return ExpressionInterpretResult.fromImmediateValue(callable.call(self, values.startToken, argumentValues) catch |err| switch (err) {
+            return callable.ptr().call(self, values.startToken, argumentValues) catch |err| switch (err) {
                 NativeError.InvalidOperand => {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
                     return InterpreterError.RuntimeError;
@@ -393,10 +393,10 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 else => {
                     return err;
                 },
-            });
+            };
         },
         .Function => |values| {
-            const function = try ExpressionInterpretResult.newFunction(values, self.activeEnvironment.?, self.allocator);
+            const function = try VariableValue.newFunction(values, self.activeEnvironment.?, self.allocator);
             return function;
         },
 
@@ -404,18 +404,18 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             const environment = try self.enterNewEnvironment();
             defer environment.exit(self);
 
-            const class = try ExpressionInterpretResult.newClassType(values, environment, self.allocator);
+            const class = try VariableValue.newClassType(values, environment, self.allocator);
             // We don't copy the value when defining the class here because we can't create a loop of references
-            try environment.define("this", class.value, self); // "this" is defined here because static methods should access the class type itself
+            try environment.define("this", class, self); // "this" is defined here because static methods should access the class type itself
             // TODO: Implement super once inheritance is added
             return class;
         },
-        .This => |token| return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
-        .Super => |token| return ExpressionInterpretResult.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
+        .This => |token| return VariableValue.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
+        .Super => |token| return VariableValue.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
 
         .VariableAccess => |values| {
             const value = try self.lookUpVariable(values.name, expression);
-            return ExpressionInterpretResult.fromNonImmediateValue(value);
+            return VariableValue.fromNonImmediateValue(value);
         },
         .VariableAssignment => |values| {
             var value = try self.interpretExpression(values.value);
@@ -449,7 +449,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             }
 
             const instance = object.asClassInstance();
-            return ExpressionInterpretResult.fromNonImmediateValue(try instance.get(values.name, self));
+            return VariableValue.fromNonImmediateValue(try instance.get(values.name, self));
         },
         .PropertyAssignment => |values| {
             var object = try self.interpretExpression(values.object);

@@ -75,7 +75,7 @@ pub const NonAtomic = struct {
     inline fn increment(ptr: *T) T {
         const val = ptr.*;
         const res = @addWithOverflow(val, 1);
-        if (res[1]) {
+        if (res[1] == 1) {
             ptr.* = MAX;
         } else {
             ptr.* = res[0];
@@ -90,7 +90,7 @@ pub const NonAtomic = struct {
             return MIN;
         }
         const res = @addWithOverflow(val, 1);
-        if (res[1]) {
+        if (res[1] == 1) {
             ptr.* = MAX;
         } else {
             ptr.* = res[0];
@@ -102,7 +102,7 @@ pub const NonAtomic = struct {
     inline fn decrement(ptr: *T) T {
         const val = ptr.*;
         const res = @subWithOverflow(val, 1);
-        if (res[1]) {
+        if (res[1] == 1) {
             ptr.* = MIN;
         } else {
             ptr.* = res[0];
@@ -127,6 +127,8 @@ pub const NonAtomic = struct {
 /// Shared pointer with `NonAtomic` operations should not use
 /// any clones outside of a single thread simultaneously.
 pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
+    _ = T.deinit; // T must have a deinit method
+
     const Inner = struct {
         val: T,
         strong_ctr: usize = 1,
@@ -331,7 +333,8 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
                 if (cw == 1) {
                     Ops.synchronize();
                     // then deallocate
-                    p.*.allocator.destroy(p);
+                    p.val.deinit(p.allocator);
+                    p.allocator.destroy(p);
                     return true;
                 }
             }
