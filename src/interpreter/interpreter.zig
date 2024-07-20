@@ -122,10 +122,10 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
             defer result.deinit(self);
         },
         .Let => |values| {
-            var value = try self.interpretExpression(values.initializer);
-            defer value.deinit(self);
+            var value = (try self.interpretExpression(values.initializer)).takeReference();
+            errdefer value.deinit(self);
 
-            try self.activeEnvironment.?.define(values.name.lexeme, value.value.copy(), self);
+            try self.activeEnvironment.?.define(values.name.lexeme, value, self);
         },
         .Block => |values| {
             var childEnvironment = if (!avoidDefiningBlockScope) try self.enterNewEnvironment() else self.activeEnvironment.?;
@@ -157,7 +157,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
         },
 
         .Return => |values| {
-            self.lastReturnValue = (try self.interpretExpression(values.value)).value;
+            self.lastReturnValue = (try self.interpretExpression(values.value)).takeReference();
             return InterpreterError.Return;
         },
         .Break => return InterpreterError.Break,
@@ -355,8 +355,8 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            var callable = callee.asCallable();
-            defer _ = callable.deinit();
+            var callable = callee.referenceCallable();
+            defer _ = callable.deinit(self);
 
             if (values.arguments.items.len != callable.ptr().getArity()) {
                 self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.ptr().getArity(), values.arguments.items.len });
@@ -410,12 +410,11 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             // TODO: Implement super once inheritance is added
             return class;
         },
-        .This => |token| return VariableValue.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
-        .Super => |token| return VariableValue.fromNonImmediateValue(try self.lookUpVariable(token, expression)),
+        .This => |token| return try self.lookUpVariable(token, expression),
+        .Super => |token| return try self.lookUpVariable(token, expression),
 
         .VariableAccess => |values| {
-            const value = try self.lookUpVariable(values.name, expression);
-            return VariableValue.fromNonImmediateValue(value);
+            return try self.lookUpVariable(values.name, expression);
         },
         .VariableAssignment => |values| {
             var value = try self.interpretExpression(values.value);
@@ -424,18 +423,17 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             const depth = self.expressionDefinitionDepth.get(expression.id);
             if (depth == null) {
-                try self.rootEnvironment.assign(values.name, value.value, self);
+                try self.rootEnvironment.assign(values.name, value, self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
             } else {
-                try self.activeEnvironment.?.assignAtDepth(values.name, value.value, depth.?, self);
+                try self.activeEnvironment.?.assignAtDepth(values.name, value, depth.?, self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
             }
 
-            value.immediateValue = false;
             return value;
         },
 
@@ -448,8 +446,8 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            const instance = object.asClassInstance();
-            return VariableValue.fromNonImmediateValue(try instance.get(values.name, self));
+            const instance = object.classInstanceConstPointer();
+            return try instance.get(values.name, self);
         },
         .PropertyAssignment => |values| {
             var object = try self.interpretExpression(values.object);
@@ -460,15 +458,14 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            const instance = object.asClassInstance();
-            var value = try self.interpretExpression(values.value);
+            const instance = object.classInstanceUnsafePointer();
+            const value = try self.interpretExpression(values.value);
 
-            try instance.set(values.name, value.value, self);
+            try instance.set(values.name, value, self);
             if (self.runtimeError != null) {
                 return InterpreterError.RuntimeError;
             }
 
-            value.immediateValue = false;
             return value;
         },
     }

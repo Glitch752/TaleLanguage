@@ -127,8 +127,6 @@ pub const NonAtomic = struct {
 /// Shared pointer with `NonAtomic` operations should not use
 /// any clones outside of a single thread simultaneously.
 pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
-    _ = T.deinit; // T must have a deinit method
-
     const Inner = struct {
         val: T,
         strong_ctr: usize = 1,
@@ -254,6 +252,11 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
         /// caused by momentarily inconsistent strong and weak
         /// counters (where the total number of counters might
         /// be incorrect during downgrade or upgrade operations)
+        ///
+        /// In other words: when all strong references to a shared
+        /// pointer are released, the value is deinitialized but
+        /// not deallocated. Once all weak references are released,
+        /// the value is deallocated.
         pub fn weakClone(self: Self) Weak {
             const prev = Ops.increment(&self.inner.?.*.weak_ctr);
             if (prev == Ops.MAX) {
@@ -328,17 +331,196 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
                 if (deinitializer) |deinit_fn| {
                     deinit_fn(&p.*.val, context);
                 }
+
                 const cw = Ops.decrement(&p.*.weak_ctr);
                 // also, if there are no outstanding weak counters,
                 if (cw == 1) {
                     Ops.synchronize();
                     // then deallocate
-                    p.val.deinit(p.allocator);
                     p.allocator.destroy(p);
                     return true;
                 }
             }
             return false;
+        }
+    };
+}
+
+pub fn DeinitializingRcSharedPointer(comptime T: type, comptime Ops: type, comptime DeinitializeContext: type) type {
+    _ = T.deinit; // T must have a deinit method
+    // Ensure T.deinit takes one parameter of type DeinitializeContext
+    if (@typeInfo(@TypeOf(T.deinit)) != .Fn) {
+        @compileError("T.deinit must be a function");
+    }
+    if (@typeInfo(@TypeOf(T.deinit)).Fn.params.len != 2) {
+        @compileError("T.deinit must take exactly two parameters: self and DeinitializeContext");
+    }
+    if (@typeInfo(@TypeOf(T.deinit)).Fn.params[0].type != T and @typeInfo(@TypeOf(T.deinit)).Fn.params[0].type != *T and @typeInfo(@TypeOf(T.deinit)).Fn.params[0].type != *const T) {
+        @compileError("T.deinit's first parameter must be of type T, *T or *const T");
+    }
+    if (@typeInfo(@TypeOf(T.deinit)).Fn.params[1].type != DeinitializeContext) {
+        @compileError("T.deinit's second parameter must be of type " ++ @typeName(DeinitializeContext) ++ ", but it is of type " ++ @typeName(@typeInfo(@TypeOf(T.deinit)).Fn.params[1].type orelse void));
+    }
+
+    const RCSP = RcSharedPointer(T, Ops);
+
+    const DRCSPDeinitContext = struct {
+        originalContext: DeinitializeContext,
+        originalCallback: ?fn (*T, DeinitializeContext) void,
+    };
+
+    return struct {
+        const Strong = @This();
+        pub const Weak = struct {
+            weak: RCSP.Weak,
+
+            pub const Type = T;
+
+            // There's seemingly a bug in Zig that messes with
+            // creation of RcSharedPointer if the constant below
+            // is declared as `Self` (and is later reused in the
+            // outer scope)
+            const SelfWeak = @This();
+
+            /// Create a strong clone
+            ///
+            /// Might return zero if no other strong clones are present
+            /// (which indicates that the value has been deinitialized,
+            /// but not deallocated)
+            ///
+            /// Instead of upgrading a shared pointer or its
+            /// strong clone to a weak one, creation of a weak
+            /// clone is used to avoid any potential race conditions
+            /// caused by momentarily inconsistent strong and weak
+            /// counters (where the total number of counters might
+            /// be incorrect during downgrade or upgrade operations)
+            pub fn strongClone(self: SelfWeak) ?Strong {
+                return Strong{ .rcsp = self.weak.strongClone() orelse return null };
+            }
+
+            /// Create a weak clone
+            pub fn weakClone(self: SelfWeak) SelfWeak {
+                return SelfWeak{ .weak = self.weak.weakClone() };
+            }
+
+            /// Number of strong clones
+            pub inline fn strongCount(self: SelfWeak) usize {
+                return self.weak.strongCount();
+            }
+
+            /// Number of weak clones
+            pub inline fn weakCount(self: SelfWeak) usize {
+                return self.weak.weakCount();
+            }
+
+            /// Deinitialize weak clone
+            ///
+            /// Will never deinitialize the value but will
+            /// deallocate it if it is the last clone (both strong and weak)
+            ///
+            /// Returns true if the value was deallocated
+            pub fn deinit(self: *SelfWeak) bool {
+                return self.weak.deinit();
+            }
+        };
+
+        rcsp: RCSP,
+
+        pub const Type = T;
+
+        const Self = @This();
+
+        /// Initialize the counter with a value
+        ///
+        /// Allocates memory to hold the value and the counter
+        pub fn init(val: T, allocator: std.mem.Allocator) !Self {
+            return Self{ .rcsp = try RCSP.init(val, allocator) };
+        }
+
+        /// Create a strong clone
+        pub fn strongClone(self: Self) Self {
+            return Self{ .rcsp = self.rcsp.strongClone() };
+        }
+
+        /// Create a weak clone
+        ///
+        /// Instead of downgrading a shared pointer or its
+        /// strong clone to a weak one, creation of a weak
+        /// clone is used to avoid any potential race conditions
+        /// caused by momentarily inconsistent strong and weak
+        /// counters (where the total number of counters might
+        /// be incorrect during downgrade or upgrade operations)
+        pub fn weakClone(self: Self) Weak {
+            return Weak{ .weak = self.rcsp.weakClone() };
+        }
+
+        /// Number of strong clones
+        pub inline fn strongCount(self: Self) usize {
+            return self.rcsp.strongCount();
+        }
+
+        /// Number of weak clones
+        pub inline fn weakCount(self: Self) usize {
+            return self.rcsp.weakCount();
+        }
+
+        /// Const pointer to the value
+        ///
+        /// As the pointer is constant, if mutability
+        /// is desired, use of `std.Mutex` and `unsafePtr`
+        /// is recommended
+        pub fn ptr(self: Self) *const T {
+            return self.rcsp.ptr();
+        }
+
+        /// Unsafe (mutable) pointer to the value
+        /// Normally it is recommended to use `std.Mutex`
+        /// for concurrent access:
+        ///
+        /// ```
+        /// const T = struct { value: u128, ptr: std.Mutex = std.Mutex.init() };
+        /// var counter = RcSharedPointer(T, Atomic).init(T{ .value = 10 });
+        /// defer counter.deinit();
+        /// var ptr = counter.unsafePtr();
+        /// {
+        ///     const lock = ptr.*.mutex.aquire();
+        ///     defer lock.release();
+        ///     ptr.*.value = 100;
+        /// }
+        /// ```
+        pub fn unsafePtr(self: Self) *T {
+            return self.rcsp.unsafePtr();
+        }
+
+        /// Deinitialize the shared pointer
+        ///
+        /// Will deallocate its initial allocation
+        ///
+        /// Return true if the value was deallocated
+        pub fn deinit(self: *Self, deinitializerContext: DeinitializeContext) bool {
+            return self.deinitWithCallback(deinitializerContext, null);
+        }
+
+        /// Deinitialize the shared pointer with a callback
+        ///
+        /// Will first deinitialize the value using the callback
+        /// (if there are no other strong clones present) and then
+        /// deallocate its initial allocation (if there are no weak
+        /// clones present)
+        ///
+        /// Return true if the value was deallocated
+        pub fn deinitWithCallback(self: *Self, context: DeinitializeContext, deinitializer: ?fn (*T, DeinitializeContext) void) bool {
+            return self.rcsp.deinitWithCallback(DRCSPDeinitContext, .{
+                .originalContext = context,
+                .originalCallback = deinitializer,
+            }, deinitializeDRCSP);
+        }
+
+        fn deinitializeDRCSP(self: *Self, value: T, context: DRCSPDeinitContext) void {
+            _ = self;
+
+            value.deinit(context.originalContext);
+            context.originalCallback(&value, context.originalContext);
         }
     };
 }

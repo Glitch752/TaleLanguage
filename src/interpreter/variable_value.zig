@@ -17,7 +17,7 @@ const ClassType = @import("./class_value.zig").ClassType;
 
 const RCSP = @import("../rcsp.zig");
 fn ReferenceCountedVariable(comptime T: type) type {
-    return RCSP.RcSharedPointer(T, RCSP.NonAtomic);
+    return RCSP.DeinitializingRcSharedPointer(T, RCSP.NonAtomic, *Interpreter);
 }
 
 const RCSPCallable = ReferenceCountedVariable(CallableFunction);
@@ -41,18 +41,26 @@ pub const VariableValue = union(enum) {
         Function: RCSPCallable.Weak,
         ClassType: RCSPCallable.Weak,
         ClassInstance: RCSPClassInstance.Weak,
+
+        pub fn deinit(self: *@This()) void {
+            switch (self.*) {
+                .Function => _ = self.Function.deinit(),
+                .ClassType => _ = self.ClassType.deinit(),
+                .ClassInstance => _ = self.ClassInstance.deinit(),
+            }
+        }
     },
 
     Null,
 
-    /// Deinitializes the value if it was allocated.
-    /// Must be called before a string variable is discarded.
+    /// Deinitializes the value, dropping the reference if necessary.
     pub fn deinit(self: *VariableValue, interpreter: *Interpreter) void {
         switch (self.*) {
             .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
-            .Function => self.Function.deinit(interpreter),
-            .ClassType => self.ClassType.class.deinit(interpreter),
-            .ClassInstance => self.ClassInstance.instance.unreference(interpreter),
+            .Function => _ = self.Function.deinit(interpreter),
+            .ClassType => _ = self.ClassType.deinit(interpreter),
+            .ClassInstance => _ = self.ClassInstance.deinit(interpreter),
+            .WeakReference => _ = self.WeakReference.deinit(),
             else => {},
         }
     }
@@ -106,14 +114,14 @@ pub const VariableValue = union(enum) {
     pub fn isCallable(self: VariableValue) bool {
         return self == .Function or self == .ClassType;
     }
-    pub fn asCallable(self: VariableValue) RCSPCallable {
+    pub fn referenceCallable(self: VariableValue) RCSPCallable {
         switch (self) {
             .Function => |value| return value.strongClone(),
             .ClassType => |value| return value.strongClone(),
             .WeakReference => |value| {
                 switch (value) {
-                    .Function => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deallocated", .{}),
-                    .ClassType => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deallocated", .{}),
+                    .Function => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deinitialized", .{}),
+                    .ClassType => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deinitialized", .{}),
                     else => std.debug.panic("Tried to access non-callable weakly-referenced variable as a callable", .{}),
                 }
             },
@@ -124,15 +132,21 @@ pub const VariableValue = union(enum) {
     pub fn isClassType(self: VariableValue) bool {
         return self == .ClassType;
     }
-    pub fn asClassType(self: VariableValue) *ClassType {
-        return self.ClassType.strongClone().ptr().ClassType.class;
+    pub fn referenceClassType(self: VariableValue) RCSPCallable {
+        return self.ClassType.strongClone();
     }
 
     pub fn isClassInstance(self: VariableValue) bool {
         return self == .ClassInstance;
     }
-    pub fn asClassInstance(self: VariableValue) *ClassInstance {
-        return self.ClassInstance.instance;
+    pub fn referenceClassInstance(self: VariableValue) RCSPClassInstance {
+        return self.ClassInstance.strongClone();
+    }
+    pub fn classInstanceConstPointer(self: VariableValue) *const ClassInstance {
+        return self.ClassInstance.ptr();
+    }
+    pub fn classInstanceUnsafePointer(self: VariableValue) *ClassInstance {
+        return self.ClassInstance.unsafePtr();
     }
 
     // Type coercion

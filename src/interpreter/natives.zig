@@ -20,6 +20,13 @@ pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
         .ClassType => std.debug.print("<class>", .{}),
         .Function => std.debug.print("<function>", .{}),
         .ClassInstance => std.debug.print("<instance>", .{}),
+        .WeakReference => |value| {
+            switch (value) {
+                .Function => std.debug.print("<weak function>", .{}),
+                .ClassType => std.debug.print("<weak class>", .{}),
+                else => std.debug.print("<weak>", .{}),
+            }
+        },
     }
 
     return .Null;
