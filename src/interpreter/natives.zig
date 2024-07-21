@@ -22,9 +22,7 @@ pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
         .ClassInstance => std.debug.print("<instance>", .{}),
         .WeakReference => |value| {
             switch (value) {
-                .Function => std.debug.print("<weak function>", .{}),
-                .ClassType => std.debug.print("<weak class>", .{}),
-                else => std.debug.print("<weak>", .{}),
+                .ClassInstance => std.debug.print("<weak class instance>", .{}),
             }
         },
     }

@@ -11,59 +11,51 @@ const CallableFunction = @import("./callable_value.zig").CallableFunction;
 
 const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 
+const RCSP = @import("../rcsp.zig");
+
+pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, *Interpreter);
+
 pub const ClassInstance = struct {
-    referenceCount: usize, // TODO: Change to RCSP
-    classType: *ClassType,
+    classType: ClassTypeReference,
     environment: *Environment,
 
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    pub fn new(interpreter: *Interpreter, classType: *ClassType, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstance {
-        const value = try interpreter.allocator.create(ClassInstance);
+    pub fn new(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
-        allocatedEnvironment.* = classType.parentEnvironment.createChild(classType.parentEnvironment);
+        allocatedEnvironment.* = classType.ptr().parentEnvironment.createChild(classType.ptr().parentEnvironment);
 
-        value.* = .{
-            .referenceCount = 1,
+        const value = try ClassInstanceReference.init(.{
             .classType = classType,
             .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
-        };
-        classType.referenceCount += 1;
+        }, interpreter.allocator);
 
         // try allocatedEnvironment.define("this", VariableValue.classInstance(value), interpreter);
         // TODO: Implement super once inheritance is implemented
 
-        const constructorMethod = classType.methods.get("constructor");
+        const constructorMethod = classType.ptr().methods.get("constructor");
         if (constructorMethod != null) {
             const boundConstructor = constructorMethod.?.function.bindToClass(value);
             _ = try boundConstructor.call(interpreter, callToken, arguments); // Return value is ignored
         }
 
-        return value.*;
+        return value;
     }
 
     pub fn deinit(self: *ClassInstance, interpreter: *Interpreter) void {
-        self.referenceCount -= 1;
-        if (self.referenceCount == 0) {
-            self.classType.deinit(interpreter);
+        _ = self.classType.deinit(interpreter);
 
-            var iter = self.fieldValues.iterator();
-            while (iter.next()) |entry| {
-                entry.value_ptr.deinit(interpreter);
-                interpreter.allocator.free(entry.key_ptr.*);
-            }
-            self.fieldValues.deinit(interpreter.allocator);
-
-            self.environment.unreference(interpreter);
-
-            interpreter.allocator.destroy(self);
+        var iter = self.fieldValues.iterator();
+        while (iter.next()) |entry| {
+            entry.value_ptr.deinit(interpreter);
+            interpreter.allocator.free(entry.key_ptr.*);
         }
-    }
+        self.fieldValues.deinit(interpreter.allocator);
 
-    pub fn copy(self: *ClassInstance) *ClassInstance {
-        self.referenceCount += 1;
-        return self;
+        self.environment.unreference(interpreter);
+
+        interpreter.allocator.destroy(self);
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {
@@ -72,7 +64,7 @@ pub const ClassInstance = struct {
     }
 
     pub fn get(self: *const ClassInstance, name: Token, interpreter: *Interpreter) !VariableValue {
-        const method = self.classType.methods.get(name.lexeme);
+        const method = self.classType.ptr().methods.get(name.lexeme);
         if (method != null) {
             if (method.?.static) {
                 std.debug.panic("TODO: Implement static method calls on class instances", .{});
@@ -91,7 +83,7 @@ pub const ClassInstance = struct {
     }
 
     pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
-        if (self.classType.methods.contains(name.lexeme)) {
+        if (self.classType.ptr().methods.contains(name.lexeme)) {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
             return InterpreterError.RuntimeError;
         }
@@ -101,13 +93,14 @@ pub const ClassInstance = struct {
     }
 };
 
+pub const ClassTypeReference = RCSP.DeinitializingRcSharedPointer(ClassType, RCSP.NonAtomic, *Interpreter);
+
 /// NOTE: This isn't a class instance, but a class type.
 pub const ClassType = struct {
-    referenceCount: usize, // TODO: Change to RCSP
     methods: std.StringHashMapUnmanaged(ClassMethod),
     parentEnvironment: *Environment,
 
-    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator) !*ClassType {
+    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator) !ClassTypeReference {
         var methods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
             const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
@@ -115,36 +108,24 @@ pub const ClassType = struct {
             try methods.put(allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(allocator), function));
         }
 
-        const value = try allocator.create(ClassType);
-
-        parentEnvironment.referenceCount += 1;
-        value.* = .{
-            .referenceCount = 1,
+        const value = try ClassTypeReference.init(.{
             .methods = methods,
             .parentEnvironment = parentEnvironment,
-        };
+        }, allocator);
+
+        parentEnvironment.referenceCount += 1;
         return value;
     }
 
     pub fn deinit(self: *ClassType, interpreter: *Interpreter) void {
-        if (self.referenceCount == 0) {
-            std.debug.panic("Unreferencing a class type with a reference count of 0", .{});
+        var iterator = self.methods.iterator();
+        while (iterator.next()) |method| {
+            method.value_ptr.deinit(interpreter);
+            interpreter.allocator.free(method.key_ptr.*);
         }
+        self.methods.deinit(interpreter.allocator);
 
-        self.referenceCount -= 1;
-
-        if (self.referenceCount == 0) {
-            var iterator = self.methods.iterator();
-            while (iterator.next()) |method| {
-                method.value_ptr.deinit(interpreter);
-                interpreter.allocator.free(method.key_ptr.*);
-            }
-            self.methods.deinit(interpreter.allocator);
-
-            self.parentEnvironment.deinit(interpreter);
-
-            interpreter.allocator.destroy(self);
-        }
+        self.parentEnvironment.deinit(interpreter);
     }
 
     pub fn getArity(self: *const ClassType) u32 {

@@ -33,19 +33,19 @@ expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 pub fn init(allocator: std.mem.Allocator) !Interpreter {
     var environment = Environment.init(allocator);
 
-    try environment.define("print", try VariableValue.nativeFunction(1, &natives.print, allocator), null);
-    try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin, allocator), null);
-    try environment.define("cos", try VariableValue.nativeFunction(1, &natives.cos, allocator), null);
-    try environment.define("tan", try VariableValue.nativeFunction(1, &natives.tan, allocator), null);
-    try environment.define("exp", try VariableValue.nativeFunction(1, &natives.exp, allocator), null);
-    try environment.define("exp2", try VariableValue.nativeFunction(1, &natives.exp2, allocator), null);
-    try environment.define("log", try VariableValue.nativeFunction(1, &natives.log, allocator), null);
-    try environment.define("log2", try VariableValue.nativeFunction(1, &natives.log2, allocator), null);
-    try environment.define("log10", try VariableValue.nativeFunction(1, &natives.log10, allocator), null);
-    try environment.define("floor", try VariableValue.nativeFunction(1, &natives.floor, allocator), null);
-    try environment.define("substring", try VariableValue.nativeFunction(3, &natives.substring, allocator), null);
-    try environment.define("intChar", try VariableValue.nativeFunction(1, &natives.intChar, allocator), null);
-    try environment.define("length", try VariableValue.nativeFunction(1, &natives.length, allocator), null);
+    try environment.define("print", try VariableValue.nativeFunction(1, &natives.print), null);
+    try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin), null);
+    try environment.define("cos", try VariableValue.nativeFunction(1, &natives.cos), null);
+    try environment.define("tan", try VariableValue.nativeFunction(1, &natives.tan), null);
+    try environment.define("exp", try VariableValue.nativeFunction(1, &natives.exp), null);
+    try environment.define("exp2", try VariableValue.nativeFunction(1, &natives.exp2), null);
+    try environment.define("log", try VariableValue.nativeFunction(1, &natives.log), null);
+    try environment.define("log2", try VariableValue.nativeFunction(1, &natives.log2), null);
+    try environment.define("log10", try VariableValue.nativeFunction(1, &natives.log10), null);
+    try environment.define("floor", try VariableValue.nativeFunction(1, &natives.floor), null);
+    try environment.define("substring", try VariableValue.nativeFunction(3, &natives.substring), null);
+    try environment.define("intChar", try VariableValue.nativeFunction(1, &natives.intChar), null);
+    try environment.define("length", try VariableValue.nativeFunction(1, &natives.length), null);
 
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
@@ -355,11 +355,11 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            var callable = callee.referenceCallable();
+            var callable = callee.asCallable();
             defer _ = callable.deinit(self);
 
-            if (values.arguments.items.len != callable.ptr().getArity()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.ptr().getArity(), values.arguments.items.len });
+            if (values.arguments.items.len != callable.getArity()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.getArity(), values.arguments.items.len });
                 return InterpreterError.RuntimeError;
             }
 
@@ -385,7 +385,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 try argumentValues.append(result);
             }
 
-            return callable.ptr().call(self, values.startToken, argumentValues) catch |err| switch (err) {
+            return callable.call(self, values.startToken, argumentValues) catch |err| switch (err) {
                 NativeError.InvalidOperand => {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
                     return InterpreterError.RuntimeError;
@@ -406,7 +406,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             const class = try VariableValue.newClassType(values, environment, self.allocator);
             // We don't copy the value when defining the class here because we can't create a loop of references
-            try environment.define("this", class, self); // "this" is defined here because static methods should access the class type itself
+            // try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
             // TODO: Implement super once inheritance is added
             return class;
         },

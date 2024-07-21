@@ -364,11 +364,6 @@ pub fn DeinitializingRcSharedPointer(comptime T: type, comptime Ops: type, compt
 
     const RCSP = RcSharedPointer(T, Ops);
 
-    const DRCSPDeinitContext = struct {
-        originalContext: DeinitializeContext,
-        originalCallback: ?fn (*T, DeinitializeContext) void,
-    };
-
     return struct {
         const Strong = @This();
         pub const Weak = struct {
@@ -498,29 +493,11 @@ pub fn DeinitializingRcSharedPointer(comptime T: type, comptime Ops: type, compt
         ///
         /// Return true if the value was deallocated
         pub fn deinit(self: *Self, deinitializerContext: DeinitializeContext) bool {
-            return self.deinitWithCallback(deinitializerContext, null);
+            return self.rcsp.deinitWithCallback(DeinitializeContext, deinitializerContext, deinitializeDRCSP);
         }
 
-        /// Deinitialize the shared pointer with a callback
-        ///
-        /// Will first deinitialize the value using the callback
-        /// (if there are no other strong clones present) and then
-        /// deallocate its initial allocation (if there are no weak
-        /// clones present)
-        ///
-        /// Return true if the value was deallocated
-        pub fn deinitWithCallback(self: *Self, context: DeinitializeContext, deinitializer: ?fn (*T, DeinitializeContext) void) bool {
-            return self.rcsp.deinitWithCallback(DRCSPDeinitContext, .{
-                .originalContext = context,
-                .originalCallback = deinitializer,
-            }, deinitializeDRCSP);
-        }
-
-        fn deinitializeDRCSP(self: *Self, value: T, context: DRCSPDeinitContext) void {
-            _ = self;
-
-            value.deinit(context.originalContext);
-            context.originalCallback(&value, context.originalContext);
+        fn deinitializeDRCSP(value: *T, context: DeinitializeContext) void {
+            value.deinit(context);
         }
     };
 }

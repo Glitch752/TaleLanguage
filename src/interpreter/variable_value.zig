@@ -13,15 +13,11 @@ const FunctionExpression = @import("../parser/expression.zig").FunctionExpressio
 const ClassExpression = @import("../parser/expression.zig").ClassExpression;
 
 const ClassInstance = @import("./class_value.zig").ClassInstance;
+const ClassInstanceReference = @import("./class_value.zig").ClassInstanceReference;
 const ClassType = @import("./class_value.zig").ClassType;
+const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
 
 const RCSP = @import("../rcsp.zig");
-fn ReferenceCountedVariable(comptime T: type) type {
-    return RCSP.DeinitializingRcSharedPointer(T, RCSP.NonAtomic, *Interpreter);
-}
-
-const RCSPCallable = ReferenceCountedVariable(CallableFunction);
-const RCSPClassInstance = ReferenceCountedVariable(ClassInstance);
 
 pub const VariableValue = union(enum) {
     Number: f64,
@@ -31,21 +27,17 @@ pub const VariableValue = union(enum) {
     },
     Boolean: bool,
 
-    Function: RCSPCallable,
+    Function: CallableFunction,
 
     /// NOTE: This isn't a class instance, but a class type.
-    ClassType: RCSPCallable,
-    ClassInstance: RCSPClassInstance,
+    ClassType: CallableFunction,
+    ClassInstance: ClassInstanceReference,
 
     WeakReference: union(enum) {
-        Function: RCSPCallable.Weak,
-        ClassType: RCSPCallable.Weak,
-        ClassInstance: RCSPClassInstance.Weak,
+        ClassInstance: ClassInstanceReference.Weak,
 
         pub fn deinit(self: *@This()) void {
             switch (self.*) {
-                .Function => _ = self.Function.deinit(),
-                .ClassType => _ = self.ClassType.deinit(),
                 .ClassInstance => _ = self.ClassInstance.deinit(),
             }
         }
@@ -67,8 +59,6 @@ pub const VariableValue = union(enum) {
 
     pub fn takeReference(self: VariableValue) VariableValue {
         switch (self) {
-            .Function => |value| return .{ .Function = value.strongClone() },
-            .ClassType => |value| return .{ .ClassType = value.strongClone() },
             .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
             else => return self,
         }
@@ -77,8 +67,6 @@ pub const VariableValue = union(enum) {
     /// Takes a weak reference to the inner value.
     pub fn takeWeakReference(self: VariableValue) VariableValue {
         switch (self) {
-            .Function => |value| return .{ .WeakReference = .{ .Function = value.weakClone() } },
-            .ClassType => |value| return .{ .WeakReference = .{ .ClassType = value.weakClone() } },
             .ClassInstance => |value| return .{ .WeakReference = .{ .ClassInstance = value.weakClone() } },
             else => return self,
         }
@@ -114,17 +102,10 @@ pub const VariableValue = union(enum) {
     pub fn isCallable(self: VariableValue) bool {
         return self == .Function or self == .ClassType;
     }
-    pub fn referenceCallable(self: VariableValue) RCSPCallable {
+    pub fn asCallable(self: VariableValue) CallableFunction {
         switch (self) {
-            .Function => |value| return value.strongClone(),
-            .ClassType => |value| return value.strongClone(),
-            .WeakReference => |value| {
-                switch (value) {
-                    .Function => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deinitialized", .{}),
-                    .ClassType => |weak| return weak.strongClone() orelse std.debug.panic("Tried to access weakly-referenced variable that was already deinitialized", .{}),
-                    else => std.debug.panic("Tried to access non-callable weakly-referenced variable as a callable", .{}),
-                }
-            },
+            .Function => |value| return value,
+            .ClassType => |value| return value,
             else => std.debug.panic("Tried to access non-callable variable as a callable", .{}),
         }
     }
@@ -132,14 +113,11 @@ pub const VariableValue = union(enum) {
     pub fn isClassType(self: VariableValue) bool {
         return self == .ClassType;
     }
-    pub fn referenceClassType(self: VariableValue) RCSPCallable {
-        return self.ClassType.strongClone();
-    }
 
     pub fn isClassInstance(self: VariableValue) bool {
         return self == .ClassInstance;
     }
-    pub fn referenceClassInstance(self: VariableValue) RCSPClassInstance {
+    pub fn referenceClassInstance(self: VariableValue) ClassInstanceReference {
         return self.ClassInstance.strongClone();
     }
     pub fn classInstanceConstPointer(self: VariableValue) *const ClassInstance {
@@ -194,18 +172,18 @@ pub const VariableValue = union(enum) {
         }
     }
 
-    pub fn nativeFunction(arity: u32, function: CallableNativeFunction, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Function = try RCSPCallable.init(CallableFunction.native(arity, function), allocator) };
+    pub fn nativeFunction(arity: u32, function: CallableNativeFunction) !VariableValue {
+        return .{ .Function = CallableFunction.native(arity, function) };
     }
     pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Function = try RCSPCallable.init(try CallableFunction.user(function, activeEnvironment, allocator), allocator) };
+        return .{ .Function = try CallableFunction.user(function, activeEnvironment, allocator) };
     }
 
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .ClassType = try RCSPCallable.init(try CallableFunction.classType(class, activeEnvironment, allocator), allocator) };
+        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator) };
     }
-    pub fn newClassInstance(classType: *ClassType, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
-        return .{ .ClassInstance = try RCSPClassInstance.init(try ClassInstance.new(interpreter, classType, callToken, arguments), interpreter.allocator) };
+    pub fn newClassInstance(classType: ClassTypeReference, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
+        return .{ .ClassInstance = try ClassInstance.new(interpreter, classType, callToken, arguments) };
     }
 
     pub fn classInstance(instance: *ClassInstance) VariableValue {

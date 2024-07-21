@@ -21,7 +21,7 @@ allocator: std.mem.Allocator,
 tokens: std.ArrayList(Token),
 fileName: []const u8,
 
-const escapeSequences = std.ComptimeStringMap(u8, .{
+const escapeSequences = std.StaticStringMap(u8).initComptime(.{
     .{ "n", '\n' },
     .{ "r", '\r' },
     .{ "t", '\t' },

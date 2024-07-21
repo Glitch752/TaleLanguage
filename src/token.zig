@@ -143,7 +143,7 @@ pub const Token = struct {
         return try std.fmt.allocPrint(allocator, "{s}({s}) ", .{ self.type.typeNameString(), literalString });
     }
 
-    pub const keywordMap = std.ComptimeStringMap(TokenType, .{
+    pub const keywordMap = std.StaticStringMap(TokenType).initComptime(.{
         .{ "function", TokenType.FunctionKeyword },
         .{ "if", TokenType.IfKeyword },
         .{ "else", TokenType.ElseKeyword },
@@ -167,7 +167,7 @@ pub const Token = struct {
         .{ "continue", TokenType.ContinueKeyword },
         .{ "return", TokenType.ReturnKeyword },
     });
-    pub const symbolMap = std.ComptimeStringMap(TokenType, .{
+    pub const symbolMap = std.StaticStringMap(TokenType).initComptime(.{
         .{ "(", TokenType.OpenParen },
         .{ ")", TokenType.CloseParen },
         .{ "{", TokenType.OpenCurly },
@@ -199,5 +199,15 @@ pub const Token = struct {
         .{ ".", TokenType.Dot },
         .{ ";", TokenType.Semicolon },
     });
-    pub const maxSymbolLength = symbolMap.kvs[symbolMap.kvs.len - 1].key.len;
+    pub const maxSymbolLength = findMaxKeyLength(symbolMap);
 };
+
+fn findMaxKeyLength(comptime map: std.StaticStringMap(TokenType)) usize {
+    var max = 0;
+    for (map.keys()) |key| {
+        if (key.len > max) {
+            max = key.len;
+        }
+    }
+    return max;
+}
