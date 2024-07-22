@@ -119,12 +119,10 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
     switch (statement.*) {
         .Expression => |values| {
             var result = try self.interpretExpression(values.expression);
-            defer result.deinit(self);
+            result.deinit(self);
         },
         .Let => |values| {
-            var value = (try self.interpretExpression(values.initializer)).takeReference();
-            errdefer value.deinit(self);
-
+            const value = (try self.interpretExpression(values.initializer));
             try self.activeEnvironment.?.define(values.name.lexeme, value, self);
         },
         .Block => |values| {
@@ -171,7 +169,7 @@ fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression
         return self.rootEnvironment.get(name, self);
     }
 
-    return self.activeEnvironment.?.getAtDepth(name, depth.?, self);
+    return (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference();
 }
 
 fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {

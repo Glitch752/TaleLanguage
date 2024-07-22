@@ -1,7 +1,7 @@
 let TestClass = class {
     constructor(param) {
         print("TestClass constructor\n");
-        // let self = this;
+        let self = this;
         // self.number = param;
     }
 

@@ -96,6 +96,7 @@ pub const CallableFunction = union(enum) {
                 const previousEnvironment = interpreter.activeEnvironment;
 
                 interpreter.activeEnvironment = data.classInstance.ptr().environment;
+                try interpreter.activeEnvironment.?.printVariables(interpreter, 0);
                 defer interpreter.activeEnvironment = previousEnvironment;
 
                 return try callUserFunction(interpreter, callToken, data.method, arguments);
@@ -139,6 +140,8 @@ pub const CallableFunction = union(enum) {
         switch (self) {
             .Native => return std.fmt.allocPrint(allocator, "<native function>", .{}),
             .User => return std.fmt.allocPrint(allocator, "<function>", .{}),
+            .BoundClassMethod => return std.fmt.allocPrint(allocator, "<bound class method>", .{}),
+            .ClassType => return std.fmt.allocPrint(allocator, "<class type>", .{}),
         }
     }
 };

@@ -31,12 +31,14 @@ pub const ClassInstance = struct {
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
         }, interpreter.allocator);
 
-        // try allocatedEnvironment.define("this", VariableValue.classInstance(value), interpreter);
+        try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);
         // TODO: Implement super once inheritance is implemented
 
         const constructorMethod = classType.ptr().methods.get("constructor");
         if (constructorMethod != null) {
-            const boundConstructor = constructorMethod.?.function.bindToClass(value);
+            var boundConstructor = constructorMethod.?.function.bindToClass(value);
+            defer boundConstructor.deinit(interpreter);
+
             _ = try boundConstructor.call(interpreter, callToken, arguments); // Return value is ignored
         }
 
@@ -54,8 +56,6 @@ pub const ClassInstance = struct {
         self.fieldValues.deinit(interpreter.allocator);
 
         self.environment.unreference(interpreter);
-
-        interpreter.allocator.destroy(self);
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {

@@ -66,9 +66,7 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
-        if (!std.mem.eql(u8, wrapper.name, "this") and !std.mem.eql(u8, wrapper.name, "super")) { // A special case feels a bit hacky, but I can't find an easier way to do this
-            wrapper.value.deinit(interpreter);
-        }
+        wrapper.value.deinit(interpreter);
         self.allocator.free(wrapper.name);
 
         self.allocator.destroy(wrapper);

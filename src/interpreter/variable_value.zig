@@ -41,6 +41,12 @@ pub const VariableValue = union(enum) {
                 .ClassInstance => _ = self.ClassInstance.deinit(),
             }
         }
+
+        pub fn toString(self: *@This(), allocator: std.mem.Allocator) void {
+            switch (self.*) {
+                .ClassInstance => _ = std.fmt.allocPrint(allocator, "class instance"),
+            }
+        }
     },
 
     Null,
@@ -191,6 +197,10 @@ pub const VariableValue = union(enum) {
         return .{ .ClassInstance = .{ .instance = instance } };
     }
 
+    pub fn weakClassInstanceReference(instance: ClassInstanceReference.Weak) VariableValue {
+        return .{ .WeakReference = .{ .ClassInstance = instance } };
+    }
+
     pub fn @"null"() VariableValue {
         return .Null;
     }
@@ -205,8 +215,9 @@ pub const VariableValue = union(enum) {
             .Boolean => return if (self.Boolean) std.fmt.allocPrint(allocator, "true", .{}) else std.fmt.allocPrint(allocator, "false", .{}),
             .Null => return std.fmt.allocPrint(allocator, "null", .{}),
             .Function => |value| return value.toString(allocator),
-            .ClassType => |value| return value.class.ClassType.class.toString(allocator),
-            .ClassInstance => |value| return value.instance.toString(allocator),
+            .ClassType => |value| return value.ClassType.ptr().toString(allocator),
+            .ClassInstance => |value| return value.ptr().toString(allocator),
+            .WeakReference => |value| return value.toString(allocator),
         }
     }
 };
