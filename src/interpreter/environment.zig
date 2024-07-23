@@ -178,8 +178,10 @@ pub fn printVariables(self: *Environment, interpreter: *Interpreter, indent: u32
         const wrapper = entry.value_ptr.*;
         const name = wrapper.name;
         const value = wrapper.value;
+        const string = try value.toString(interpreter.allocator);
+        defer interpreter.allocator.free(string);
 
-        std.debug.print("{s}{s} = {s}\n", .{ spaces, name, try value.toString(interpreter.allocator) });
+        std.debug.print("{s}{s} = {s}\n", .{ spaces, name, string });
     }
 
     if (self.parent != null) {

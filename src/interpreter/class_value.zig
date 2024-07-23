@@ -34,7 +34,7 @@ pub const ClassInstance = struct {
         try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);
         // TODO: Implement super once inheritance is implemented
 
-        const constructorMethod = classType.ptr().methods.get("constructor");
+        var constructorMethod = classType.ptr().methods.get("constructor");
         if (constructorMethod != null) {
             var boundConstructor = constructorMethod.?.function.bindToClass(value);
             defer boundConstructor.deinit(interpreter);
@@ -46,8 +46,6 @@ pub const ClassInstance = struct {
     }
 
     pub fn deinit(self: *ClassInstance, interpreter: *Interpreter) void {
-        _ = self.classType.deinit(interpreter);
-
         var iter = self.fieldValues.iterator();
         while (iter.next()) |entry| {
             entry.value_ptr.deinit(interpreter);
@@ -56,6 +54,8 @@ pub const ClassInstance = struct {
         self.fieldValues.deinit(interpreter.allocator);
 
         self.environment.unreference(interpreter);
+
+        _ = self.classType.deinit(interpreter);
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {

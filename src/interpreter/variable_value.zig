@@ -42,9 +42,9 @@ pub const VariableValue = union(enum) {
             }
         }
 
-        pub fn toString(self: *@This(), allocator: std.mem.Allocator) void {
+        pub fn toString(self: *const @This(), allocator: std.mem.Allocator) ![]const u8 {
             switch (self.*) {
-                .ClassInstance => _ = std.fmt.allocPrint(allocator, "class instance"),
+                .ClassInstance => return std.fmt.allocPrint(allocator, "<class instance>", .{}),
             }
         }
     },

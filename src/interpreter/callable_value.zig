@@ -90,16 +90,20 @@ pub const CallableFunction = union(enum) {
                 return try data.body(interpreter, arguments);
             },
             .User => |data| {
-                return try callUserFunction(interpreter, callToken, data, arguments);
+                var environment = try interpreter.enterChildEnvironment(data.ptr().parentEnvironment, interpreter.activeEnvironment.?);
+                defer environment.exit(interpreter);
+
+                return try callUserFunction(interpreter, callToken, environment, data, arguments);
             },
             .BoundClassMethod => |data| {
                 const previousEnvironment = interpreter.activeEnvironment;
 
                 interpreter.activeEnvironment = data.classInstance.ptr().environment;
-                try interpreter.activeEnvironment.?.printVariables(interpreter, 0);
-                defer interpreter.activeEnvironment = previousEnvironment;
 
-                return try callUserFunction(interpreter, callToken, data.method, arguments);
+                var environment = try interpreter.enterChildEnvironment(interpreter.activeEnvironment.?, previousEnvironment.?);
+                defer environment.exit(interpreter);
+
+                return try callUserFunction(interpreter, callToken, environment, data.method, arguments);
             },
             .ClassType => |data| {
                 return try VariableValue.newClassInstance(data, interpreter, callToken, arguments);
@@ -131,7 +135,7 @@ pub const CallableFunction = union(enum) {
 
     pub fn bindToClass(self: *const CallableFunction, classInstance: ClassInstanceReference) CallableFunction {
         switch (self.*) {
-            .User => return .{ .BoundClassMethod = .{ .method = self.User, .classInstance = classInstance } },
+            .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance } },
             else => std.debug.panic("Tried to bind a non-class method to a class instance", .{}),
         }
     }
@@ -146,11 +150,8 @@ pub const CallableFunction = union(enum) {
     }
 };
 
-fn callUserFunction(interpreter: *Interpreter, callToken: Token, functionReference: UserFunctionReference, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+fn callUserFunction(interpreter: *Interpreter, callToken: Token, environment: *Environment, functionReference: UserFunctionReference, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
     const function = functionReference.ptr();
-
-    var environment = try interpreter.enterChildEnvironment(function.parentEnvironment, interpreter.activeEnvironment.?);
-    defer environment.exit(interpreter);
 
     // Check the number of arguments
     if (arguments.items.len != function.parameters.items.len) {
