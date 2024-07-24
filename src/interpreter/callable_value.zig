@@ -61,8 +61,9 @@ pub const CallableFunction = union(enum) {
         switch (self.*) {
             .User => _ = self.User.deinit(interpreter),
             .BoundClassMethod => {
-                _ = self.BoundClassMethod.method.deinit(interpreter);
-                _ = self.BoundClassMethod.classInstance.deinit(interpreter);
+                if (self.BoundClassMethod.method.deinit(interpreter)) {
+                    _ = self.BoundClassMethod.classInstance.deinit(interpreter);
+                }
             },
             .ClassType => _ = self.ClassType.deinit(interpreter),
             else => {},
@@ -106,7 +107,7 @@ pub const CallableFunction = union(enum) {
                 return try callUserFunction(interpreter, callToken, environment, data.method, arguments);
             },
             .ClassType => |data| {
-                return try VariableValue.newClassInstance(data, interpreter, callToken, arguments);
+                return try VariableValue.newClassInstance(data.strongClone(), interpreter, callToken, arguments);
             },
         }
     }

@@ -17,8 +17,8 @@ let TestClass = class {
 
 let ClassCopy = TestClass;
 
-let test = ClassCopy(5);
-// test.number = 3;
+let test = TestClass(5);
+test.number = 3;
 // print(test.number);
 // print("\n");
 
