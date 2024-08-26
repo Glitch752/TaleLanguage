@@ -63,9 +63,12 @@ pub const VariableValue = union(enum) {
         }
     }
 
-    pub fn takeReference(self: VariableValue) VariableValue {
+    /// Clones the value, incrementing the reference count if necessary.
+    pub fn takeReference(self: VariableValue, interpreter: *Interpreter) !VariableValue {
         switch (self) {
             .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
+            .Function => |value| return .{ .Function = value.takeReference() },
+            .String => |value| return .{ .String = .{ .string = try interpreter.allocator.dupe(u8, value.string), .allocated = true } },
             else => return self,
         }
     }

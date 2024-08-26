@@ -142,6 +142,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 
 # Development
 
+Tale requires Zig version 0.13.0.
 To run the program, use `zig run .\src\main.zig -freference-trace -- [tale file path]`. I plan to eventually migrate to Zig's build system, but this works well enough for now.
 
 ## Random

@@ -134,6 +134,15 @@ pub const CallableFunction = union(enum) {
         return .{ .ClassType = try ClassType.new(parentEnvironment, expression, allocator) };
     }
 
+    pub fn takeReference(self: CallableFunction) CallableFunction {
+        switch (self) {
+            .User => return .{ .User = self.User.strongClone() },
+            .BoundClassMethod => return .{ .BoundClassMethod = .{ .method = self.BoundClassMethod.method.strongClone(), .classInstance = self.BoundClassMethod.classInstance.strongClone() } },
+            .ClassType => return .{ .ClassType = self.ClassType.strongClone() },
+            else => return self,
+        }
+    }
+
     pub fn bindToClass(self: *const CallableFunction, classInstance: ClassInstanceReference) CallableFunction {
         switch (self.*) {
             .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance } },

@@ -122,7 +122,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
             result.deinit(self);
         },
         .Let => |values| {
-            const value = (try self.interpretExpression(values.initializer));
+            const value = try self.interpretExpression(values.initializer);
             try self.activeEnvironment.?.define(values.name.lexeme, value, self);
         },
         .Block => |values| {
@@ -155,7 +155,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
         },
 
         .Return => |values| {
-            self.lastReturnValue = (try self.interpretExpression(values.value)).takeReference();
+            self.lastReturnValue = try self.interpretExpression(values.value);
             return InterpreterError.Return;
         },
         .Break => return InterpreterError.Break,
@@ -166,10 +166,10 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
 fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression) !VariableValue {
     const depth = self.expressionDefinitionDepth.get(expression.id);
     if (depth == null) {
-        return self.rootEnvironment.get(name, self);
+        return try (try self.rootEnvironment.get(name, self)).takeReference(self);
     }
 
-    return (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference();
+    return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self);
 }
 
 fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
@@ -353,7 +353,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            var callable = callee.asCallable();
+            var callable = callee.asCallable().takeReference();
             defer _ = callable.deinit(self);
 
             if (values.arguments.items.len != callable.getArity()) {
@@ -374,7 +374,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 var value = try self.interpretExpression(argument);
                 errdefer value.deinit(self);
 
-                try argumentResults.append(value.takeReference());
+                try argumentResults.append(value);
             }
 
             var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
@@ -421,12 +421,12 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             const depth = self.expressionDefinitionDepth.get(expression.id);
             if (depth == null) {
-                try self.rootEnvironment.assign(values.name, value, self);
+                try self.rootEnvironment.assign(values.name, try value.takeReference(self), self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
             } else {
-                try self.activeEnvironment.?.assignAtDepth(values.name, value, depth.?, self);
+                try self.activeEnvironment.?.assignAtDepth(values.name, try value.takeReference(self), depth.?, self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
