@@ -56,8 +56,14 @@ pub const VariableValue = union(enum) {
         switch (self.*) {
             .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
             .Function => _ = self.Function.deinit(interpreter),
-            .ClassType => _ = self.ClassType.deinit(interpreter),
-            .ClassInstance => _ = self.ClassInstance.deinit(interpreter),
+            .ClassType => {
+                std.debug.assert(self.ClassType.ClassType.strongCount() != 0);
+                _ = self.ClassType.deinit(interpreter);
+            },
+            .ClassInstance => {
+                std.debug.assert(self.ClassInstance.strongCount() != 0);
+                _ = self.ClassInstance.deinit(interpreter);
+            },
             .WeakReference => _ = self.WeakReference.deinit(),
             else => {},
         }
@@ -124,16 +130,17 @@ pub const VariableValue = union(enum) {
     }
 
     pub fn isClassInstance(self: VariableValue) bool {
-        return self == .ClassInstance;
+        return self == .ClassInstance or (self == .WeakReference and self.WeakReference == .ClassInstance);
     }
     pub fn referenceClassInstance(self: VariableValue) ClassInstanceReference {
-        return self.ClassInstance.strongClone();
-    }
-    pub fn classInstanceConstPointer(self: VariableValue) *const ClassInstance {
-        return self.ClassInstance.ptr();
-    }
-    pub fn classInstanceUnsafePointer(self: VariableValue) *ClassInstance {
-        return self.ClassInstance.unsafePtr();
+        if (self == .ClassInstance) {
+            return self.ClassInstance.strongClone();
+        } else if (self == .WeakReference) {
+            std.debug.assert(self.WeakReference.ClassInstance.strongCount() != 0);
+            return self.WeakReference.ClassInstance.strongClone().?;
+        } else {
+            std.debug.panic("Tried to access non-class instance as a class instance", .{});
+        }
     }
 
     // Type coercion

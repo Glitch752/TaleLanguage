@@ -205,7 +205,7 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
                 // incapacitate self (useful methods will now panic)
                 self.inner = null;
                 // if weak counter was not saturated
-                if (cw_ == 1) {
+                if (cw_ == 1 and p.strong_ctr == 0) {
                     Ops.synchronize();
                     // then we can deallocate
                     p.*.allocator.destroy(p);
@@ -333,8 +333,9 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
                 }
 
                 const cw = Ops.decrement(&p.*.weak_ctr);
+
                 // also, if there are no outstanding weak counters,
-                if (cw == 1) {
+                if (cw <= 1) {
                     Ops.synchronize();
                     // then deallocate
                     p.allocator.destroy(p);
@@ -410,7 +411,7 @@ pub fn DeinitializingRcSharedPointer(comptime T: type, comptime Ops: type, compt
 
             /// Deinitialize weak clone
             ///
-            /// Will never deinitialize the value but will
+            /// Will never deinitialize the inner value but will
             /// deallocate it if it is the last clone (both strong and weak)
             ///
             /// Returns true if the value was deallocated

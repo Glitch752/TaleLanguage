@@ -117,7 +117,7 @@ pub fn parseExpression(self: *Parser) anyerror!*Expression {
     return expression;
 }
 
-pub fn uninit(self: *Parser) void {
+pub fn deinit(self: *Parser) void {
     _ = self;
 }
 

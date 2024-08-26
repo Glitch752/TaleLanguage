@@ -1,8 +1,25 @@
-let TestClass = class {};
-let test = TestClass();
-print(test);
-print("\n\n---\n\n");
+let TestClass = class {
+    constructor(constructorValue) {
+        this.a = constructorValue;
 
-test.a = 5;
+        print("Constructor\n");
+        print(this.a);
+        print("\n");
 
-print(test.a);
+        this.b = 4;
+    }
+};
+let test = TestClass(5);
+
+print(test); // <isntance>
+print("\n---\n");
+
+print(test.a); // 5
+print("\n");
+
+test.a = 10;
+
+print(test.a); // 10
+print("\n");
+
+print(test.b); // 4

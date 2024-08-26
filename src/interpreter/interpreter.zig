@@ -444,8 +444,9 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            const instance = object.classInstanceConstPointer();
-            return try instance.get(values.name, self);
+            var instance = object.referenceClassInstance();
+            defer _ = instance.deinit(self);
+            return try instance.ptr().get(values.name, self);
         },
         .PropertyAssignment => |values| {
             var object = try self.interpretExpression(values.object);
@@ -456,10 +457,12 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
                 return InterpreterError.RuntimeError;
             }
 
-            const instance = object.classInstanceUnsafePointer();
+            var instance = object.referenceClassInstance();
+            defer _ = instance.deinit(self);
+
             const value = try self.interpretExpression(values.value);
 
-            try instance.set(values.name, value, self);
+            try instance.unsafePtr().set(values.name, value, self);
             if (self.runtimeError != null) {
                 return InterpreterError.RuntimeError;
             }

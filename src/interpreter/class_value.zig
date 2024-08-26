@@ -23,10 +23,11 @@ pub const ClassInstance = struct {
 
     pub fn new(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
-        allocatedEnvironment.* = classType.ptr().parentEnvironment.createChild(classType.ptr().parentEnvironment);
+        var classTypeParent = classType.ptr().parentEnvironment;
+        allocatedEnvironment.* = classTypeParent.createChild(classTypeParent);
 
         const value = try ClassInstanceReference.init(.{
-            .classType = classType,
+            .classType = classType.strongClone(),
             .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
         }, interpreter.allocator);
@@ -53,9 +54,10 @@ pub const ClassInstance = struct {
         }
         self.fieldValues.deinit(interpreter.allocator);
 
-        self.environment.unreference(interpreter);
-
+        std.debug.assert(self.classType.strongCount() != 0);
         _ = self.classType.deinit(interpreter);
+
+        self.environment.unreference(interpreter);
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {
@@ -64,7 +66,8 @@ pub const ClassInstance = struct {
     }
 
     pub fn get(self: *const ClassInstance, name: Token, interpreter: *Interpreter) !VariableValue {
-        const method = self.classType.ptr().methods.get(name.lexeme);
+        const classType = self.classType.ptr();
+        const method = classType.methods.get(name.lexeme);
         if (method != null) {
             if (method.?.static) {
                 std.debug.panic("TODO: Implement static method calls on class instances", .{});
@@ -75,7 +78,7 @@ pub const ClassInstance = struct {
 
         const property = self.fieldValues.get(name.lexeme);
         if (property != null) {
-            return property.?;
+            return property.?.takeReference(interpreter);
         }
 
         interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No proprety or method '{s}' found.", .{name.lexeme});
@@ -86,6 +89,11 @@ pub const ClassInstance = struct {
         if (self.classType.ptr().methods.contains(name.lexeme)) {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
             return InterpreterError.RuntimeError;
+        }
+
+        if (self.fieldValues.contains(name.lexeme)) {
+            self.fieldValues.getPtr(name.lexeme).?.* = value;
+            return;
         }
 
         const duplicatedName = try interpreter.allocator.dupe(u8, name.lexeme);
@@ -125,7 +133,7 @@ pub const ClassType = struct {
         }
         self.methods.deinit(interpreter.allocator);
 
-        self.parentEnvironment.deinit(interpreter);
+        self.parentEnvironment.unreference(interpreter);
     }
 
     pub fn getArity(self: *const ClassType) u32 {

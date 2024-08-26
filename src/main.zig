@@ -140,7 +140,7 @@ fn run(self: *Main, fileName: []const u8, source: []const u8) !void {
 
     // PARSING -------------------------------------
     var sourceParser = try parser.init(tokens, fileName, source, self.args.?.flags, self.allocator);
-    defer sourceParser.uninit();
+    defer sourceParser.deinit();
 
     var program = sourceParser.parse() catch {
         self.hadError = true;
