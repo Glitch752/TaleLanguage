@@ -86,7 +86,7 @@ while(true) {
 - [ ] Implement a compiler
 
 # The language
-The language, Tale, is not very well-defined yet -- I'm mostly experimenting with different ideas. However, here are the characteristics I'm aiming for:
+The language, Tale, is not very well-defined yet -- I'm mostly experimenting with different ideas. However, here are the characteristics I'm currently implementing:
 - [X] Dynamic typing (for now)
 - [X] First-class functions
 - [X] C-derived syntax
@@ -128,17 +128,16 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
       - Access: `Point.method()` (No `this` reference)
     - [ ] Fields: `let Point = class { static x = 5; }`
       - Access: `Point.x`
-- [ ] Extremely simple standard library, globally accessible as `Std` (for now):
-  - [X] `print` function: `Std.print("Hello, world!");`
-  - [ ] (From Crafting Interpreters) `clock` function: `std.print(Std.clock());` (Returns the time in seconds since the program started running)
-  - [ ] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
-  - [ ] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
+- [ ] Simple standard library, ~~globally accessible as `Std` (until I implement imports)~~ globally accessible for now:
+  - [X] `print` function: `print("Hello, world!");`
+  - [ ] `clock` function: `print(clock());` (Returns the time in seconds since the program started running)
+  - [ ] `panic` function: `panic("Something went wrong!");` (Throws an irrecoverable error)
+  - [ ] `assert` function: `assert(5 == 5);` (Panics if the condition is false)
 
 ## Considerations for the future
 - Static typing
 - How should imports work (and how should we change the standard library so it's not just a global object)?
 - How should we handle errors?
-- Should null be a type?
 - Should statements be expressions? (E.g. `let x = if (true) { 5 } else { 3 }`)
 
 # Development
@@ -146,13 +145,13 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 To run the program, use `zig run .\src\main.zig -freference-trace -- [tale file path]`. I plan to eventually migrate to Zig's build system, but this works well enough for now.
 
 ## Random
-When developing on Windows, you'll need to paste this in PowerShell because it doesn't recognize UTF-8 by default:
+When developing on Windows and using Powershell, you'll need to run this because Powershell doesn't recognize UTF-8 by default:
 ```powershell
 $OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
 ```
-I might eventually find the proper way to do this, but for now, this works.
+I couldn't find the proper way to do this, but for now, this works for me.
 
-# FAQ (Questions to myself)
+# Random questions
 
 ## Where does the name come from?
 A random noun generator. I needed a name and I couldn't think of one ¯\\\_(ツ)_/¯
