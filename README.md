@@ -140,6 +140,16 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 - How should we handle errors?
 - Should statements be expressions? (E.g. `let x = if (true) { 5 } else { 3 }`)
 
+# Running
+I don't currently provide builds since I'm still developing the basic features and things are changing quickly. If you want to run the language as it currently is, you can do the following:
+```sh
+git clone https://github.com/Glitch752/TaleLanguage/
+cd TaleLanguage
+zig build -Doptimize=ReleaseFast
+./zig-out/bin/ZigCompiler ./examples/working/donut.tale
+```
+(And replace `.\examples\working\donut.tale` with the path to your source file)
+
 # Development
 
 Tale requires Zig version 0.13.0.
