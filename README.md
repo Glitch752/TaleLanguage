@@ -1,7 +1,5 @@
 # Tale, the programming language
-A work-in-progress programming language interpreter/compiler written in Zig.
-
-Testing using `zig run .\src\main.zig -freference-trace -- ./examples/fizzbuzz.tale`, but I'll figure out how to use Zig's build system sooner or later.
+This is a to-be-compiler interpreter for a custom language I made to learn Zig.
 
 I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/) and [Let's Build a Simple Interpreter](https://ruslanspivak.com/lsbasi-part1/).
 
@@ -71,6 +69,8 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 
 # Development
 
+To run the program, use `zig run .\src\main.zig -freference-trace -- [tale file path]`. I plan to eventually migrate to Zig's build system, but this works well enough for now.
+
 ## Random
 When developing on Windows, you'll need to paste this in PowerShell because it doesn't recognize UTF-8 by default:
 ```powershell
@@ -84,12 +84,12 @@ I might eventually find the proper way to do this, but for now, this works.
 A random noun generator. I needed a name and I couldn't think of one ¯\\\_(ツ)_/¯
 
 ## Why object-oriented?
-It's the most familiar paradigm to me, and since I want to eventually self-host this language, I want to make it as easy as possible to work with.  
-I also personally think it can be a very powerful style when used correctly, and it's not that difficult to implement.  
+It's the most familiar paradigm to me, and since I think it would be interesting to eventually self-host this language, I want to make it as easy as possible to work with.  
+I also believe it can be a very powerful style when used correctly, and it's not that difficult to implement.  
 Another part of it is that I want to learn how object-oriented features are implemented.  
 
 ## Why did you make this?
 I'm making this language because I wanted to learn Zig and I'm interested in compiler design.
 
 ## What's the goal of this project?
-To make a programming language that is relatively fast, easy-to-use (ish), and compiles to various targets.
+To make a programming language that is relatively fast, easy-to-use, memory safe with reference counting, and (eventually) compilable to x86_64.
