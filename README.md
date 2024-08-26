@@ -3,6 +3,80 @@ This is a to-be-compiler interpreter for a custom language I made to learn Zig.
 
 I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/) and [Let's Build a Simple Interpreter](https://ruslanspivak.com/lsbasi-part1/).
 
+# Demo of the language
+This isn't a particularly good piece of code: it uses string manipulation hacks to work around the current lack of arrays, as well as temporary global functions I added. However, it demonstrates a relatively complicated program works in Tale--a port of `donut.c`. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays.
+```
+let tmr1 = null;
+let tmr2 = null;
+let A = 1;
+let B = 1;
+
+let asciiframe = function() {
+    A = A + 0.07;
+    B = B + 0.03;
+
+    let sinA = sin(A);
+    let cosA = cos(A);
+    let sinB = sin(B);
+    let cosB = cos(B);
+
+    let output = "";
+    let zBuffer = "";
+
+    let k = 0;
+    while(k < 1760) {
+        zBuffer = zBuffer + " ";
+        if(k % 80 == 79) {
+            output = output + "\n";
+        } else {
+            output = output + " ";
+        }
+        k = k + 1;
+    }
+
+    let j = 0; // J is theta
+    while(j < 6.28) {
+        let jSin = sin(j);
+        let jCos = cos(j);
+
+        let i = 0; // I is phi
+        while(i < 6.28) {
+            let iSin = sin(i);
+            let iCos = cos(i);
+
+            let h = jCos + 2;
+            let d = 1 / (iSin * h * sinA + jSin * cosA + 5);
+            let t = iSin * h * cosA - jSin * sinA;
+
+            let x = floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
+            let y = floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
+
+            let o = x + 80 * y;
+
+            let depthChar = substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", floor(d * 100), floor(d * 100) + 1);
+            if(y < 22 && y >= 0 && x >= 0 && x < 79 && intChar(depthChar) > intChar(substring(zBuffer, o, o + 1))) {
+                let N = 8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB);
+
+                zBuffer = substring(zBuffer, 0, o) + depthChar + substring(zBuffer, o + 1, length(zBuffer));
+                let idx = 0;
+                if(N > 0) idx = N;
+
+                output = substring(output, 0, o) + substring(".,-~:;=!*#$@", idx, idx + 1) + substring(output, o + 1, length(output));
+            }
+
+            i = i + 0.02;
+        }
+        j = j + 0.07;
+    }
+
+    print(output);
+};
+
+while(true) {
+    asciiframe();
+}
+```
+
 # TODO
 - [x] Implement a lexer
 - [X] Implement a parser
