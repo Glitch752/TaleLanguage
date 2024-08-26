@@ -65,14 +65,14 @@ pub const ClassInstance = struct {
         return std.fmt.allocPrint(allocator, "<instance <class>>", .{});
     }
 
-    pub fn get(self: *const ClassInstance, name: Token, interpreter: *Interpreter) !VariableValue {
+    pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *Interpreter) !VariableValue {
         const classType = self.classType.ptr();
         const method = classType.methods.get(name.lexeme);
         if (method != null) {
             if (method.?.static) {
                 std.debug.panic("TODO: Implement static method calls on class instances", .{});
             } else {
-                std.debug.panic("TODO: Implement method calls on class instances", .{});
+                return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference));
             }
         }
 

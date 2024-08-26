@@ -8,6 +8,14 @@ let TestClass = class {
 
         this.b = 4;
     }
+
+    method() {
+        print("Method\n");
+        print(this.a);
+        print("\n");
+
+        return this.a;
+    }
 };
 let test = TestClass(5);
 
@@ -23,3 +31,6 @@ print(test.a); // 10
 print("\n");
 
 print(test.b); // 4
+print("\n---\n");
+
+print(test.method()); // 10

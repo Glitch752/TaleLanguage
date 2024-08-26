@@ -194,6 +194,9 @@ pub const VariableValue = union(enum) {
     pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
         return .{ .Function = try CallableFunction.user(function, activeEnvironment, allocator) };
     }
+    pub fn newFunctionReference(function: CallableFunction) VariableValue {
+        return .{ .Function = function };
+    }
 
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
         return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator) };

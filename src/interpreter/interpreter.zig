@@ -446,7 +446,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
 
             var instance = object.referenceClassInstance();
             defer _ = instance.deinit(self);
-            return try instance.ptr().get(values.name, self);
+            return try instance.ptr().get(values.name, instance, self);
         },
         .PropertyAssignment => |values| {
             var object = try self.interpretExpression(values.object);

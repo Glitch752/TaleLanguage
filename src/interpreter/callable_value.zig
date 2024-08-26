@@ -61,9 +61,8 @@ pub const CallableFunction = union(enum) {
         switch (self.*) {
             .User => _ = self.User.deinit(interpreter),
             .BoundClassMethod => {
-                if (self.BoundClassMethod.method.deinit(interpreter)) {
-                    _ = self.BoundClassMethod.classInstance.deinit(interpreter);
-                }
+                _ = self.BoundClassMethod.method.deinit(interpreter);
+                _ = self.BoundClassMethod.classInstance.deinit(interpreter);
             },
             .ClassType => _ = self.ClassType.deinit(interpreter),
             else => {},
@@ -145,7 +144,7 @@ pub const CallableFunction = union(enum) {
 
     pub fn bindToClass(self: *const CallableFunction, classInstance: ClassInstanceReference) CallableFunction {
         switch (self.*) {
-            .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance } },
+            .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance.strongClone() } },
             else => std.debug.panic("Tried to bind a non-class method to a class instance", .{}),
         }
     }
