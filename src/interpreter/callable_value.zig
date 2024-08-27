@@ -106,7 +106,7 @@ pub const CallableFunction = union(enum) {
                 return try callUserFunction(interpreter, callToken, environment, data.method, arguments);
             },
             .ClassType => |data| {
-                return try VariableValue.newClassInstance(data.strongClone(), interpreter, callToken, arguments);
+                return try VariableValue.newClassInstance(data, interpreter, callToken, arguments);
             },
         }
     }

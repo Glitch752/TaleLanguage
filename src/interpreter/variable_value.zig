@@ -76,6 +76,7 @@ pub const VariableValue = union(enum) {
     pub fn takeReference(self: VariableValue, interpreter: *Interpreter) !VariableValue {
         switch (self) {
             .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
+            .ClassType => |value| return .{ .ClassType = value.takeReference() },
             .Function => |value| return .{ .Function = value.takeReference() },
             .String => |value| return .{ .String = .{ .string = try interpreter.allocator.dupe(u8, value.string), .allocated = true } },
             else => return self,
@@ -134,6 +135,16 @@ pub const VariableValue = union(enum) {
     }
     pub fn asClassType(self: VariableValue) ClassTypeReference {
         return self.ClassType.ClassType;
+    }
+    pub fn referenceClassType(self: VariableValue) ClassTypeReference {
+        if (self == .ClassType) {
+            return self.ClassType.ClassType.strongClone();
+        } else if (self == .WeakReference) {
+            std.debug.assert(self.WeakReference.ClassType.strongCount() != 0);
+            return self.WeakReference.ClassType.strongClone().?;
+        } else {
+            std.debug.panic("Tried to access non-class type as a class type", .{});
+        }
     }
 
     pub fn isClassInstance(self: VariableValue) bool {

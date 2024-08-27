@@ -357,8 +357,7 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
                 return InterpreterError.RuntimeError;
             }
 
-            var callable = callee.asCallable().takeReference();
-            defer _ = callable.deinit(self);
+            var callable = callee.asCallable();
 
             if (values.arguments.items.len != callable.getArity()) {
                 self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Expected {d} arguments but got {d}", .{ callable.getArity(), values.arguments.items.len });
@@ -407,10 +406,20 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             defer environment.exit(self);
 
             var superClass: ?ClassTypeReference = null;
+            errdefer _ = if (superClass != null) superClass.?.deinit(self);
             if (values.superClass != null) {
-                superClass = (try self.interpretExpression(values.superClass.?)).asClassType().strongClone();
+                var value = try self.interpretExpression(values.superClass.?);
+                defer value.deinit(self);
+
+                if (!value.isClassType()) {
+                    self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Must extend class type", .{});
+                    return InterpreterError.RuntimeError;
+                }
+
+                superClass = value.asClassType().strongClone();
                 errdefer _ = superClass.?.deinit(self);
-                try environment.define("super", .{ .ClassType = .{ .ClassType = superClass.? } }, self);
+
+                try environment.define("super", value.takeWeakReference(), self);
             }
 
             const class = try VariableValue.newClassType(values, environment, self.allocator, superClass);
@@ -446,7 +455,10 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
                 lexeme = call.method.?.lexeme;
             }
 
-            const method = superClass.asClassType().ptr().getInstanceMethod(lexeme);
+            var superClassReference = superClass.referenceClassType();
+            defer _ = superClassReference.deinit(self);
+
+            const method = superClassReference.ptr().getInstanceMethod(lexeme);
             if (method == null) {
                 self.runtimeError = RuntimeError.tokenError(self, call.superToken, "Undefined method '{s}'", .{call.method.?.lexeme});
                 return InterpreterError.RuntimeError;
