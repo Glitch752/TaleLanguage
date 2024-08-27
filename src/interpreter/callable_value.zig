@@ -51,7 +51,7 @@ pub const CallableFunction = union(enum) {
     /// Similar to normal user functions, but has some distinct calling characteristics (notably `this`).
     BoundClassMethod: struct {
         method: UserFunctionReference,
-        classInstance: ClassInstanceReference.Weak,
+        classInstance: ClassInstanceReference,
     },
 
     /// NOTE: This isn't a class instance, but a class type.
@@ -62,7 +62,7 @@ pub const CallableFunction = union(enum) {
             .User => _ = self.User.deinit(interpreter),
             .BoundClassMethod => {
                 _ = self.BoundClassMethod.method.deinit(interpreter);
-                _ = self.BoundClassMethod.classInstance.deinit();
+                _ = self.BoundClassMethod.classInstance.deinit(interpreter);
             },
             .ClassType => _ = self.ClassType.deinit(interpreter),
             else => {},
@@ -129,8 +129,8 @@ pub const CallableFunction = union(enum) {
             .id = functionId,
         }, allocator) };
     }
-    pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, interpreter: *Interpreter) !CallableFunction {
-        return .{ .ClassType = try ClassType.new(parentEnvironment, expression, interpreter) };
+    pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator, superClass: ?ClassTypeReference) !CallableFunction {
+        return .{ .ClassType = try ClassType.new(parentEnvironment, expression, allocator, superClass) };
     }
 
     pub fn takeReference(self: CallableFunction) CallableFunction {
@@ -138,16 +138,17 @@ pub const CallableFunction = union(enum) {
             .User => return .{ .User = self.User.strongClone() },
             .BoundClassMethod => return .{ .BoundClassMethod = .{
                 .method = self.BoundClassMethod.method.strongClone(),
-                .classInstance = self.BoundClassMethod.classInstance.weakClone(),
+                .classInstance = self.BoundClassMethod.classInstance.strongClone(),
             } },
             .ClassType => return .{ .ClassType = self.ClassType.strongClone() },
             else => return self,
         }
     }
 
+    /// NOTE: classInstance must be a unique reference. It's not cloned.
     pub fn bindToClass(self: *const CallableFunction, classInstance: ClassInstanceReference) CallableFunction {
         switch (self.*) {
-            .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance.weakClone() } },
+            .User => return .{ .BoundClassMethod = .{ .method = self.User.strongClone(), .classInstance = classInstance } },
             else => std.debug.panic("Tried to bind a non-class method to a class instance", .{}),
         }
     }

@@ -35,16 +35,19 @@ pub const VariableValue = union(enum) {
 
     WeakReference: union(enum) {
         ClassInstance: ClassInstanceReference.Weak,
+        ClassType: ClassTypeReference.Weak,
 
         pub fn deinit(self: *@This()) void {
             switch (self.*) {
                 .ClassInstance => _ = self.ClassInstance.deinit(),
+                .ClassType => _ = self.ClassType.deinit(),
             }
         }
 
         pub fn toString(self: *const @This(), allocator: std.mem.Allocator) ![]const u8 {
             switch (self.*) {
                 .ClassInstance => return std.fmt.allocPrint(allocator, "<class instance>", .{}),
+                .ClassType => return std.fmt.allocPrint(allocator, "<class type>", .{}),
             }
         }
     },
@@ -83,6 +86,7 @@ pub const VariableValue = union(enum) {
     pub fn takeWeakReference(self: VariableValue) VariableValue {
         switch (self) {
             .ClassInstance => |value| return .{ .WeakReference = .{ .ClassInstance = value.weakClone() } },
+            .ClassType => |value| return .{ .WeakReference = .{ .ClassType = value.ClassType.weakClone() } },
             else => return self,
         }
     }
@@ -127,6 +131,9 @@ pub const VariableValue = union(enum) {
 
     pub fn isClassType(self: VariableValue) bool {
         return self == .ClassType;
+    }
+    pub fn asClassType(self: VariableValue) ClassTypeReference {
+        return self.ClassType.ClassType;
     }
 
     pub fn isClassInstance(self: VariableValue) bool {
@@ -198,8 +205,8 @@ pub const VariableValue = union(enum) {
         return .{ .Function = function };
     }
 
-    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, interpreter: *Interpreter) !VariableValue {
-        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, interpreter) };
+    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator, superClass: ?ClassTypeReference) !VariableValue {
+        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator, superClass) };
     }
     pub fn newClassInstance(classType: ClassTypeReference, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
         return .{ .ClassInstance = try ClassInstance.new(interpreter, classType, callToken, arguments) };

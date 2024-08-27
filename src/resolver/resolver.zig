@@ -195,16 +195,20 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
 
         .Class => |values| {
             try self.beginScope();
-            // These are the static class type "this" and "super"
             try self.scopes.last.?.data.put(self.interpreter.allocator, "this", true);
-            try self.scopes.last.?.data.put(self.interpreter.allocator, "super", true);
+
+            if (values.superClass != null) {
+                try self.resolveExpression(values.superClass.?);
+
+                try self.beginScope();
+                try self.scopes.last.?.data.put(self.interpreter.allocator, "super", true);
+            }
 
             for (values.methods.items) |method| {
                 if (!method.static) {
                     // These are the instance "this" and "super"
                     try self.beginScope();
                     try self.scopes.last.?.data.put(self.interpreter.allocator, "this", true);
-                    try self.scopes.last.?.data.put(self.interpreter.allocator, "super", true);
                 }
 
                 try self.resolveFunction(method.function);
@@ -212,6 +216,10 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
                 if (!method.static) {
                     try self.endScope();
                 }
+            }
+
+            if (values.superClass != null) {
+                try self.endScope();
             }
 
             try self.endScope();
@@ -222,11 +230,11 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             }
             try self.resolveLocal(expression, token);
         },
-        .Super => |token| {
+        .Super => |call| {
             if (self.scopes.len == 0) {
-                try self.errorOn(token, "Cannot use 'super' outside of a class", .{});
+                try self.errorOn(call.superToken, "Cannot use 'super' outside of a class", .{});
             }
-            try self.resolveLocal(expression, token);
+            try self.resolveLocal(expression, call.superToken);
         },
 
         .VariableAccess => |values| {

@@ -15,6 +15,9 @@ const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 const natives = @import("./natives.zig");
 const NativeError = @import("./natives.zig").NativeError;
 
+const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
+const ClassMethod = @import("./class_value.zig").ClassMethod;
+
 pub const Interpreter = @This();
 
 allocator: std.mem.Allocator,
@@ -350,7 +353,7 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             defer callee.deinit(self);
 
             if (!callee.isCallable()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and classes", .{});
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and class types", .{});
                 return InterpreterError.RuntimeError;
             }
 
@@ -400,17 +403,47 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
         },
 
         .Class => |values| {
-            const environment = try self.enterNewEnvironment();
+            var environment = try self.enterNewEnvironment();
             defer environment.exit(self);
 
-            const class = try VariableValue.newClassType(values, environment, self);
+            var superClass: ?ClassTypeReference = null;
+            if (values.superClass != null) {
+                superClass = (try self.interpretExpression(values.superClass.?)).asClassType().strongClone();
+                errdefer _ = superClass.?.deinit(self);
+                try environment.define("super", .{ .ClassType = .{ .ClassType = superClass.? } }, self);
+            }
+
+            const class = try VariableValue.newClassType(values, environment, self.allocator, superClass);
             // We don't copy the value when defining the class here because we can't create a loop of references
-            // try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
+            try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
             // TODO: Implement super once inheritance is added
+
             return class;
         },
         .This => |token| return try self.lookUpVariable(token, expression),
-        .Super => |token| return try self.lookUpVariable(token, expression),
+        .Super => |call| {
+            const depth = self.expressionDefinitionDepth.get(expression.id);
+            if (depth == null) {
+                self.runtimeError = RuntimeError.tokenError(self, call.superToken, "Cannot use 'super' outside of a class", .{});
+                return InterpreterError.RuntimeError;
+            }
+
+            const superClass = try self.activeEnvironment.?.getAtDepth(call.superToken, depth.?, self);
+            const object = try self.activeEnvironment.?.getLexemeAtDepth("this", call.superToken, depth.? - 1, self);
+
+            var lexeme: []const u8 = "constructor";
+            if (call.method != null) {
+                lexeme = call.method.?.lexeme;
+            }
+
+            const method = superClass.asClassType().ptr().getMethod(lexeme);
+            if (method == null) {
+                self.runtimeError = RuntimeError.tokenError(self, call.superToken, "Undefined method '{s}'", .{call.method.?.lexeme});
+                return InterpreterError.RuntimeError;
+            }
+
+            return .{ .Function = method.?.function.bindToClass(object.referenceClassInstance()) };
+        },
 
         .VariableAccess => |values| {
             return try self.lookUpVariable(values.name, expression);

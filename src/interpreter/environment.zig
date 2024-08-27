@@ -147,6 +147,16 @@ pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Int
     return InterpreterError.RuntimeError;
 }
 
+pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Token, depth: u32, interpreter: *Interpreter) !VariableValue {
+    const environment = try self.ancestorAtDepth(depth);
+
+    const entry = environment.values.get(lexeme);
+    if (entry != null) return entry.?.value;
+
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, errorToken, "Tried to access {s} at depth {d}, which is undefined.", .{ lexeme, depth });
+    return InterpreterError.RuntimeError;
+}
+
 pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *Interpreter) !void {
     const environment = try self.ancestorAtDepth(depth);
 

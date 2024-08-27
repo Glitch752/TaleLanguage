@@ -640,7 +640,18 @@ fn consumePrimary(self: *Parser) anyerror!*Expression {
         return Expression.this(self.allocator, self.peekPrevious());
     }
     if (self.matchToken(TokenType.SuperKeyword)) {
-        return Expression.super(self.allocator, self.peekPrevious());
+        const keyword = self.peekPrevious();
+        if (!self.matchToken(TokenType.Dot)) {
+            if (self.peek().type != TokenType.OpenParen) {
+                const err = ParseError.consumeFailed(self, "Expected '.' or '(' after 'super'.", self.peek());
+                err.print(self.allocator);
+                return ParseErrorEnum.Unknown;
+            }
+
+            return Expression.super(self.allocator, keyword, null);
+        }
+        const method = try self.consume(TokenType.Identifier, "Expected method name after 'super.'");
+        return Expression.super(self.allocator, keyword, method);
     }
 
     const err = ParseError.consumeFailed(self, "Expected expression", self.peek());

@@ -15,7 +15,7 @@ pub const FunctionExpression = struct {
 
 pub const ClassExpression = struct {
     methods: std.ArrayListUnmanaged(ClassExpressionMethod),
-    superclass: ?*const Expression,
+    superClass: ?*const Expression,
     startToken: Token,
 
     pub fn deinit(self: *const ClassExpression, allocator: std.mem.Allocator) void {
@@ -24,8 +24,8 @@ pub const ClassExpression = struct {
         }
         allocator.free(self.methods.allocatedSlice());
 
-        if (self.superclass != null) {
-            self.superclass.?.*.uninit(allocator);
+        if (self.superClass != null) {
+            self.superClass.?.*.uninit(allocator);
         }
     }
 };
@@ -61,7 +61,7 @@ pub const Expression = struct {
 
         Class: ClassExpression,
         This: Token,
-        Super: Token,
+        Super: struct { superToken: Token, method: ?Token },
 
         VariableAccess: struct { name: Token },
         VariableAssignment: struct { name: Token, value: *const Expression },
@@ -162,7 +162,7 @@ pub const Expression = struct {
     pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassExpressionMethod), startToken: Token, superclass: ?*const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
-        alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods, .startToken = startToken, .superclass = superclass } } };
+        alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods, .startToken = startToken, .superClass = superclass } } };
         return alloc;
     }
     pub fn this(allocator: std.mem.Allocator, token: Token) !*Expression {
@@ -171,10 +171,13 @@ pub const Expression = struct {
         alloc.* = .{ .id = globalId, .value = .{ .This = token } };
         return alloc;
     }
-    pub fn super(allocator: std.mem.Allocator, token: Token) !*Expression {
+    pub fn super(allocator: std.mem.Allocator, superToken: Token, method: ?Token) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
-        alloc.* = .{ .id = globalId, .value = .{ .Super = token } };
+        alloc.* = .{ .id = globalId, .value = .{ .Super = .{
+            .superToken = superToken,
+            .method = method,
+        } } };
         return alloc;
     }
 

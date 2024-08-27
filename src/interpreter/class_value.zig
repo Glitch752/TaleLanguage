@@ -14,76 +14,37 @@ const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 const RCSP = @import("../rcsp.zig");
 
 pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, *Interpreter);
-const ClassInstanceReferencePointer = *align(8) anyopaque; // ClassInstanceReference.*;
 
 pub const ClassInstance = struct {
     classType: ClassTypeReference,
     environment: *Environment,
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    _superClass: ?ClassInstanceReferencePointer,
-    pub fn superClass(self: *const ClassInstance) ?ClassInstanceReference {
-        if (self._superClass == null) {
-            return null;
-        }
-
-        return @as(*ClassInstanceReference, @ptrCast(self._superClass.?)).*;
-    }
-
-    /// Creates a new super class instance. The difference between this and `new` is that this
-    /// doesn't call the constructor method by default.
-    pub fn newSuper(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token) !ClassInstanceReference {
+    pub fn new(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
         var classTypeParent = classType.ptr().parentEnvironment;
         allocatedEnvironment.* = classTypeParent.createChild(classTypeParent);
         errdefer allocatedEnvironment.exit(interpreter);
 
-        var super: ?ClassInstanceReferencePointer = null;
-
-        if (classType.ptr()._superClass != null) {
-            const superInstance: *ClassInstanceReference = try interpreter.allocator.create(ClassInstanceReference);
-            errdefer interpreter.allocator.destroy(superInstance);
-
-            superInstance.* = try ClassInstance.newSuper(interpreter, classType.ptr().superClass().?, callToken);
-            super = @ptrCast(superInstance);
-
-            try allocatedEnvironment.define("super", VariableValue.weakClassInstanceReference(superInstance.*.weakClone()), interpreter);
-        }
-
-        errdefer {
-            if (super != null) {
-                var superPointer = @as(*ClassInstanceReference, @ptrCast(super.?));
-                _ = superPointer.deinit(interpreter);
-                interpreter.allocator.destroy(superPointer);
-            }
-        }
-
         var value = try ClassInstanceReference.init(.{
             .classType = classType.strongClone(),
             .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
-            ._superClass = super,
         }, interpreter.allocator);
         errdefer _ = value.deinit(interpreter);
 
         try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);
 
-        return value;
-    }
-
-    pub fn new(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
-        const superVersion = try ClassInstance.newSuper(interpreter, classType, callToken);
-
-        const constructorMethod = classType.ptr().methods.get("constructor");
+        const constructorMethod = classType.ptr().getMethod("constructor");
         if (constructorMethod != null) {
-            var boundConstructor = constructorMethod.?.function.bindToClass(superVersion);
+            var boundConstructor = constructorMethod.?.function.bindToClass(value.strongClone());
             defer boundConstructor.deinit(interpreter);
 
             var result = try boundConstructor.call(interpreter, callToken, arguments);
             _ = result.deinit(interpreter);
         }
 
-        return superVersion;
+        return value;
     }
 
     pub fn deinit(self: *ClassInstance, interpreter: *Interpreter) void {
@@ -97,13 +58,6 @@ pub const ClassInstance = struct {
         std.debug.assert(self.classType.strongCount() != 0);
         _ = self.classType.deinit(interpreter);
 
-        if (self._superClass != null) {
-            var super = self.superClass();
-            _ = super.?.deinit(interpreter);
-
-            interpreter.allocator.destroy(@as(*ClassInstanceReference, @ptrCast(self._superClass.?)));
-        }
-
         self.environment.unreference(interpreter);
     }
 
@@ -114,12 +68,12 @@ pub const ClassInstance = struct {
 
     pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *Interpreter) !VariableValue {
         const classType = self.classType.ptr();
-        const method = classType.methods.get(name.lexeme);
+        const method = classType.getMethod(name.lexeme);
         if (method != null) {
             if (method.?.static) {
                 std.debug.panic("TODO: Implement static method calls on class instances", .{});
             } else {
-                return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference));
+                return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference.strongClone()));
             }
         }
 
@@ -165,32 +119,26 @@ pub const ClassType = struct {
         return @as(*ClassTypeReference, @ptrCast(self._superClass.?)).*;
     }
 
-    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, interpreter: *Interpreter) !ClassTypeReference {
+    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator, superClassType: ?ClassTypeReference) !ClassTypeReference {
         var methods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
-            const function = try CallableFunction.user(method.function, parentEnvironment, interpreter.allocator);
-            const duplicatedName = try interpreter.allocator.dupe(u8, method.name.lexeme);
-            try methods.put(interpreter.allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(interpreter.allocator), function));
+            const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
+            const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
+            try methods.put(allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(allocator), function));
         }
 
         var super: ?ClassTypeReferencePointer = null;
-        if (expression.superclass != null) {
-            const value = try interpreter.interpretExpression(expression.superclass.?);
-            if (!value.isClassType()) {
-                interpreter.runtimeError = RuntimeError.tokenError(interpreter, expression.superclass.?.value.Class.startToken, "Superclass must be a class type value.", .{});
-                return InterpreterError.RuntimeError;
-            }
-
-            const superClassType: *ClassTypeReference = try interpreter.allocator.create(ClassTypeReference);
-            superClassType.* = value.ClassType.ClassType.strongClone();
-            super = @ptrCast(superClassType);
+        if (superClassType != null) {
+            const superClassPointer: *ClassTypeReference = try allocator.create(ClassTypeReference);
+            superClassPointer.* = superClassType.?;
+            super = @ptrCast(superClassPointer);
         }
 
         const value = try ClassTypeReference.init(.{
             .methods = methods,
             .parentEnvironment = parentEnvironment,
             ._superClass = super,
-        }, interpreter.allocator);
+        }, allocator);
 
         parentEnvironment.referenceCount += 1;
         return value;
@@ -222,6 +170,14 @@ pub const ClassType = struct {
         }
 
         return constructorMethod.?.getArity();
+    }
+
+    pub fn getMethod(self: *const ClassType, name: []const u8) ?ClassMethod {
+        const value = self.methods.get(name);
+        if (value == null and self._superClass != null) {
+            return self.superClass().?.ptr().getMethod(name);
+        }
+        return value;
     }
 
     pub fn toString(self: *const ClassType, allocator: std.mem.Allocator) ![]const u8 {
