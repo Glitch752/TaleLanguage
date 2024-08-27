@@ -87,6 +87,13 @@ pub const CallableFunction = union(enum) {
                     return InterpreterError.RuntimeError;
                 }
 
+                defer {
+                    for (arguments.items) |value| {
+                        var val = value;
+                        val.deinit(interpreter);
+                    }
+                }
+
                 return try data.body(interpreter, arguments);
             },
             .User => |data| {

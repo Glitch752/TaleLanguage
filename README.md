@@ -123,11 +123,11 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] Single inheritance: `let Point3D = class extending Point { constructor(x, y, z) { super.constructor(x, y); this.z = z; } }`
     - Constructors are inherited just like any other method
   - [X] Method access: `p.method()` (Just another function)
-  - [ ] Static:
-    - [ ] Methods: `let Point = class { static method() { return 5; } }`
+  - [X] Static:
+    - [X] Methods: `let Point = class { static method() { return 5; } }`
       - Access: `Point.method()` (No `this` reference)
       - Static and instance methods can have the same name. You cannot call static methods on instances.
-    - [ ] Fields: `let Point = class { static x = 5; }`
+    - [X] Fields: `let Point = class {}; Point.x = 5;`
       - Access: `Point.x`
 - [ ] Imports from other files: `const test = import("test.tale");` (`test` is a namespace with all the exported values)
   - [ ] Exporting values: `export let x = 5;`

@@ -89,7 +89,9 @@ pub const ClassInstance = struct {
         }
 
         if (self.fieldValues.contains(name.lexeme)) {
-            self.fieldValues.getPtr(name.lexeme).?.* = value;
+            const pointer = self.fieldValues.getPtr(name.lexeme);
+            pointer.?.*.deinit(interpreter);
+            pointer.?.* = value;
             return;
         }
 

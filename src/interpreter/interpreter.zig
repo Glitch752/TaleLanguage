@@ -365,12 +365,12 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             }
 
             var argumentResults = std.ArrayList(VariableValue).init(self.allocator);
-            defer {
+            defer argumentResults.deinit();
+            errdefer {
                 for (argumentResults.items) |value| {
                     var val = value;
                     val.deinit(self);
                 }
-                argumentResults.deinit();
             }
 
             for (values.arguments.items) |argument| {
@@ -380,13 +380,7 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
                 try argumentResults.append(value);
             }
 
-            var argumentValues = std.ArrayList(VariableValue).init(self.allocator);
-            defer argumentValues.deinit();
-            for (argumentResults.items) |result| {
-                try argumentValues.append(result);
-            }
-
-            return callable.call(self, values.startToken, argumentValues) catch |err| switch (err) {
+            return callable.call(self, values.startToken, argumentResults) catch |err| switch (err) {
                 NativeError.InvalidOperand => {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
                     return InterpreterError.RuntimeError;
@@ -438,6 +432,9 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
 
             const superClass = try self.activeEnvironment.?.getAtDepth(call.superToken, depth.?, self);
 
+            var superClassReference = superClass.referenceClassType();
+            defer _ = superClassReference.deinit(self);
+
             if (!self.activeEnvironment.?.lexemeExistsAtDepth("this", depth.? - 1)) {
                 // This is a static method
                 if (call.method == null) {
@@ -445,7 +442,7 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
                     return InterpreterError.RuntimeError;
                 }
 
-                return superClass.asClassType().ptr().getStatic(call.method.?, self);
+                return superClassReference.ptr().getStatic(call.method.?, self);
             }
 
             const object = try self.activeEnvironment.?.getLexemeAtDepth("this", call.superToken, depth.? - 1, self);
@@ -454,9 +451,6 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             if (call.method != null) {
                 lexeme = call.method.?.lexeme;
             }
-
-            var superClassReference = superClass.referenceClassType();
-            defer _ = superClassReference.deinit(self);
 
             const method = superClassReference.ptr().getInstanceMethod(lexeme);
             if (method == null) {

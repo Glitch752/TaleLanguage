@@ -1,0 +1,23 @@
+let TestClass = class {
+    static a() {
+        print("A\n");
+    }
+};
+let TestClass2 = class extending TestClass {
+    static b() {
+        print("B\n");
+    }
+};
+TestClass.tc2 = TestClass2;
+let TestClass3 = class extending class extending TestClass.tc2 {} {
+    static c() {
+        super.b();
+        print("C\n");
+    }
+};
+
+TestClass.a();
+TestClass2.a();
+TestClass2.b();
+
+TestClass3.c();
