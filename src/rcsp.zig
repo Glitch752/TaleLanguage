@@ -193,6 +193,34 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
                 return Ops.load(&self.inner.?.*.weak_ctr) - 1;
             }
 
+            /// Const pointer to the value
+            ///
+            /// As the pointer is constant, if mutability
+            /// is desired, use of `std.Mutex` and `unsafePtr`
+            /// is recommended
+            pub fn ptr(self: SelfWeak) *const T {
+                return &self.inner.?.*.val;
+            }
+
+            /// Unsafe (mutable) pointer to the value
+            /// Normally it is recommended to use `std.Mutex`
+            /// for concurrent access:
+            ///
+            /// ```
+            /// const T = struct { value: u128, ptr: std.Mutex = std.Mutex.init() };
+            /// var counter = RcSharedPointer(T, Atomic).init(T{ .value = 10 });
+            /// defer counter.deinit();
+            /// var ptr = counter.unsafePtr();
+            /// {
+            ///     const lock = ptr.*.mutex.aquire();
+            ///     defer lock.release();
+            ///     ptr.*.value = 100;
+            /// }
+            /// ```
+            pub fn unsafePtr(self: SelfWeak) *T {
+                return &self.inner.?.*.val;
+            }
+
             /// Deinitialize weak clone
             ///
             /// Will never deinitialize the value but will
@@ -327,12 +355,14 @@ pub fn RcSharedPointer(comptime T: type, comptime Ops: type) type {
             // incapacitate self (useful methods will now panic)
             self.inner = null;
             if (c_ == 1) {
+                // NOTE: We run this before deinitializing the value because sometimes it causes
+                // segfaults if we don't... for some reason.
+                const cw = Ops.decrement(&p.*.weak_ctr);
+
                 // ...ready to deinitialize the value
                 if (deinitializer) |deinit_fn| {
                     deinit_fn(&p.*.val, context);
                 }
-
-                const cw = Ops.decrement(&p.*.weak_ctr);
 
                 // also, if there are no outstanding weak counters,
                 if (cw <= 1) {
@@ -407,6 +437,34 @@ pub fn DeinitializingRcSharedPointer(comptime T: type, comptime Ops: type, compt
             /// Number of weak clones
             pub inline fn weakCount(self: SelfWeak) usize {
                 return self.weak.weakCount();
+            }
+
+            /// Const pointer to the value
+            ///
+            /// As the pointer is constant, if mutability
+            /// is desired, use of `std.Mutex` and `unsafePtr`
+            /// is recommended
+            pub fn ptr(self: SelfWeak) *const T {
+                return self.weak.ptr();
+            }
+
+            /// Unsafe (mutable) pointer to the value
+            /// Normally it is recommended to use `std.Mutex`
+            /// for concurrent access:
+            ///
+            /// ```
+            /// const T = struct { value: u128, ptr: std.Mutex = std.Mutex.init() };
+            /// var counter = RcSharedPointer(T, Atomic).init(T{ .value = 10 });
+            /// defer counter.deinit();
+            /// var ptr = counter.unsafePtr();
+            /// {
+            ///     const lock = ptr.*.mutex.aquire();
+            ///     defer lock.release();
+            ///     ptr.*.value = 100;
+            /// }
+            /// ```
+            pub fn unsafePtr(self: SelfWeak) *T {
+                return self.weak.unsafePtr();
             }
 
             /// Deinitialize weak clone

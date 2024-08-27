@@ -30,6 +30,12 @@ pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
     return .Null;
 }
 
+/// Aruty: 1
+pub fn toString(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    const argument = arguments.items[0];
+    return VariableValue.fromString(VariableValue.toString(argument, interpreter.allocator) catch return NativeError.Unknown, true);
+}
+
 /// Arity: 1
 pub fn sin(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;

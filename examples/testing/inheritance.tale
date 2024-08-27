@@ -1,0 +1,49 @@
+let Point = class {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    print() {
+        print("Point(" + string(this.x) + ", " + string(this.y) + ")\n");
+    }
+
+    add(x, y) {
+        this.x = this.x + x;
+        this.y = this.y + y;
+    }
+};
+
+let point = Point(1, 2);
+let i = 0;
+while(i < 10) {
+    point.print();
+    point.add(1, 1);
+    i = i + 1;
+}
+
+print("---\n");
+
+let Point3D = class extending Point {
+    constructor(x, y, z) {
+        // super(x, y);
+        this.z = z;
+    }
+
+    print() {
+        print("Point3D(" + string(this.x) + ", " + string(this.y) + ", " + string(this.z) + ")\n");
+    }
+
+    add(x, y, z) {
+        super.add(x, y);
+        this.z = this.z + z;
+    }
+};
+
+let point3d = Point3D(1, 2, 3);
+// let j = 0;
+// while(j < 10) {
+//     point3d.print();
+//     point3d.add(1, 1, 1);
+//     j = j + 1;
+// }

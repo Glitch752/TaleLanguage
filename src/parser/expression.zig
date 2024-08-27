@@ -15,12 +15,18 @@ pub const FunctionExpression = struct {
 
 pub const ClassExpression = struct {
     methods: std.ArrayListUnmanaged(ClassExpressionMethod),
+    superclass: ?*const Expression,
+    startToken: Token,
 
     pub fn deinit(self: *const ClassExpression, allocator: std.mem.Allocator) void {
         for (self.methods.items) |method| {
             method.deinit(allocator);
         }
         allocator.free(self.methods.allocatedSlice());
+
+        if (self.superclass != null) {
+            self.superclass.?.*.uninit(allocator);
+        }
     }
 };
 pub const ClassExpressionMethod = struct {
@@ -153,10 +159,10 @@ pub const Expression = struct {
         return alloc;
     }
 
-    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassExpressionMethod)) !*Expression {
+    pub fn class(allocator: std.mem.Allocator, methods: std.ArrayListUnmanaged(ClassExpressionMethod), startToken: Token, superclass: ?*const Expression) !*Expression {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
-        alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods } } };
+        alloc.* = .{ .id = globalId, .value = .{ .Class = .{ .methods = methods, .startToken = startToken, .superclass = superclass } } };
         return alloc;
     }
     pub fn this(allocator: std.mem.Allocator, token: Token) !*Expression {

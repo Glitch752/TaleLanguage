@@ -308,7 +308,12 @@ fn consumeExpression(self: *Parser) anyerror!*Expression {
 fn consumeClassExpression(self: *Parser) anyerror!*Expression {
     var methods = std.ArrayListUnmanaged(ClassMethod){};
 
-    // TODO: Inheritance
+    const startToken = self.peekPrevious();
+
+    var superclass: ?*Expression = null;
+    if (self.matchToken(TokenType.ExtendingKeyword)) {
+        superclass = try self.consumeExpression();
+    }
 
     _ = try self.consume(TokenType.OpenCurly, "Expected '{' after 'class'");
     while (!self.matchToken(TokenType.CloseCurly) and !self.isAtEnd()) {
@@ -316,7 +321,7 @@ fn consumeClassExpression(self: *Parser) anyerror!*Expression {
         try methods.append(self.allocator, method);
     }
 
-    return Expression.class(self.allocator, methods);
+    return Expression.class(self.allocator, methods, startToken, superclass);
 }
 
 fn consumeClassMethod(self: *Parser) anyerror!ClassMethod {

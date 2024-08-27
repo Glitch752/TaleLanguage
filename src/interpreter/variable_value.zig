@@ -198,8 +198,8 @@ pub const VariableValue = union(enum) {
         return .{ .Function = function };
     }
 
-    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator) };
+    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, interpreter: *Interpreter) !VariableValue {
+        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, interpreter) };
     }
     pub fn newClassInstance(classType: ClassTypeReference, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
         return .{ .ClassInstance = try ClassInstance.new(interpreter, classType, callToken, arguments) };

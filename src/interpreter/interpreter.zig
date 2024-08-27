@@ -46,6 +46,7 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
     try environment.define("substring", try VariableValue.nativeFunction(3, &natives.substring), null);
     try environment.define("intChar", try VariableValue.nativeFunction(1, &natives.intChar), null);
     try environment.define("length", try VariableValue.nativeFunction(1, &natives.length), null);
+    try environment.define("string", try VariableValue.nativeFunction(1, &natives.toString), null);
 
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
@@ -172,7 +173,7 @@ fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression
     return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self);
 }
 
-fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
+pub fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
     switch (expression.*.value) {
         .Grouping => |values| {
             return self.interpretExpression(values.expression);
@@ -402,7 +403,7 @@ fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerr
             const environment = try self.enterNewEnvironment();
             defer environment.exit(self);
 
-            const class = try VariableValue.newClassType(values, environment, self.allocator);
+            const class = try VariableValue.newClassType(values, environment, self);
             // We don't copy the value when defining the class here because we can't create a loop of references
             // try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
             // TODO: Implement super once inheritance is added
