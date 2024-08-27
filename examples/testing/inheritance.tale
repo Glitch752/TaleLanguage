@@ -32,6 +32,10 @@ let Point3D = class extending Point {
         super.add(x, y);
         this.z = this.z + z;
     }
+    addTo(point) {
+        super.add(point.x, point.y);
+        this.z = this.z + point.z;
+    }
 };
 
 let point3d = Point3D(5, 5, 3);
@@ -40,5 +44,9 @@ let j = 0;
 while(j < 10) {
     point3d.print();
     point3d.add(1, 1, 1);
+
+    let point = Point3D(j, j, j + 1);
+    point3d.addTo(point);
+
     j = j + 1;
 }
