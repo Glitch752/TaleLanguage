@@ -1,0 +1,7 @@
+let Point = class {
+    constructor(x, y) { this.x = x; this.y = y; }
+    print() { print("Point(" + string(this.x) + ", " + string(this.y) + ")\n"); }
+    add(x, y) { this.x = this.x + x; this.y = this.y + y; }
+};
+
+Point(1, 1);

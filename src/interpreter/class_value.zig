@@ -35,7 +35,7 @@ pub const ClassInstance = struct {
 
         try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);
 
-        const constructorMethod = classType.ptr().getMethod("constructor");
+        const constructorMethod = classType.ptr().getInstanceMethod("constructor");
         if (constructorMethod != null) {
             var boundConstructor = constructorMethod.?.function.bindToClass(value.strongClone());
             defer boundConstructor.deinit(interpreter);
@@ -68,13 +68,9 @@ pub const ClassInstance = struct {
 
     pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *Interpreter) !VariableValue {
         const classType = self.classType.ptr();
-        const method = classType.getMethod(name.lexeme);
+        const method = classType.getInstanceMethod(name.lexeme);
         if (method != null) {
-            if (method.?.static) {
-                std.debug.panic("TODO: Implement static method calls on class instances", .{});
-            } else {
-                return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference.strongClone()));
-            }
+            return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference.strongClone()));
         }
 
         const property = self.fieldValues.get(name.lexeme);
@@ -87,7 +83,7 @@ pub const ClassInstance = struct {
     }
 
     pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
-        if (self.classType.ptr().methods.contains(name.lexeme)) {
+        if (self.classType.ptr().instanceMethods.contains(name.lexeme)) {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
             return InterpreterError.RuntimeError;
         }
@@ -107,9 +103,13 @@ const ClassTypeReferencePointer = *align(8) anyopaque; // ClassTypeReference.*;
 
 /// NOTE: This isn't a class instance, but a class type.
 pub const ClassType = struct {
-    methods: std.StringHashMapUnmanaged(ClassMethod),
+    instanceMethods: std.StringHashMapUnmanaged(ClassMethod),
+    staticMethods: std.StringHashMapUnmanaged(ClassMethod),
+
     parentEnvironment: *Environment,
     _superClass: ?ClassTypeReferencePointer,
+
+    staticFieldValues: std.StringHashMapUnmanaged(VariableValue),
 
     pub fn superClass(self: *const ClassType) ?ClassTypeReference {
         if (self._superClass == null) {
@@ -120,11 +120,12 @@ pub const ClassType = struct {
     }
 
     pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator, superClassType: ?ClassTypeReference) !ClassTypeReference {
-        var methods = std.StringHashMapUnmanaged(ClassMethod){};
+        var instanceMethods = std.StringHashMapUnmanaged(ClassMethod){};
+        var staticMethods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
             const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
             const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
-            try methods.put(allocator, duplicatedName, ClassMethod.new(method.static, try method.name.clone(allocator), function));
+            try (if (method.static) staticMethods else instanceMethods).put(allocator, duplicatedName, ClassMethod.new(try method.name.clone(allocator), function));
         }
 
         var super: ?ClassTypeReferencePointer = null;
@@ -135,9 +136,13 @@ pub const ClassType = struct {
         }
 
         const value = try ClassTypeReference.init(.{
-            .methods = methods,
+            .instanceMethods = instanceMethods,
+            .staticMethods = staticMethods,
+
             .parentEnvironment = parentEnvironment,
             ._superClass = super,
+
+            .staticFieldValues = std.StringHashMapUnmanaged(VariableValue){},
         }, allocator);
 
         parentEnvironment.referenceCount += 1;
@@ -145,12 +150,26 @@ pub const ClassType = struct {
     }
 
     pub fn deinit(self: *ClassType, interpreter: *Interpreter) void {
-        var iterator = self.methods.iterator();
-        while (iterator.next()) |method| {
+        var instanceIterator = self.instanceMethods.iterator();
+        while (instanceIterator.next()) |method| {
             method.value_ptr.deinit(interpreter);
             interpreter.allocator.free(method.key_ptr.*);
         }
-        self.methods.deinit(interpreter.allocator);
+        self.instanceMethods.deinit(interpreter.allocator);
+
+        var staticIterator = self.staticMethods.iterator();
+        while (staticIterator.next()) |method| {
+            method.value_ptr.deinit(interpreter);
+            interpreter.allocator.free(method.key_ptr.*);
+        }
+        self.staticMethods.deinit(interpreter.allocator);
+
+        var fieldIterator = self.staticFieldValues.iterator();
+        while (fieldIterator.next()) |field| {
+            field.value_ptr.deinit(interpreter);
+            interpreter.allocator.free(field.key_ptr.*);
+        }
+        self.staticFieldValues.deinit(interpreter.allocator);
 
         if (self._superClass != null) {
             var super = self.superClass();
@@ -162,8 +181,46 @@ pub const ClassType = struct {
         self.parentEnvironment.unreference(interpreter);
     }
 
+    pub fn getStatic(self: *const ClassType, name: Token, interpreter: *Interpreter) !VariableValue {
+        const method = self.getStaticMethod(name.lexeme);
+        if (method != null) {
+            return VariableValue.newFunctionReference(method.?.function.takeReference());
+        }
+
+        const property = self.staticFieldValues.get(name.lexeme);
+        if (property != null) {
+            return property.?.takeReference(interpreter);
+        }
+
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No static proprety or method '{s}' found.", .{name.lexeme});
+        return InterpreterError.RuntimeError;
+    }
+
+    pub fn setStatic(self: *ClassType, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
+        if (self.staticMethods.contains(name.lexeme)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to static method '{s}'.", .{name.lexeme});
+            return InterpreterError.RuntimeError;
+        }
+
+        if (self.staticFieldValues.contains(name.lexeme)) {
+            self.staticFieldValues.getPtr(name.lexeme).?.* = value;
+            return;
+        }
+
+        const duplicatedName = try interpreter.allocator.dupe(u8, name.lexeme);
+        try self.staticFieldValues.put(interpreter.allocator, duplicatedName, value);
+    }
+
+    fn getStaticMethod(self: *const ClassType, name: []const u8) ?ClassMethod {
+        const value = self.staticMethods.get(name);
+        if (value == null and self._superClass != null) {
+            return self.superClass().?.ptr().getStaticMethod(name);
+        }
+        return value;
+    }
+
     pub fn getArity(self: *const ClassType) u32 {
-        const constructorMethod = self.methods.get("constructor");
+        const constructorMethod = self.instanceMethods.get("constructor");
 
         if (constructorMethod == null) {
             return 0;
@@ -172,10 +229,10 @@ pub const ClassType = struct {
         return constructorMethod.?.getArity();
     }
 
-    pub fn getMethod(self: *const ClassType, name: []const u8) ?ClassMethod {
-        const value = self.methods.get(name);
+    pub fn getInstanceMethod(self: *const ClassType, name: []const u8) ?ClassMethod {
+        const value = self.instanceMethods.get(name);
         if (value == null and self._superClass != null) {
-            return self.superClass().?.ptr().getMethod(name);
+            return self.superClass().?.ptr().getInstanceMethod(name);
         }
         return value;
     }
@@ -188,12 +245,11 @@ pub const ClassType = struct {
 
 /// NOTE: This exists on a class type, not a class instance.
 pub const ClassMethod = struct {
-    static: bool,
     name: Token,
     function: CallableFunction,
 
-    pub fn new(static: bool, name: Token, function: CallableFunction) ClassMethod {
-        return .{ .static = static, .name = name, .function = function };
+    pub fn new(name: Token, function: CallableFunction) ClassMethod {
+        return .{ .name = name, .function = function };
     }
 
     pub fn deinit(self: *ClassMethod, interpreter: *Interpreter) void {

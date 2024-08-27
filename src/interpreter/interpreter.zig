@@ -416,7 +416,6 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             const class = try VariableValue.newClassType(values, environment, self.allocator, superClass);
             // We don't copy the value when defining the class here because we can't create a loop of references
             try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
-            // TODO: Implement super once inheritance is added
 
             return class;
         },
@@ -429,6 +428,17 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             }
 
             const superClass = try self.activeEnvironment.?.getAtDepth(call.superToken, depth.?, self);
+
+            if (!self.activeEnvironment.?.lexemeExistsAtDepth("this", depth.? - 1)) {
+                // This is a static method
+                if (call.method == null) {
+                    self.runtimeError = RuntimeError.tokenError(self, call.superToken, "Cannot use a super constructor in a static method", .{});
+                    return InterpreterError.RuntimeError;
+                }
+
+                return superClass.asClassType().ptr().getStatic(call.method.?, self);
+            }
+
             const object = try self.activeEnvironment.?.getLexemeAtDepth("this", call.superToken, depth.? - 1, self);
 
             var lexeme: []const u8 = "constructor";
@@ -436,7 +446,7 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
                 lexeme = call.method.?.lexeme;
             }
 
-            const method = superClass.asClassType().ptr().getMethod(lexeme);
+            const method = superClass.asClassType().ptr().getInstanceMethod(lexeme);
             if (method == null) {
                 self.runtimeError = RuntimeError.tokenError(self, call.superToken, "Undefined method '{s}'", .{call.method.?.lexeme});
                 return InterpreterError.RuntimeError;
@@ -474,8 +484,12 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             defer object.deinit(self);
 
             if (!object.isClassInstance()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances", .{});
-                return InterpreterError.RuntimeError;
+                if (!object.isClassType()) {
+                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances or types", .{});
+                    return InterpreterError.RuntimeError;
+                }
+                var classType = object.asClassType();
+                return try classType.ptr().getStatic(values.name, self);
             }
 
             var instance = object.referenceClassInstance();
@@ -486,20 +500,26 @@ pub fn interpretExpression(self: *Interpreter, expression: *const Expression) an
             var object = try self.interpretExpression(values.object);
             defer object.deinit(self);
 
+            var value = try self.interpretExpression(values.value);
+            errdefer value.deinit(self);
+
             if (!object.isClassInstance()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances", .{});
-                return InterpreterError.RuntimeError;
+                if (!object.isClassType()) {
+                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances or types", .{});
+                    return InterpreterError.RuntimeError;
+                }
+                var classType = object.asClassType();
+                try classType.unsafePtr().setStatic(values.name, value, self);
+                if (self.runtimeError != null) return InterpreterError.RuntimeError;
+
+                return value;
             }
 
             var instance = object.referenceClassInstance();
             defer _ = instance.deinit(self);
 
-            const value = try self.interpretExpression(values.value);
-
             try instance.unsafePtr().set(values.name, value, self);
-            if (self.runtimeError != null) {
-                return InterpreterError.RuntimeError;
-            }
+            if (self.runtimeError != null) return InterpreterError.RuntimeError;
 
             return value;
         },

@@ -157,6 +157,11 @@ pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Toke
     return InterpreterError.RuntimeError;
 }
 
+pub fn lexemeExistsAtDepth(self: *Environment, lexeme: []const u8, depth: u32) bool {
+    const environment = try self.ancestorAtDepth(depth);
+    return environment.values.contains(lexeme);
+}
+
 pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *Interpreter) !void {
     const environment = try self.ancestorAtDepth(depth);
 

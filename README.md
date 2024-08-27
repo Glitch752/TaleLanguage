@@ -126,8 +126,13 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [ ] Static:
     - [ ] Methods: `let Point = class { static method() { return 5; } }`
       - Access: `Point.method()` (No `this` reference)
+      - Static and instance methods can have the same name. You cannot call static methods on instances.
     - [ ] Fields: `let Point = class { static x = 5; }`
       - Access: `Point.x`
+- [ ] Imports from other files: `const test = import("test.tale");` (`test` is a namespace with all the exported values)
+  - [ ] Exporting values: `export let x = 5;`
+  - [ ] Exporting classes: `export class Point { constructor(x, y) { this.x = x; this.y = y; } }`
+  - [ ] Circular imports should be handled gracefully
 - [ ] Simple standard library, ~~globally accessible as `Std` (until I implement imports)~~ globally accessible for now:
   - [X] `print` function: `print("Hello, world!");`
   - [ ] `clock` function: `print(clock());` (Returns the time in seconds since the program started running)

@@ -50,7 +50,7 @@ fn errorOn(self: *const Resolver, token: Token, comptime message: []const u8, pa
     defer self.interpreter.allocator.free(formattedMessage);
     try prettyError(formattedMessage);
 
-    try errorContext(self.originalBuffer, self.fileName, token.position, token.position + token.lexeme.len, self.interpreter.allocator);
+    try errorContext(self.originalBuffer, self.fileName, token.position, token.lexeme.len, self.interpreter.allocator);
 }
 
 fn unknownError(self: *const Resolver, comptime message: []const u8, params: anytype) !void {
@@ -206,8 +206,8 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
 
             for (values.methods.items) |method| {
                 if (!method.static) {
-                    // These are the instance "this" and "super"
                     try self.beginScope();
+                    // These are the instance "this" and "super"
                     try self.scopes.last.?.data.put(self.interpreter.allocator, "this", true);
                 }
 
@@ -234,6 +234,7 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             if (self.scopes.len == 0) {
                 try self.errorOn(call.superToken, "Cannot use 'super' outside of a class", .{});
             }
+
             try self.resolveLocal(expression, call.superToken);
         },
 
