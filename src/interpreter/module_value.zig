@@ -18,8 +18,8 @@ pub const Module = struct {
         return self.moduleInterpreter.rootEnvironment;
     }
 
-    pub fn load(interpreter: *Interpreter, path: []const u8, import: CallableNativeFunction) !Module {
-        var moduleInterpreter = try ModuleInterpreter.init(interpreter.allocator, import);
+    pub fn load(interpreter: *Interpreter, path: []const u8) !Module {
+        var moduleInterpreter = try ModuleInterpreter.init(interpreter.allocator, interpreter);
         _ = try interpreter.runFile(path, &moduleInterpreter);
 
         return .{

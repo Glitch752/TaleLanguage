@@ -20,6 +20,8 @@ const ClassMethod = @import("./class_value.zig").ClassMethod;
 
 const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFunction;
 
+const Interpreter = @import("./interpreter.zig").Interpreter;
+
 pub const ModuleInterpreter = @This();
 
 allocator: std.mem.Allocator,
@@ -28,16 +30,18 @@ runtimeError: ?RuntimeError = null,
 lastReturnValue: VariableValue = VariableValue.null(),
 
 originalBuffer: []const u8 = "",
-fileName: []const u8 = "",
+filePath: []const u8 = "",
 
 rootEnvironment: Environment,
 activeEnvironment: ?*Environment = null,
 
 expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 
-pub fn init(allocator: std.mem.Allocator, import: CallableNativeFunction) !ModuleInterpreter {
+interpreter: *Interpreter,
+
+pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInterpreter {
     var environment = Environment.init(allocator);
-    try environment.define("import", try VariableValue.nativeFunction(1, import), null);
+    try environment.define("import", try VariableValue.nativeFunction(1, Interpreter.import), null);
 
     try environment.define("print", try VariableValue.nativeFunction(1, &natives.print), null);
     try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin), null);
@@ -57,17 +61,22 @@ pub fn init(allocator: std.mem.Allocator, import: CallableNativeFunction) !Modul
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
 
-    return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = expressionDepths };
+    return .{
+        .allocator = allocator,
+        .rootEnvironment = environment,
+        .expressionDefinitionDepth = expressionDepths,
+        .interpreter = interpreter,
+    };
 }
 
 pub fn deinit(self: *ModuleInterpreter) void {
-    self.rootEnvironment.deinit(self);
+    self.rootEnvironment.deinit(self.allocator);
     self.expressionDefinitionDepth.deinit(self.allocator);
 }
 
-pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
+pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, filePath: []const u8) !void {
     self.originalBuffer = originalBuffer;
-    self.fileName = fileName;
+    self.filePath = filePath;
 
     self.activeEnvironment = &self.rootEnvironment;
 
@@ -79,9 +88,9 @@ pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []
     }
 }
 
-pub fn runExpression(self: *ModuleInterpreter, expression: *const Expression, originalBuffer: []const u8, fileName: []const u8) !VariableValue {
+pub fn runExpression(self: *ModuleInterpreter, expression: *const Expression, originalBuffer: []const u8, filePath: []const u8) !VariableValue {
     self.originalBuffer = originalBuffer;
-    self.fileName = fileName;
+    self.filePath = filePath;
 
     self.activeEnvironment = &self.rootEnvironment;
 
@@ -126,7 +135,7 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
     switch (statement.*) {
         .Expression => |values| {
             var result = try self.interpretExpression(values.expression);
-            result.deinit(self);
+            result.deinit(self.allocator);
         },
         .Let => |values| {
             const value = try self.interpretExpression(values.initializer);
@@ -143,7 +152,7 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
 
         .If => |values| {
             var condition = try self.interpretExpression(values.condition);
-            defer condition.deinit(self);
+            defer condition.deinit(self.allocator);
 
             if (condition.isTruthy()) {
                 try self.interpretStatement(values.trueBranch, false);
@@ -173,10 +182,10 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
 fn lookUpVariable(self: *ModuleInterpreter, name: Token, expression: *const Expression) !VariableValue {
     const depth = self.expressionDefinitionDepth.get(expression.id);
     if (depth == null) {
-        return try (try self.rootEnvironment.get(name, self)).takeReference(self);
+        return try (try self.rootEnvironment.get(name, self)).takeReference(self.allocator);
     }
 
-    return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self);
+    return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self.allocator);
 }
 
 pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expression) anyerror!VariableValue {
@@ -190,10 +199,10 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
         .Binary => |values| {
             var left = try self.interpretExpression(values.left);
-            defer left.deinit(self);
+            defer left.deinit(self.allocator);
 
             var right = try self.interpretExpression(values.right);
-            defer right.deinit(self);
+            defer right.deinit(self.allocator);
 
             switch (values.operator.type) {
                 .Minus => {
@@ -307,7 +316,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
         },
         .Logical => |values| {
             var left = try self.interpretExpression(values.left);
-            errdefer left.deinit(self);
+            errdefer left.deinit(self.allocator);
 
             if (values.operator.type == .Or) {
                 if (left.isTruthy()) {
@@ -320,17 +329,17 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             }
 
             const right = try self.interpretExpression(values.right);
-            errdefer right.deinit(self);
+            errdefer right.deinit(self.allocator);
 
             return right;
         },
         .Bitwise => |value| {
             // We take the Javascript approach and treat bitwise operators as integer operations
             var left = try self.interpretExpression(value.left);
-            defer left.deinit(self);
+            defer left.deinit(self.allocator);
 
             var right = try self.interpretExpression(value.right);
-            defer right.deinit(self);
+            defer right.deinit(self.allocator);
 
             if (!left.isNumber() or !right.isNumber()) {
                 self.runtimeError = RuntimeError.tokenError(self, value.operator, "Operands must be numbers", .{});
@@ -353,7 +362,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
         .FunctionCall => |values| {
             var callee = try self.interpretExpression(values.callee);
-            defer callee.deinit(self);
+            defer callee.deinit(self.allocator);
 
             if (!callee.isCallable()) {
                 self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and class types", .{});
@@ -372,13 +381,13 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             errdefer {
                 for (argumentResults.items) |value| {
                     var val = value;
-                    val.deinit(self);
+                    val.deinit(self.allocator);
                 }
             }
 
             for (values.arguments.items) |argument| {
                 var value = try self.interpretExpression(argument);
-                errdefer value.deinit(self);
+                errdefer value.deinit(self.allocator);
 
                 try argumentResults.append(value);
             }
@@ -403,10 +412,10 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             defer environment.exit(self);
 
             var superClass: ?ClassTypeReference = null;
-            errdefer _ = if (superClass != null) superClass.?.deinit(self);
+            errdefer _ = if (superClass != null) superClass.?.deinit(self.allocator);
             if (values.superClass != null) {
                 var value = try self.interpretExpression(values.superClass.?);
-                defer value.deinit(self);
+                defer value.deinit(self.allocator);
 
                 if (!value.isClassType()) {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Must extend class type", .{});
@@ -414,7 +423,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                 }
 
                 superClass = value.asClassType().strongClone();
-                errdefer _ = superClass.?.deinit(self);
+                errdefer _ = superClass.?.deinit(self.allocator);
 
                 try environment.define("super", value.takeWeakReference(), self);
             }
@@ -436,7 +445,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             const superClass = try self.activeEnvironment.?.getAtDepth(call.superToken, depth.?, self);
 
             var superClassReference = superClass.referenceClassType();
-            defer _ = superClassReference.deinit(self);
+            defer _ = superClassReference.deinit(self.allocator);
 
             if (!self.activeEnvironment.?.lexemeExistsAtDepth("this", depth.? - 1)) {
                 // This is a static method
@@ -470,16 +479,16 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
         .VariableAssignment => |values| {
             var value = try self.interpretExpression(values.value);
             // Don't deinit unless there's an error -- we want to keep the value since we're storing it
-            errdefer value.deinit(self);
+            errdefer value.deinit(self.allocator);
 
             const depth = self.expressionDefinitionDepth.get(expression.id);
             if (depth == null) {
-                try self.rootEnvironment.assign(values.name, try value.takeReference(self), self);
+                try self.rootEnvironment.assign(values.name, try value.takeReference(self.allocator), self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
             } else {
-                try self.activeEnvironment.?.assignAtDepth(values.name, try value.takeReference(self), depth.?, self);
+                try self.activeEnvironment.?.assignAtDepth(values.name, try value.takeReference(self.allocator), depth.?, self);
                 if (self.runtimeError != null) {
                     return InterpreterError.RuntimeError;
                 }
@@ -490,7 +499,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
         .PropertyAccess => |values| {
             var object = try self.interpretExpression(values.object);
-            defer object.deinit(self);
+            defer object.deinit(self.allocator);
 
             if (!object.isClassInstance()) {
                 if (!object.isClassType()) {
@@ -502,15 +511,15 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             }
 
             var instance = object.referenceClassInstance();
-            defer _ = instance.deinit(self);
+            defer _ = instance.deinit(self.allocator);
             return try instance.ptr().get(values.name, instance, self);
         },
         .PropertyAssignment => |values| {
             var object = try self.interpretExpression(values.object);
-            defer object.deinit(self);
+            defer object.deinit(self.allocator);
 
             var value = try self.interpretExpression(values.value);
-            errdefer value.deinit(self);
+            errdefer value.deinit(self.allocator);
 
             if (!object.isClassInstance()) {
                 if (!object.isClassType()) {
@@ -525,7 +534,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             }
 
             var instance = object.referenceClassInstance();
-            defer _ = instance.deinit(self);
+            defer _ = instance.deinit(self.allocator);
 
             try instance.unsafePtr().set(values.name, value, self);
             if (self.runtimeError != null) return InterpreterError.RuntimeError;

@@ -14,7 +14,7 @@ pub const RuntimeError = struct {
     token: Token,
 
     originalBuffer: []const u8,
-    fileName: []const u8,
+    filePath: []const u8,
 
     pub fn tokenError(interpreter: *ModuleInterpreter, token: Token, comptime message: []const u8, format: anytype) RuntimeError {
         const formattedMessage = std.fmt.allocPrint(interpreter.allocator, message, format) catch {
@@ -24,7 +24,7 @@ pub const RuntimeError = struct {
                 .allocatedMessage = false,
                 .token = token,
                 .originalBuffer = interpreter.originalBuffer,
-                .fileName = interpreter.fileName,
+                .filePath = interpreter.filePath,
             };
         };
         return .{
@@ -33,7 +33,7 @@ pub const RuntimeError = struct {
             .allocatedMessage = true,
             .token = token,
             .originalBuffer = interpreter.originalBuffer,
-            .fileName = interpreter.fileName,
+            .filePath = interpreter.filePath,
         };
     }
 
@@ -58,7 +58,7 @@ pub const RuntimeError = struct {
         prettyError(errorMessage) catch {
             return;
         };
-        errorContext(self.originalBuffer, self.fileName, self.token.position, self.token.lexeme.len, self.allocator) catch {
+        errorContext(self.originalBuffer, self.filePath, self.token.position, self.token.lexeme.len, self.allocator) catch {
             return;
         };
     }

@@ -55,7 +55,7 @@ fn entry(self: *Main) !void {
 }
 
 fn enterRepl(self: *Main) !void {
-    var astInterpreter = try ModuleInterpreter.init(self.allocator, &Interpreter.import);
+    var astInterpreter = try ModuleInterpreter.init(self.allocator, &self.interpreter);
     errdefer astInterpreter.deinit();
 
     const stdin = std.io.getStdIn().reader();
@@ -81,7 +81,9 @@ fn enterRepl(self: *Main) !void {
 }
 
 fn enterFile(self: *Main) !void {
-    const filePath = self.args.?.mode.RunFile;
-    var module: Module = Module.load(&self.interpreter, filePath, &Interpreter.import) catch |err| return err;
+    const filePath = try std.fs.realpathAlloc(self.allocator, self.args.?.mode.RunFile);
+    defer self.allocator.free(filePath);
+
+    var module: Module = Module.load(&self.interpreter, filePath) catch |err| return err;
     module.deinit({});
 }

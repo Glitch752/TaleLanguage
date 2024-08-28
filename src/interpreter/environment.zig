@@ -9,6 +9,7 @@ const Token = @import("../token.zig").Token;
 
 pub const Environment = @This();
 
+// TODO: Remove this
 const ValueWrapper = struct {
     value: VariableValue,
     name: []const u8,
@@ -37,13 +38,13 @@ pub fn createChild(self: *Environment, previous: *Environment) Environment {
     return .{ .allocator = self.allocator, .values = ValueMap{}, .parent = self, .previous = previous };
 }
 
-pub fn unreference(self: *Environment, interpreter: *ModuleInterpreter) void {
+pub fn unreference(self: *Environment, allocator: std.mem.Allocator) void {
     if (self.referenceCount == 0) std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
 
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
         if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
-        self.deinit(interpreter);
+        self.deinit(allocator);
     }
 }
 
@@ -58,7 +59,7 @@ pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
         if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
-        self.deinit(interpreter);
+        self.deinit(interpreter.allocator);
     }
 }
 
@@ -67,13 +68,13 @@ fn discard(args: anytype) void {
     _ = args;
 }
 
-pub fn deinit(self: *Environment, interpreter: *ModuleInterpreter) void {
+pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
         discard(.{wrapper.name});
 
-        wrapper.value.deinit(interpreter);
+        wrapper.value.deinit(allocator);
         self.allocator.free(wrapper.name);
 
         self.allocator.destroy(wrapper);
@@ -81,7 +82,7 @@ pub fn deinit(self: *Environment, interpreter: *ModuleInterpreter) void {
     self.values.deinit(self.allocator);
 
     if (self.parent != null) {
-        self.parent.?.unreference(interpreter);
+        self.parent.?.unreference(allocator);
         self.allocator.destroy(self);
     }
 }
@@ -99,7 +100,7 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
 
         const prev = previousValue.?.value;
         self.allocator.free(prev.name);
-        prev.value.deinit(interpreter.?);
+        prev.value.deinit(interpreter.?.allocator);
         self.allocator.destroy(prev);
     }
 }
@@ -116,7 +117,7 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
         return;
     }
 
-    pointer.?.*.value.deinit(interpreter);
+    pointer.?.*.value.deinit(interpreter.allocator);
 
     pointer.?.*.value = value;
 }
@@ -178,7 +179,7 @@ pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, dept
         return;
     }
 
-    pointer.?.*.value.deinit(interpreter);
+    pointer.?.*.value.deinit(interpreter.allocator);
 
     pointer.?.*.value = value;
 }

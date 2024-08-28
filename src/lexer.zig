@@ -19,7 +19,7 @@ tokenStartPosition: usize = 0,
 position: usize = 0,
 allocator: std.mem.Allocator,
 tokens: std.ArrayList(Token),
-fileName: []const u8,
+filePath: []const u8,
 
 const escapeSequences = std.StaticStringMap(u8).initComptime(.{
     .{ "n", '\n' },
@@ -30,12 +30,12 @@ const escapeSequences = std.StaticStringMap(u8).initComptime(.{
     .{ "'", '\'' },
 });
 
-pub fn init(allocator: std.mem.Allocator, fileName: []const u8, buffer: []const u8) Tokenizer {
+pub fn init(allocator: std.mem.Allocator, filePath: []const u8, buffer: []const u8) Tokenizer {
     return .{
         .allocator = allocator,
         // The source data to tokenize
         .buffer = buffer,
-        .fileName = fileName,
+        .filePath = filePath,
         .tokens = std.ArrayList(Token).init(allocator),
     };
 }
@@ -67,7 +67,7 @@ pub fn getAllTokens(self: *Tokenizer) !?[]Token {
             const errorMessage = try std.fmt.allocPrint(self.allocator, "Invalid character: {c}\n", .{errorPayload.InvalidCharacter});
             defer self.allocator.free(errorMessage);
             try prettyError(errorMessage);
-            try errorContext(self.buffer, self.fileName, self.position - 1, 1, self.allocator);
+            try errorContext(self.buffer, self.filePath, self.position - 1, 1, self.allocator);
             return null;
         }
     }

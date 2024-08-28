@@ -19,13 +19,13 @@ interpreter: *ModuleInterpreter,
 scopes: Scopes,
 
 originalBuffer: []const u8 = "",
-fileName: []const u8 = "",
+filePath: []const u8 = "",
 
-pub fn init(interpreter: *ModuleInterpreter, originalBuffer: []const u8, fileName: []const u8) Resolver {
+pub fn init(interpreter: *ModuleInterpreter, originalBuffer: []const u8, filePath: []const u8) Resolver {
     return .{
         .interpreter = interpreter,
         .originalBuffer = originalBuffer,
-        .fileName = fileName,
+        .filePath = filePath,
         .scopes = Scopes{},
     };
 }
@@ -50,7 +50,7 @@ fn errorOn(self: *const Resolver, token: Token, comptime message: []const u8, pa
     defer self.interpreter.allocator.free(formattedMessage);
     try prettyError(formattedMessage);
 
-    try errorContext(self.originalBuffer, self.fileName, token.position, token.lexeme.len, self.interpreter.allocator);
+    try errorContext(self.originalBuffer, self.filePath, token.position, token.lexeme.len, self.interpreter.allocator);
 }
 
 fn unknownError(self: *const Resolver, comptime message: []const u8, params: anytype) !void {

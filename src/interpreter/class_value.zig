@@ -13,7 +13,7 @@ const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 
 const RCSP = @import("../rcsp.zig");
 
-pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, *ModuleInterpreter);
+pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, std.mem.Allocator);
 
 pub const ClassInstance = struct {
     classType: ClassTypeReference,
@@ -31,34 +31,34 @@ pub const ClassInstance = struct {
             .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
         }, interpreter.allocator);
-        errdefer _ = value.deinit(interpreter);
+        errdefer _ = value.deinit(interpreter.allocator);
 
         try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);
 
         const constructorMethod = classType.ptr().getInstanceMethod("constructor");
         if (constructorMethod != null) {
             var boundConstructor = constructorMethod.?.function.bindToClass(value.strongClone());
-            defer boundConstructor.deinit(interpreter);
+            defer boundConstructor.deinit(interpreter.allocator);
 
             var result = try boundConstructor.call(interpreter, callToken, arguments);
-            _ = result.deinit(interpreter);
+            _ = result.deinit(interpreter.allocator);
         }
 
         return value;
     }
 
-    pub fn deinit(self: *ClassInstance, interpreter: *ModuleInterpreter) void {
+    pub fn deinit(self: *ClassInstance, allocator: std.mem.Allocator) void {
         var iter = self.fieldValues.iterator();
         while (iter.next()) |entry| {
-            entry.value_ptr.deinit(interpreter);
-            interpreter.allocator.free(entry.key_ptr.*);
+            entry.value_ptr.deinit(allocator);
+            allocator.free(entry.key_ptr.*);
         }
-        self.fieldValues.deinit(interpreter.allocator);
+        self.fieldValues.deinit(allocator);
 
         std.debug.assert(self.classType.strongCount() != 0);
-        _ = self.classType.deinit(interpreter);
+        _ = self.classType.deinit(allocator);
 
-        self.environment.unreference(interpreter);
+        self.environment.unreference(allocator);
     }
 
     pub fn toString(self: *const ClassInstance, allocator: std.mem.Allocator) ![]const u8 {
@@ -75,7 +75,7 @@ pub const ClassInstance = struct {
 
         const property = self.fieldValues.get(name.lexeme);
         if (property != null) {
-            return property.?.takeReference(interpreter);
+            return property.?.takeReference(interpreter.allocator);
         }
 
         interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No proprety or method '{s}' found.", .{name.lexeme});
@@ -90,7 +90,7 @@ pub const ClassInstance = struct {
 
         if (self.fieldValues.contains(name.lexeme)) {
             const pointer = self.fieldValues.getPtr(name.lexeme);
-            pointer.?.*.deinit(interpreter);
+            pointer.?.*.deinit(interpreter.allocator);
             pointer.?.* = value;
             return;
         }
@@ -100,7 +100,7 @@ pub const ClassInstance = struct {
     }
 };
 
-pub const ClassTypeReference = RCSP.DeinitializingRcSharedPointer(ClassType, RCSP.NonAtomic, *ModuleInterpreter);
+pub const ClassTypeReference = RCSP.DeinitializingRcSharedPointer(ClassType, RCSP.NonAtomic, std.mem.Allocator);
 const ClassTypeReferencePointer = *align(8) anyopaque; // ClassTypeReference.*;
 
 /// NOTE: This isn't a class instance, but a class type.
@@ -151,36 +151,36 @@ pub const ClassType = struct {
         return value;
     }
 
-    pub fn deinit(self: *ClassType, interpreter: *ModuleInterpreter) void {
+    pub fn deinit(self: *ClassType, allocator: std.mem.Allocator) void {
         var instanceIterator = self.instanceMethods.iterator();
         while (instanceIterator.next()) |method| {
-            method.value_ptr.deinit(interpreter);
-            interpreter.allocator.free(method.key_ptr.*);
+            method.value_ptr.deinit(allocator);
+            allocator.free(method.key_ptr.*);
         }
-        self.instanceMethods.deinit(interpreter.allocator);
+        self.instanceMethods.deinit(allocator);
 
         var staticIterator = self.staticMethods.iterator();
         while (staticIterator.next()) |method| {
-            method.value_ptr.deinit(interpreter);
-            interpreter.allocator.free(method.key_ptr.*);
+            method.value_ptr.deinit(allocator);
+            allocator.free(method.key_ptr.*);
         }
-        self.staticMethods.deinit(interpreter.allocator);
+        self.staticMethods.deinit(allocator);
 
         var fieldIterator = self.staticFieldValues.iterator();
         while (fieldIterator.next()) |field| {
-            field.value_ptr.deinit(interpreter);
-            interpreter.allocator.free(field.key_ptr.*);
+            field.value_ptr.deinit(allocator);
+            allocator.free(field.key_ptr.*);
         }
-        self.staticFieldValues.deinit(interpreter.allocator);
+        self.staticFieldValues.deinit(allocator);
 
         if (self._superClass != null) {
             var super = self.superClass();
-            _ = super.?.deinit(interpreter);
+            _ = super.?.deinit(allocator);
 
-            interpreter.allocator.destroy(@as(*ClassTypeReference, @ptrCast(self._superClass.?)));
+            allocator.destroy(@as(*ClassTypeReference, @ptrCast(self._superClass.?)));
         }
 
-        self.parentEnvironment.unreference(interpreter);
+        self.parentEnvironment.unreference(allocator);
     }
 
     pub fn getStatic(self: *const ClassType, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
@@ -191,7 +191,7 @@ pub const ClassType = struct {
 
         const property = self.staticFieldValues.get(name.lexeme);
         if (property != null) {
-            return property.?.takeReference(interpreter);
+            return property.?.takeReference(interpreter.allocator);
         }
 
         interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No static proprety or method '{s}' found.", .{name.lexeme});
@@ -254,10 +254,10 @@ pub const ClassMethod = struct {
         return .{ .name = name, .function = function };
     }
 
-    pub fn deinit(self: *ClassMethod, interpreter: *ModuleInterpreter) void {
-        self.name.deinit(interpreter.allocator);
-        interpreter.allocator.free(self.name.lexeme);
-        self.function.deinit(interpreter);
+    pub fn deinit(self: *ClassMethod, allocator: std.mem.Allocator) void {
+        self.name.deinit(allocator);
+        allocator.free(self.name.lexeme);
+        self.function.deinit(allocator);
     }
 
     pub fn getArity(self: *const ClassMethod) u32 {

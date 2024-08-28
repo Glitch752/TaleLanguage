@@ -23,7 +23,7 @@ tokens: []Token,
 current: usize = 0,
 
 originalBuffer: []const u8,
-fileName: []const u8,
+filePath: []const u8,
 
 allocator: std.mem.Allocator,
 flags: ArgsFlags,
@@ -37,7 +37,7 @@ const ParseError = struct {
         token: Token,
     } },
 
-    fileName: []const u8,
+    filePath: []const u8,
     originalBuffer: []const u8,
 
     pub fn print(self: *const ParseError, allocator: std.mem.Allocator) void {
@@ -56,7 +56,7 @@ const ParseError = struct {
                 prettyError(errorMessage) catch {
                     return;
                 };
-                errorContext(self.originalBuffer, self.fileName, value.token.position, value.token.lexeme.len, allocator) catch {
+                errorContext(self.originalBuffer, self.filePath, value.token.position, value.token.lexeme.len, allocator) catch {
                     return;
                 };
             },
@@ -64,7 +64,7 @@ const ParseError = struct {
     }
 
     pub fn consumeFailed(parser: *const Parser, string: []const u8, token: Token) ParseError {
-        return .{ .@"error" = .{ .ConsumeFailed = .{ .string = string, .token = token } }, .fileName = parser.fileName, .originalBuffer = parser.originalBuffer };
+        return .{ .@"error" = .{ .ConsumeFailed = .{ .string = string, .token = token } }, .filePath = parser.filePath, .originalBuffer = parser.originalBuffer };
     }
 };
 
@@ -72,8 +72,8 @@ const ParseErrorEnum = error{
     Unknown,
 };
 
-pub fn init(tokens: []Token, fileName: []const u8, originalBuffer: []const u8, flags: ArgsFlags, allocator: std.mem.Allocator) !Parser {
-    return .{ .tokens = tokens, .fileName = fileName, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
+pub fn init(tokens: []Token, filePath: []const u8, originalBuffer: []const u8, flags: ArgsFlags, allocator: std.mem.Allocator) !Parser {
+    return .{ .tokens = tokens, .filePath = filePath, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
 }
 
 pub fn parse(self: *Parser) anyerror!Program {

@@ -27,17 +27,17 @@ const UserFunction = struct {
     /// For debugging.
     id: u32,
 
-    pub fn deinit(self: *UserFunction, interpreter: *ModuleInterpreter) void {
+    pub fn deinit(self: *UserFunction, allocator: std.mem.Allocator) void {
         for (self.parameters.items) |parameter| {
-            interpreter.allocator.free(parameter.lexeme);
-            parameter.deinit(interpreter.allocator);
+            allocator.free(parameter.lexeme);
+            parameter.deinit(allocator);
         }
-        self.parameters.deinit(interpreter.allocator);
+        self.parameters.deinit(allocator);
 
-        self.parentEnvironment.unreference(interpreter);
+        self.parentEnvironment.unreference(allocator);
     }
 };
-const UserFunctionReference = RCSP.DeinitializingRcSharedPointer(UserFunction, RCSP.NonAtomic, *ModuleInterpreter);
+const UserFunctionReference = RCSP.DeinitializingRcSharedPointer(UserFunction, RCSP.NonAtomic, std.mem.Allocator);
 
 var functionId: u32 = 0;
 
@@ -57,14 +57,14 @@ pub const CallableFunction = union(enum) {
     /// NOTE: This isn't a class instance, but a class type.
     ClassType: ClassTypeReference,
 
-    pub fn deinit(self: *CallableFunction, interpreter: *ModuleInterpreter) void {
+    pub fn deinit(self: *CallableFunction, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .User => _ = self.User.deinit(interpreter),
+            .User => _ = self.User.deinit(allocator),
             .BoundClassMethod => {
-                _ = self.BoundClassMethod.method.deinit(interpreter);
-                _ = self.BoundClassMethod.classInstance.deinit(interpreter);
+                _ = self.BoundClassMethod.method.deinit(allocator);
+                _ = self.BoundClassMethod.classInstance.deinit(allocator);
             },
-            .ClassType => _ = self.ClassType.deinit(interpreter),
+            .ClassType => _ = self.ClassType.deinit(allocator),
             else => {},
         }
     }
@@ -90,7 +90,7 @@ pub const CallableFunction = union(enum) {
                 defer {
                     for (arguments.items) |value| {
                         var val = value;
-                        val.deinit(interpreter);
+                        val.deinit(interpreter.allocator);
                     }
                 }
 

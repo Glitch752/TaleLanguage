@@ -60,30 +60,32 @@ pub const VariableValue = union(enum) {
     Null,
 
     /// Deinitializes the value, dropping the reference if necessary.
-    pub fn deinit(self: *VariableValue, interpreter: *ModuleInterpreter) void {
+    pub fn deinit(self: *VariableValue, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
-            .Function => _ = self.Function.deinit(interpreter),
+            .String => |value| if (value.allocated) allocator.free(value.string),
+            .Function => _ = self.Function.deinit(allocator),
             .ClassType => {
                 std.debug.assert(self.ClassType.ClassType.strongCount() != 0);
-                _ = self.ClassType.deinit(interpreter);
+                _ = self.ClassType.deinit(allocator);
             },
             .ClassInstance => {
                 std.debug.assert(self.ClassInstance.strongCount() != 0);
-                _ = self.ClassInstance.deinit(interpreter);
+                _ = self.ClassInstance.deinit(allocator);
             },
             .WeakReference => _ = self.WeakReference.deinit(),
+            .Module => _ = self.Module.deinit({}),
             else => {},
         }
     }
 
     /// Clones the value, incrementing the reference count if necessary.
-    pub fn takeReference(self: VariableValue, interpreter: *ModuleInterpreter) !VariableValue {
+    pub fn takeReference(self: VariableValue, allocator: std.mem.Allocator) !VariableValue {
         switch (self) {
             .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
             .ClassType => |value| return .{ .ClassType = value.takeReference() },
             .Function => |value| return .{ .Function = value.takeReference() },
-            .String => |value| return .{ .String = .{ .string = try interpreter.allocator.dupe(u8, value.string), .allocated = true } },
+            .String => |value| return .{ .String = .{ .string = try allocator.dupe(u8, value.string), .allocated = true } },
+            .Module => |value| return .{ .Module = value.strongClone() },
             else => return self,
         }
     }
@@ -187,8 +189,8 @@ pub const VariableValue = union(enum) {
     }
 
     // Constructors
-    pub fn fromModule(module: Module, allocator: std.mem.Allocator) VariableValue {
-        return .{ .Module = ModuleReference.init(module, allocator) };
+    pub fn fromModule(module: Module, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .Module = try ModuleReference.init(module, allocator) };
     }
 
     pub fn fromNumber(number: f64) VariableValue {

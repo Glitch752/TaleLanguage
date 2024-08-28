@@ -10,23 +10,34 @@ const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 
 const VariableValue = @import("./variable_value.zig").VariableValue;
 const NativeError = @import("./natives.zig").NativeError;
+const Module = @import("./module_value.zig").Module;
 
 pub const Interpreter = @This();
 
 allocator: std.mem.Allocator,
 flags: ArgsFlags,
 
+loadedModules: std.StringHashMapUnmanaged(VariableValue),
+
 pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
-    return Interpreter{ .allocator = allocator, .flags = flags };
+    return Interpreter{
+        .allocator = allocator,
+        .flags = flags,
+        .loadedModules = std.StringHashMapUnmanaged(VariableValue){},
+    };
 }
 
 pub fn deinit(self: *Interpreter) void {
-    _ = self;
+    var iter = self.loadedModules.iterator();
+    while (iter.next()) |entry| {
+        entry.value_ptr.deinit(self.allocator);
+        self.allocator.free(entry.key_ptr.*);
+    }
+    self.loadedModules.deinit(self.allocator);
 }
 
 /// Returns if there was an error.
 pub fn runFile(self: *Interpreter, filePath: []const u8, interpreter: *ModuleInterpreter) !bool {
-    // Open the file in the arguments of the program
     const file = std.fs.cwd().openFile(filePath, .{ .mode = .read_only }) catch |err| switch (err) {
         error.FileNotFound => {
             std.debug.print("File not found: {s}\n", .{ .name_string = filePath });
@@ -45,9 +56,74 @@ pub fn runFile(self: *Interpreter, filePath: []const u8, interpreter: *ModuleInt
 
 /// Arity: 1
 pub fn import(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
-    // TODO
     const argument = arguments.items[0];
-    return VariableValue.fromString(VariableValue.toString(argument, interpreter.allocator) catch return NativeError.Unknown, true);
+    if (!argument.isString()) return NativeError.InvalidOperand;
+
+    // interpreter.interpreter actually references ourself
+    const value = try interpreter.interpreter.importFromPath(argument.asString(), interpreter.filePath);
+    return value.takeReference(interpreter.allocator) catch return NativeError.Unknown;
+}
+
+pub fn importFromPath(self: *Interpreter, path: []const u8, filePath: []const u8) NativeError!VariableValue {
+    // Resolve the path
+    var resolvedPath = std.fs.path.resolve(self.allocator, &[2][]const u8{ std.fs.path.dirname(filePath) orelse return NativeError.Unknown, path }) catch return NativeError.Unknown;
+    defer self.allocator.free(resolvedPath);
+
+    if (self.flags.extremelyVerbose) {
+        std.debug.print("Importing from path: {s}\n", .{resolvedPath});
+    }
+
+    // If the path has no file extension, add .tale
+    // If it does and the file extension isn't .tale, import it as a string. Otherwise, import it as a module.
+    const extension = std.fs.path.extension(resolvedPath);
+    if (std.mem.eql(u8, extension, "") or std.mem.eql(u8, extension, ".tale")) {
+        if (std.mem.eql(u8, extension, "")) {
+            resolvedPath = self.allocator.realloc(resolvedPath, resolvedPath.len + 5) catch return NativeError.Unknown;
+            std.mem.copyForwards(u8, resolvedPath[resolvedPath.len - 5 ..], ".tale");
+        }
+        const module = try self.importModule(resolvedPath);
+        return module;
+    } else {
+        return self.importString(resolvedPath);
+    }
+}
+
+pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableValue {
+    if (self.loadedModules.contains(path)) {
+        return self.loadedModules.get(path).?;
+    }
+
+    const module: Module = Module.load(self, path) catch return NativeError.Unknown;
+
+    const moduleVariable = VariableValue.fromModule(module, self.allocator) catch return NativeError.Unknown;
+
+    const duplicatedPath = self.allocator.dupe(u8, path) catch return NativeError.Unknown;
+    self.loadedModules.put(self.allocator, duplicatedPath, moduleVariable) catch return NativeError.Unknown;
+
+    return moduleVariable;
+}
+
+pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableValue {
+    if (self.loadedModules.contains(path)) {
+        return self.loadedModules.get(path).?;
+    }
+
+    const file = std.fs.cwd().openFile(path, .{ .mode = .read_only }) catch |err| switch (err) {
+        error.FileNotFound => {
+            std.debug.print("File not found: {s}\n", .{path});
+            return NativeError.InvalidOperand;
+        },
+        else => return NativeError.Unknown,
+    };
+    defer file.close();
+
+    const buffer = file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0) catch return NativeError.Unknown;
+    const stringVariable = VariableValue.fromString(buffer, true);
+
+    const duplicatedPath = self.allocator.dupe(u8, path) catch return NativeError.Unknown;
+    self.loadedModules.put(self.allocator, duplicatedPath, stringVariable) catch return NativeError.Unknown;
+
+    return stringVariable;
 }
 
 /// Returns if there was an error.

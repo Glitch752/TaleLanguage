@@ -30,7 +30,7 @@ pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]cons
     return buffer;
 }
 
-pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, length: usize, allocator: std.mem.Allocator) !void {
+pub fn errorContext(buffer: []const u8, filePath: []const u8, position: usize, length: usize, allocator: std.mem.Allocator) !void {
     const stderrFile = std.io.getStdErr().writer();
     var bwErr = std.io.bufferedWriter(stderrFile);
     const stderr = bwErr.writer();
@@ -65,7 +65,15 @@ pub fn errorContext(buffer: []const u8, fileName: []const u8, position: usize, l
     const line = buffer[lineStart..lineEnd];
     const column = position - lineStart + 1;
 
-    try stderr.print("{s}:{d}:{d}\n", .{ fileName, lines, column });
+    if (std.fs.path.isAbsolute(filePath)) {
+        const cwdPath = try std.fs.cwd().realpathAlloc(allocator, ".");
+        defer allocator.free(cwdPath);
+        const relativePath = try std.fs.path.relative(allocator, cwdPath, filePath);
+        defer allocator.free(relativePath);
+        try stderr.print("{s}:{d}:{d}\n", .{ relativePath, lines, column });
+    } else {
+        try stderr.print("{s}:{d}:{d}\n", .{ filePath, lines, column });
+    }
 
     const lineString = try std.fmt.allocPrint(allocator, "{d}", .{lines});
     defer allocator.free(lineString);
