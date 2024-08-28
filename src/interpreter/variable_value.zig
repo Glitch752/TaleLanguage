@@ -17,6 +17,7 @@ const ClassInstanceReference = @import("./class_value.zig").ClassInstanceReferen
 const ClassType = @import("./class_value.zig").ClassType;
 const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
 
+const Module = @import("./module_value.zig").Module;
 const ModuleReference = @import("./module_value.zig").ModuleReference;
 
 const RCSP = @import("../rcsp.zig");
@@ -186,6 +187,9 @@ pub const VariableValue = union(enum) {
     }
 
     // Constructors
+    pub fn fromModule(module: Module, allocator: std.mem.Allocator) VariableValue {
+        return .{ .Module = ModuleReference.init(module, allocator) };
+    }
 
     pub fn fromNumber(number: f64) VariableValue {
         return .{ .Number = number };

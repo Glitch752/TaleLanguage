@@ -285,6 +285,7 @@ fn consumeLetStatement(self: *Parser) anyerror!*Statement {
 
 fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
     const expression = try self.consumeExpression();
+    errdefer expression.uninit(self.allocator);
 
     _ = try self.consume(TokenType.Semicolon, "Expected ';' after an expression statement.");
 
@@ -585,6 +586,12 @@ fn finishFunctionCall(self: *Parser, callee: *Expression) anyerror!*Expression {
     const startToken = self.peekPrevious();
 
     var arguments = std.ArrayListUnmanaged(*const Expression){};
+    errdefer {
+        for (arguments.items) |argument| {
+            argument.uninit(self.allocator);
+        }
+        arguments.deinit(self.allocator);
+    }
 
     if (!self.matchToken(TokenType.CloseParen)) {
         while (true) {

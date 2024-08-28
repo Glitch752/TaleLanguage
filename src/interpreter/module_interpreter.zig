@@ -18,6 +18,8 @@ const NativeError = @import("./natives.zig").NativeError;
 const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
 const ClassMethod = @import("./class_value.zig").ClassMethod;
 
+const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFunction;
+
 pub const ModuleInterpreter = @This();
 
 allocator: std.mem.Allocator,
@@ -33,8 +35,9 @@ activeEnvironment: ?*Environment = null,
 
 expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 
-pub fn init(allocator: std.mem.Allocator) !ModuleInterpreter {
+pub fn init(allocator: std.mem.Allocator, import: CallableNativeFunction) !ModuleInterpreter {
     var environment = Environment.init(allocator);
+    try environment.define("import", try VariableValue.nativeFunction(1, import), null);
 
     try environment.define("print", try VariableValue.nativeFunction(1, &natives.print), null);
     try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin), null);

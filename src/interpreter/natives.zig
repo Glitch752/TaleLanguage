@@ -32,7 +32,7 @@ pub fn print(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableV
     return .Null;
 }
 
-/// Aruty: 1
+/// Arity: 1
 pub fn toString(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const argument = arguments.items[0];
     return VariableValue.fromString(VariableValue.toString(argument, interpreter.allocator) catch return NativeError.Unknown, true);
