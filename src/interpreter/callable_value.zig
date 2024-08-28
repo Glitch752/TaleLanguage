@@ -1,5 +1,5 @@
 const std = @import("std");
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const VariableValue = @import("./variable_value.zig").VariableValue;
 const NativeError = @import("./natives.zig").NativeError;
 const Token = @import("../token.zig").Token;
@@ -18,7 +18,7 @@ const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 
 const RCSP = @import("../rcsp.zig");
 
-pub const CallableNativeFunction = *const fn (*Interpreter, std.ArrayList(VariableValue)) NativeError!VariableValue;
+pub const CallableNativeFunction = *const fn (*ModuleInterpreter, std.ArrayList(VariableValue)) NativeError!VariableValue;
 
 const UserFunction = struct {
     parameters: std.ArrayListUnmanaged(Token),
@@ -27,7 +27,7 @@ const UserFunction = struct {
     /// For debugging.
     id: u32,
 
-    pub fn deinit(self: *UserFunction, interpreter: *Interpreter) void {
+    pub fn deinit(self: *UserFunction, interpreter: *ModuleInterpreter) void {
         for (self.parameters.items) |parameter| {
             interpreter.allocator.free(parameter.lexeme);
             parameter.deinit(interpreter.allocator);
@@ -37,7 +37,7 @@ const UserFunction = struct {
         self.parentEnvironment.unreference(interpreter);
     }
 };
-const UserFunctionReference = RCSP.DeinitializingRcSharedPointer(UserFunction, RCSP.NonAtomic, *Interpreter);
+const UserFunctionReference = RCSP.DeinitializingRcSharedPointer(UserFunction, RCSP.NonAtomic, *ModuleInterpreter);
 
 var functionId: u32 = 0;
 
@@ -57,7 +57,7 @@ pub const CallableFunction = union(enum) {
     /// NOTE: This isn't a class instance, but a class type.
     ClassType: ClassTypeReference,
 
-    pub fn deinit(self: *CallableFunction, interpreter: *Interpreter) void {
+    pub fn deinit(self: *CallableFunction, interpreter: *ModuleInterpreter) void {
         switch (self.*) {
             .User => _ = self.User.deinit(interpreter),
             .BoundClassMethod => {
@@ -78,7 +78,7 @@ pub const CallableFunction = union(enum) {
         }
     }
 
-    pub fn call(self: CallableFunction, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+    pub fn call(self: CallableFunction, interpreter: *ModuleInterpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
         switch (self) {
             .Native => |data| {
                 // Check the number of arguments
@@ -170,7 +170,7 @@ pub const CallableFunction = union(enum) {
     }
 };
 
-fn callUserFunction(interpreter: *Interpreter, callToken: Token, environment: *Environment, functionReference: UserFunctionReference, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
+fn callUserFunction(interpreter: *ModuleInterpreter, callToken: Token, environment: *Environment, functionReference: UserFunctionReference, arguments: std.ArrayList(VariableValue)) anyerror!VariableValue {
     const function = functionReference.ptr();
 
     // Check the number of arguments

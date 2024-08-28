@@ -18,9 +18,22 @@ const NativeError = @import("./natives.zig").NativeError;
 const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
 const ClassMethod = @import("./class_value.zig").ClassMethod;
 
-pub const Interpreter = @This();
+pub const ModuleInterpreter = @This();
 
-pub fn init(allocator: std.mem.Allocator) !Interpreter {
+allocator: std.mem.Allocator,
+runtimeError: ?RuntimeError = null,
+
+lastReturnValue: VariableValue = VariableValue.null(),
+
+originalBuffer: []const u8 = "",
+fileName: []const u8 = "",
+
+rootEnvironment: Environment,
+activeEnvironment: ?*Environment = null,
+
+expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
+
+pub fn init(allocator: std.mem.Allocator) !ModuleInterpreter {
     var environment = Environment.init(allocator);
 
     try environment.define("print", try VariableValue.nativeFunction(1, &natives.print), null);
@@ -44,12 +57,12 @@ pub fn init(allocator: std.mem.Allocator) !Interpreter {
     return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = expressionDepths };
 }
 
-pub fn deinit(self: *Interpreter) void {
+pub fn deinit(self: *ModuleInterpreter) void {
     self.rootEnvironment.deinit(self);
     self.expressionDefinitionDepth.deinit(self.allocator);
 }
 
-pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
+pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, fileName: []const u8) !void {
     self.originalBuffer = originalBuffer;
     self.fileName = fileName;
 
@@ -63,7 +76,7 @@ pub fn run(self: *Interpreter, program: *const Program, originalBuffer: []const 
     }
 }
 
-pub fn runExpression(self: *Interpreter, expression: *const Expression, originalBuffer: []const u8, fileName: []const u8) !VariableValue {
+pub fn runExpression(self: *ModuleInterpreter, expression: *const Expression, originalBuffer: []const u8, fileName: []const u8) !VariableValue {
     self.originalBuffer = originalBuffer;
     self.fileName = fileName;
 
@@ -82,31 +95,31 @@ pub fn runExpression(self: *Interpreter, expression: *const Expression, original
     return result.?;
 }
 
-pub fn resolve(self: *Interpreter, expressionId: u32, depth: u32) !void {
+pub fn resolve(self: *ModuleInterpreter, expressionId: u32, depth: u32) !void {
     try self.expressionDefinitionDepth.put(self.allocator, expressionId, depth);
 }
 
-pub fn enterNewEnvironment(self: *Interpreter) !*Environment {
+pub fn enterNewEnvironment(self: *ModuleInterpreter) !*Environment {
     const child = try self.allocator.create(Environment);
     child.* = self.activeEnvironment.?.createChild(self.activeEnvironment.?);
     self.activeEnvironment = child;
     return child;
 }
 
-pub fn enterChildEnvironment(self: *Interpreter, parent: *Environment, previous: *Environment) !*Environment {
+pub fn enterChildEnvironment(self: *ModuleInterpreter, parent: *Environment, previous: *Environment) !*Environment {
     const child = try self.allocator.create(Environment);
     child.* = parent.createChild(previous);
     self.activeEnvironment = child;
     return child;
 }
 
-fn interpret(self: *Interpreter, program: *const Program) !void {
+fn interpret(self: *ModuleInterpreter, program: *const Program) !void {
     for (program.statements.items) |statement| {
         try self.interpretStatement(statement, false);
     }
 }
 
-pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoidDefiningBlockScope: bool) anyerror!void {
+pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement, avoidDefiningBlockScope: bool) anyerror!void {
     switch (statement.*) {
         .Expression => |values| {
             var result = try self.interpretExpression(values.expression);
@@ -154,7 +167,7 @@ pub fn interpretStatement(self: *Interpreter, statement: *const Statement, avoid
     }
 }
 
-fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression) !VariableValue {
+fn lookUpVariable(self: *ModuleInterpreter, name: Token, expression: *const Expression) !VariableValue {
     const depth = self.expressionDefinitionDepth.get(expression.id);
     if (depth == null) {
         return try (try self.rootEnvironment.get(name, self)).takeReference(self);
@@ -163,7 +176,7 @@ fn lookUpVariable(self: *Interpreter, name: Token, expression: *const Expression
     return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self);
 }
 
-pub fn interpretExpression(self: *Interpreter, expression: *const Expression) anyerror!VariableValue {
+pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expression) anyerror!VariableValue {
     switch (expression.*.value) {
         .Grouping => |values| {
             return self.interpretExpression(values.expression);

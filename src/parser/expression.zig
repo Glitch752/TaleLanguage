@@ -47,28 +47,7 @@ var globalId: u32 = 0;
 
 pub const Expression = struct {
     id: u32,
-    value: union(enum) {
-        Grouping: struct { expression: *const Expression },
-        Literal: struct { value: TokenLiteral },
-
-        Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
-        Unary: struct { operator: Token, right: *const Expression },
-        Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
-        Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
-
-        FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayListUnmanaged(*const Expression) },
-        Function: FunctionExpression,
-
-        Class: ClassExpression,
-        This: Token,
-        Super: struct { superToken: Token, method: ?Token },
-
-        VariableAccess: struct { name: Token },
-        VariableAssignment: struct { name: Token, value: *const Expression },
-
-        PropertyAccess: struct { object: *const Expression, name: Token },
-        PropertyAssignment: struct { object: *const Expression, name: Token, value: *const Expression },
-    },
+    value: union(enum) { Grouping: struct { expression: *const Expression }, Literal: struct { value: TokenLiteral }, Binary: struct { left: *const Expression, operator: Token, right: *const Expression }, Unary: struct { operator: Token, right: *const Expression }, Logical: struct { left: *const Expression, operator: Token, right: *const Expression }, Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression }, FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayListUnmanaged(*const Expression) }, Function: FunctionExpression, Class: ClassExpression, This: Token, Super: struct { superToken: Token, method: ?Token }, VariableAccess: struct { name: Token }, VariableAssignment: struct { name: Token, value: *const Expression }, PropertyAccess: struct { object: *const Expression, name: Token }, PropertyAssignment: struct { object: *const Expression, name: Token, value: *const Expression } },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
         switch (self.*.value) {

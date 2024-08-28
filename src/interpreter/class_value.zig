@@ -1,7 +1,7 @@
 const std = @import("std");
 const Token = @import("../token.zig").Token;
 const Environment = @import("./environment.zig").Environment;
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const VariableValue = @import("./variable_value.zig").VariableValue;
 
 const RuntimeError = @import("./interpreterError.zig").RuntimeError;
@@ -13,14 +13,14 @@ const ClassExpression = @import("../parser//expression.zig").ClassExpression;
 
 const RCSP = @import("../rcsp.zig");
 
-pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, *Interpreter);
+pub const ClassInstanceReference = RCSP.DeinitializingRcSharedPointer(ClassInstance, RCSP.NonAtomic, *ModuleInterpreter);
 
 pub const ClassInstance = struct {
     classType: ClassTypeReference,
     environment: *Environment,
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    pub fn new(interpreter: *Interpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
+    pub fn new(interpreter: *ModuleInterpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
         var classTypeParent = classType.ptr().parentEnvironment;
         allocatedEnvironment.* = classTypeParent.createChild(classTypeParent);
@@ -47,7 +47,7 @@ pub const ClassInstance = struct {
         return value;
     }
 
-    pub fn deinit(self: *ClassInstance, interpreter: *Interpreter) void {
+    pub fn deinit(self: *ClassInstance, interpreter: *ModuleInterpreter) void {
         var iter = self.fieldValues.iterator();
         while (iter.next()) |entry| {
             entry.value_ptr.deinit(interpreter);
@@ -66,7 +66,7 @@ pub const ClassInstance = struct {
         return std.fmt.allocPrint(allocator, "<instance <class>>", .{});
     }
 
-    pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *Interpreter) !VariableValue {
+    pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *ModuleInterpreter) !VariableValue {
         const classType = self.classType.ptr();
         const method = classType.getInstanceMethod(name.lexeme);
         if (method != null) {
@@ -82,7 +82,7 @@ pub const ClassInstance = struct {
         return InterpreterError.RuntimeError;
     }
 
-    pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
+    pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *ModuleInterpreter) !void {
         if (self.classType.ptr().instanceMethods.contains(name.lexeme)) {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
             return InterpreterError.RuntimeError;
@@ -100,7 +100,7 @@ pub const ClassInstance = struct {
     }
 };
 
-pub const ClassTypeReference = RCSP.DeinitializingRcSharedPointer(ClassType, RCSP.NonAtomic, *Interpreter);
+pub const ClassTypeReference = RCSP.DeinitializingRcSharedPointer(ClassType, RCSP.NonAtomic, *ModuleInterpreter);
 const ClassTypeReferencePointer = *align(8) anyopaque; // ClassTypeReference.*;
 
 /// NOTE: This isn't a class instance, but a class type.
@@ -151,7 +151,7 @@ pub const ClassType = struct {
         return value;
     }
 
-    pub fn deinit(self: *ClassType, interpreter: *Interpreter) void {
+    pub fn deinit(self: *ClassType, interpreter: *ModuleInterpreter) void {
         var instanceIterator = self.instanceMethods.iterator();
         while (instanceIterator.next()) |method| {
             method.value_ptr.deinit(interpreter);
@@ -183,7 +183,7 @@ pub const ClassType = struct {
         self.parentEnvironment.unreference(interpreter);
     }
 
-    pub fn getStatic(self: *const ClassType, name: Token, interpreter: *Interpreter) !VariableValue {
+    pub fn getStatic(self: *const ClassType, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
         const method = self.getStaticMethod(name.lexeme);
         if (method != null) {
             return VariableValue.newFunctionReference(method.?.function.takeReference());
@@ -198,7 +198,7 @@ pub const ClassType = struct {
         return InterpreterError.RuntimeError;
     }
 
-    pub fn setStatic(self: *ClassType, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
+    pub fn setStatic(self: *ClassType, name: Token, value: VariableValue, interpreter: *ModuleInterpreter) !void {
         if (self.staticMethods.contains(name.lexeme)) {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to static method '{s}'.", .{name.lexeme});
             return InterpreterError.RuntimeError;
@@ -254,7 +254,7 @@ pub const ClassMethod = struct {
         return .{ .name = name, .function = function };
     }
 
-    pub fn deinit(self: *ClassMethod, interpreter: *Interpreter) void {
+    pub fn deinit(self: *ClassMethod, interpreter: *ModuleInterpreter) void {
         self.name.deinit(interpreter.allocator);
         interpreter.allocator.free(self.name.lexeme);
         self.function.deinit(interpreter);

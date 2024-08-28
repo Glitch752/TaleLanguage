@@ -1,6 +1,6 @@
 const std = @import("std");
 const Token = @import("../token.zig").Token;
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const prettyError = @import("../errors.zig").prettyError;
 const errorContext = @import("../errors.zig").errorContext;
 
@@ -16,7 +16,7 @@ pub const RuntimeError = struct {
     originalBuffer: []const u8,
     fileName: []const u8,
 
-    pub fn tokenError(interpreter: *Interpreter, token: Token, comptime message: []const u8, format: anytype) RuntimeError {
+    pub fn tokenError(interpreter: *ModuleInterpreter, token: Token, comptime message: []const u8, format: anytype) RuntimeError {
         const formattedMessage = std.fmt.allocPrint(interpreter.allocator, message, format) catch {
             return .{
                 .allocator = interpreter.allocator,

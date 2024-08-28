@@ -3,7 +3,7 @@ const Statement = @import("../parser/statement.zig").Statement;
 const Expression = @import("../parser/expression.zig").Expression;
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const Program = @import("../parser/program.zig").Program;
-const Interpreter = @import("../interpreter/interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("../interpreter/module_interpreter.zig").ModuleInterpreter;
 const Token = @import("../token.zig").Token;
 
 const errorContext = @import("../errors.zig").errorContext;
@@ -15,13 +15,13 @@ const Resolver = @This();
 
 const ResolverError = error{Unknown};
 
-interpreter: *Interpreter,
+interpreter: *ModuleInterpreter,
 scopes: Scopes,
 
 originalBuffer: []const u8 = "",
 fileName: []const u8 = "",
 
-pub fn init(interpreter: *Interpreter, originalBuffer: []const u8, fileName: []const u8) Resolver {
+pub fn init(interpreter: *ModuleInterpreter, originalBuffer: []const u8, fileName: []const u8) Resolver {
     return .{
         .interpreter = interpreter,
         .originalBuffer = originalBuffer,

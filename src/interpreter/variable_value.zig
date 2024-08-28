@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
 const Token = @import("../token.zig").Token;
 const Environment = @import("./environment.zig").Environment;
@@ -16,6 +16,8 @@ const ClassInstance = @import("./class_value.zig").ClassInstance;
 const ClassInstanceReference = @import("./class_value.zig").ClassInstanceReference;
 const ClassType = @import("./class_value.zig").ClassType;
 const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
+
+const ModuleReference = @import("./module_value.zig").ModuleReference;
 
 const RCSP = @import("../rcsp.zig");
 
@@ -52,10 +54,12 @@ pub const VariableValue = union(enum) {
         }
     },
 
+    Module: ModuleReference,
+
     Null,
 
     /// Deinitializes the value, dropping the reference if necessary.
-    pub fn deinit(self: *VariableValue, interpreter: *Interpreter) void {
+    pub fn deinit(self: *VariableValue, interpreter: *ModuleInterpreter) void {
         switch (self.*) {
             .String => |value| if (value.allocated) interpreter.allocator.free(value.string),
             .Function => _ = self.Function.deinit(interpreter),
@@ -73,7 +77,7 @@ pub const VariableValue = union(enum) {
     }
 
     /// Clones the value, incrementing the reference count if necessary.
-    pub fn takeReference(self: VariableValue, interpreter: *Interpreter) !VariableValue {
+    pub fn takeReference(self: VariableValue, interpreter: *ModuleInterpreter) !VariableValue {
         switch (self) {
             .ClassInstance => |value| return .{ .ClassInstance = value.strongClone() },
             .ClassType => |value| return .{ .ClassType = value.takeReference() },
@@ -219,7 +223,7 @@ pub const VariableValue = union(enum) {
     pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator, superClass: ?ClassTypeReference) !VariableValue {
         return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator, superClass) };
     }
-    pub fn newClassInstance(classType: ClassTypeReference, interpreter: *Interpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
+    pub fn newClassInstance(classType: ClassTypeReference, interpreter: *ModuleInterpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
         return .{ .ClassInstance = try ClassInstance.new(interpreter, classType, callToken, arguments) };
     }
 
@@ -249,6 +253,7 @@ pub const VariableValue = union(enum) {
             .ClassType => |value| return value.ClassType.ptr().toString(allocator),
             .ClassInstance => |value| return value.ptr().toString(allocator),
             .WeakReference => |value| return value.toString(allocator),
+            .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.ptr().path}),
         }
     }
 };

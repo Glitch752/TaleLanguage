@@ -1,0 +1,15 @@
+export let Vec3 = class {
+    constructor(x, y, z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+    print() {
+        print("Vec3(" + string(this.x) + ", " + string(this.y) + ", " + string(this.z) + ") ");
+    }
+    add(v) {
+        this.x = this.x + v.x;
+        this.y = this.y + v.y;
+        this.z = this.z + v.z;
+    }
+};

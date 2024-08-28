@@ -3,7 +3,7 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 
 const RuntimeError = @import("./interpreterError.zig").RuntimeError;
 const InterpreterError = @import("./interpreterError.zig").InterpreterError;
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 
 const Token = @import("../token.zig").Token;
 
@@ -37,7 +37,7 @@ pub fn createChild(self: *Environment, previous: *Environment) Environment {
     return .{ .allocator = self.allocator, .values = ValueMap{}, .parent = self, .previous = previous };
 }
 
-pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
+pub fn unreference(self: *Environment, interpreter: *ModuleInterpreter) void {
     if (self.referenceCount == 0) std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
 
     self.referenceCount -= 1;
@@ -48,7 +48,7 @@ pub fn unreference(self: *Environment, interpreter: *Interpreter) void {
 }
 
 /// Exit is like unreference, but also returns to the previous environment
-pub fn exit(self: *Environment, interpreter: *Interpreter) void {
+pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
     if (self.referenceCount == 0) std.debug.panic("Tried to exit an environment that has 0 references.", .{});
 
     if (self.parent != null) {
@@ -62,7 +62,7 @@ pub fn exit(self: *Environment, interpreter: *Interpreter) void {
     }
 }
 
-pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
+pub fn deinit(self: *Environment, interpreter: *ModuleInterpreter) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         const wrapper = entry.value_ptr.*;
@@ -79,7 +79,7 @@ pub fn deinit(self: *Environment, interpreter: *Interpreter) void {
     }
 }
 
-pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*Interpreter) !void {
+pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
@@ -97,7 +97,7 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
     }
 }
 
-pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter: *Interpreter) !void {
+pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter: *ModuleInterpreter) !void {
     const pointer = self.values.getPtr(name.lexeme);
     if (pointer == null) {
         if (self.parent != null) {
@@ -114,7 +114,7 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
     pointer.?.*.value = value;
 }
 
-pub fn get(self: *Environment, name: Token, interpreter: *Interpreter) !VariableValue {
+pub fn get(self: *Environment, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
     const entry = self.values.get(name.lexeme);
     if (entry != null) return entry.?.value;
 
@@ -137,7 +137,7 @@ fn ancestorAtDepth(self: *Environment, depth: u32) !*Environment {
     return current;
 }
 
-pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Interpreter) !VariableValue {
+pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *ModuleInterpreter) !VariableValue {
     const environment = try self.ancestorAtDepth(depth);
 
     const entry = environment.values.get(name.lexeme);
@@ -147,7 +147,7 @@ pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Int
     return InterpreterError.RuntimeError;
 }
 
-pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Token, depth: u32, interpreter: *Interpreter) !VariableValue {
+pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Token, depth: u32, interpreter: *ModuleInterpreter) !VariableValue {
     const environment = try self.ancestorAtDepth(depth);
 
     const entry = environment.values.get(lexeme);
@@ -162,7 +162,7 @@ pub fn lexemeExistsAtDepth(self: *Environment, lexeme: []const u8, depth: u32) b
     return environment.values.contains(lexeme);
 }
 
-pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *Interpreter) !void {
+pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, depth: u32, interpreter: *ModuleInterpreter) !void {
     const environment = try self.ancestorAtDepth(depth);
 
     const pointer = environment.values.getPtr(name.lexeme);
@@ -183,7 +183,7 @@ pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]cons
     }
     return buffer;
 }
-pub fn printVariables(self: *Environment, interpreter: *Interpreter, indent: u32) !void {
+pub fn printVariables(self: *Environment, interpreter: *ModuleInterpreter, indent: u32) !void {
     const spaces = try repeat(indent, ' ', interpreter.allocator);
     defer interpreter.allocator.free(spaces);
 

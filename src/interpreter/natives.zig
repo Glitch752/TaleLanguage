@@ -1,13 +1,13 @@
 const std = @import("std");
 const VariableValue = @import("./variable_value.zig").VariableValue;
-const Interpreter = @import("./interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 
 /// TODO: Payload
 pub const NativeError = error{ InvalidOperand, Unknown };
 
 /// NOTE: Having all these globals is not the end goal, but they're provided to allow testing out more complex programs.
 /// Arity: 1
-pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn print(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
 
     const argument = arguments.items[0];
@@ -26,19 +26,20 @@ pub fn print(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
                 .ClassType => std.debug.print("<weak class type>", .{}),
             }
         },
+        .Module => |module| std.debug.print("<module {s}>", .{module.ptr().path}),
     }
 
     return .Null;
 }
 
 /// Aruty: 1
-pub fn toString(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn toString(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const argument = arguments.items[0];
     return VariableValue.fromString(VariableValue.toString(argument, interpreter.allocator) catch return NativeError.Unknown, true);
 }
 
 /// Arity: 1
-pub fn sin(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn sin(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -53,7 +54,7 @@ pub fn sin(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) N
 }
 
 /// Arity: 1
-pub fn cos(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn cos(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -68,7 +69,7 @@ pub fn cos(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) N
 }
 
 /// Arity: 1
-pub fn tan(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn tan(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -83,7 +84,7 @@ pub fn tan(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) N
 }
 
 /// Arity: 1
-pub fn exp(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn exp(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -98,7 +99,7 @@ pub fn exp(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) N
 }
 
 /// Arity: 1
-pub fn exp2(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn exp2(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -113,7 +114,7 @@ pub fn exp2(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) 
 }
 
 /// Arity: 1
-pub fn log(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn log(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -128,7 +129,7 @@ pub fn log(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) N
 }
 
 /// Arity: 1
-pub fn log2(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn log2(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -143,7 +144,7 @@ pub fn log2(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) 
 }
 
 /// Arity: 1
-pub fn log10(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn log10(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -158,7 +159,7 @@ pub fn log10(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
 }
 
 /// Arity: 1
-pub fn floor(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn floor(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     _ = interpreter;
     const argument = arguments.items[0];
 
@@ -173,7 +174,7 @@ pub fn floor(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue))
 }
 
 // Arity: 3
-pub fn substring(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn substring(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
     const start = arguments.items[1];
     const end = arguments.items[2];
@@ -195,7 +196,7 @@ pub fn substring(interpreter: *Interpreter, arguments: std.ArrayList(VariableVal
 }
 
 // Arity: 1
-pub fn intChar(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn intChar(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
 
     if (string != .String) {
@@ -214,7 +215,7 @@ pub fn intChar(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue
 }
 
 // Arity: 1
-pub fn length(interpreter: *Interpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+pub fn length(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
 
     if (string != .String) {
