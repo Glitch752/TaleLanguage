@@ -14,7 +14,7 @@ pub const ModuleError = error{
 };
 
 pub const Module = struct {
-    moduleInterpreter: ModuleInterpreter,
+    moduleInterpreter: *ModuleInterpreter,
     exportedValues: ExportedValueSet,
     path: []const u8,
 
@@ -24,23 +24,29 @@ pub const Module = struct {
 
     /// Path will be freed by the interpreter when deinitialized; it should not be freed by the caller.
     pub fn load(interpreter: *Interpreter, path: []const u8) !Module {
-        errdefer interpreter.allocator.free(path);
+        try {
+            var moduleInterpreter = try interpreter.allocator.create(ModuleInterpreter);
+            moduleInterpreter.* = try ModuleInterpreter.init(interpreter.allocator, interpreter);
 
-        var moduleInterpreter = try ModuleInterpreter.init(interpreter.allocator, interpreter);
-        const err = try interpreter.runFile(path, &moduleInterpreter);
-        if (err) {
-            moduleInterpreter.deinit();
-            return ModuleError.InterpreterError;
-        }
+            const err = try interpreter.runFile(path, moduleInterpreter);
+            if (err) {
+                moduleInterpreter.deinit();
+                return ModuleError.InterpreterError;
+            }
 
-        return .{
-            .moduleInterpreter = moduleInterpreter,
-            .exportedValues = ExportedValueSet{},
-            .path = path,
+            return .{
+                .moduleInterpreter = moduleInterpreter,
+                .exportedValues = ExportedValueSet{},
+                .path = path,
+            };
+        } catch |err| {
+            interpreter.allocator.free(path);
+            return err;
         };
     }
 
     pub fn deinit(self: *Module, _: void) void {
         self.moduleInterpreter.deinit();
+        self.moduleInterpreter.allocator.destroy(self.moduleInterpreter);
     }
 };

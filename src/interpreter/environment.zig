@@ -39,18 +39,18 @@ pub fn createChild(self: *Environment, previous: *Environment) Environment {
 }
 
 pub fn unreference(self: *Environment, allocator: std.mem.Allocator) void {
-    if (self.referenceCount == 0) std.debug.panic("Tried to unreference an environment that has 0 references.", .{});
+    std.debug.assert(self.referenceCount != 0); // Tried to unreference an environment that has 0 references
 
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
-        if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
+        std.debug.assert(self.parent != null); // Tried to deinit the root environment
         self.deinit(allocator);
     }
 }
 
 /// Exit is like unreference, but also returns to the previous environment
 pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
-    if (self.referenceCount == 0) std.debug.panic("Tried to exit an environment that has 0 references.", .{});
+    std.debug.assert(self.referenceCount != 0); // Tried to unreference an environment that has 0 references
 
     if (self.parent != null) {
         interpreter.activeEnvironment = self.previous;
@@ -58,7 +58,7 @@ pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
 
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
-        if (self.parent == null) std.debug.panic("Tried to deinit the root environment.", .{});
+        std.debug.assert(self.parent != null); // Tried to deinit the root environment
         self.deinit(interpreter.allocator);
     }
 }
@@ -96,7 +96,7 @@ pub fn define(self: *Environment, name: []const u8, value: VariableValue, interp
     const previousValue = self.values.fetchPutAssumeCapacity(wrapper.name, wrapper);
 
     if (previousValue != null) {
-        if (interpreter == null) std.debug.panic("Tried to define a variable that already exists when the interpreter is not available.", .{});
+        std.debug.assert(interpreter != null); // Tried to define a variable that already exists when the interpreter is not available.
 
         const prev = previousValue.?.value;
         self.allocator.free(prev.name);
