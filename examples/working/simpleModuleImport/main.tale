@@ -1,0 +1,6 @@
+print(import("test")); // Side effect: print("Hi!\n");
+print("\n");
+print(import("test")); // Side effects only happen once per module import.
+
+print("\n\nFile content:\n");
+print(import("./lorem.txt")); // Loads file content as a string

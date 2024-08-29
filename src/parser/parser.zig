@@ -84,7 +84,7 @@ pub fn parse(self: *Parser) anyerror!Program {
 
     var hadError = false;
     while (!self.isAtEnd()) {
-        const declaration = self.consumeDeclarationAndSynchronize() orelse {
+        const declaration = self.consumeDeclarationAndSynchronize(true) orelse {
             hadError = true;
             continue;
         };
@@ -178,16 +178,26 @@ fn consume(self: *Parser, @"type": TokenType, errorMessage: []const u8) !Token {
 // Grammar rules
 //
 
-fn consumeDeclarationAndSynchronize(self: *Parser) ?*Statement {
-    return self.consumeDeclaration() catch {
+fn consumeDeclarationAndSynchronize(self: *Parser, topLevel: bool) ?*Statement {
+    return self.consumeDeclaration(topLevel) catch {
         self.synchronize();
         return null;
     };
 }
 
-fn consumeDeclaration(self: *Parser) anyerror!*Statement {
+fn consumeDeclaration(self: *Parser, topLevel: bool) anyerror!*Statement {
     if (self.matchToken(TokenType.LetKeyword)) {
-        return try self.consumeLetStatement();
+        return try self.consumeLetStatement(false);
+    }
+    if (self.matchToken(TokenType.ExportKeyword)) {
+        if (!topLevel) {
+            self.errorOccured("Cannot export a variable in a block statement");
+            return ParseErrorEnum.Unknown;
+        }
+
+        _ = try self.consume(TokenType.LetKeyword, "Expected 'let' after 'export'");
+
+        return try self.consumeLetStatement(true);
     }
 
     return try self.consumeStatement();
@@ -262,7 +272,7 @@ fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
     var statements = std.ArrayList(*Statement).init(self.allocator);
 
     while (!(self.peek().type == TokenType.CloseCurly) and !self.isAtEnd()) {
-        const statement = self.consumeDeclarationAndSynchronize() orelse continue;
+        const statement = self.consumeDeclarationAndSynchronize(false) orelse continue;
         try statements.append(statement);
     }
 
@@ -271,7 +281,7 @@ fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
     return Statement.block(self.allocator, statements);
 }
 
-fn consumeLetStatement(self: *Parser) anyerror!*Statement {
+fn consumeLetStatement(self: *Parser, exported: bool) anyerror!*Statement {
     const name = try self.consume(TokenType.Identifier, "Expected variable name");
     const initializer = if (self.matchToken(TokenType.Assign))
         try self.consumeExpression()
@@ -280,7 +290,7 @@ fn consumeLetStatement(self: *Parser) anyerror!*Statement {
 
     _ = try self.consume(TokenType.Semicolon, "Expected ';' after a variable declaration.");
 
-    return Statement.let(self.allocator, name, initializer);
+    return Statement.let(self.allocator, name, initializer, exported);
 }
 
 fn consumeExpressionStatement(self: *Parser) anyerror!*Statement {
@@ -563,6 +573,7 @@ fn consumeUnary(self: *Parser) anyerror!*Expression {
 
 fn consumeFunctionCall(self: *Parser) anyerror!*Expression {
     var expression = try self.consumePrimary();
+    errdefer expression.uninit(self.allocator);
 
     while (true) {
         if (self.matchToken(TokenType.OpenParen)) {

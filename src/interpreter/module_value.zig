@@ -9,6 +9,10 @@ const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFun
 pub const ModuleReference = RCSP.DeinitializingRcSharedPointer(Module, RCSP.NonAtomic, void);
 pub const ExportedValueSet = std.StringHashMapUnmanaged(u0);
 
+pub const ModuleError = error{
+    InterpreterError,
+};
+
 pub const Module = struct {
     moduleInterpreter: ModuleInterpreter,
     exportedValues: ExportedValueSet,
@@ -18,9 +22,16 @@ pub const Module = struct {
         return self.moduleInterpreter.rootEnvironment;
     }
 
+    /// Path will be freed by the interpreter when deinitialized; it should not be freed by the caller.
     pub fn load(interpreter: *Interpreter, path: []const u8) !Module {
+        errdefer interpreter.allocator.free(path);
+
         var moduleInterpreter = try ModuleInterpreter.init(interpreter.allocator, interpreter);
-        _ = try interpreter.runFile(path, &moduleInterpreter);
+        const err = try interpreter.runFile(path, &moduleInterpreter);
+        if (err) {
+            moduleInterpreter.deinit();
+            return ModuleError.InterpreterError;
+        }
 
         return .{
             .moduleInterpreter = moduleInterpreter,

@@ -60,14 +60,12 @@ pub fn import(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variable
     if (!argument.isString()) return NativeError.InvalidOperand;
 
     // interpreter.interpreter actually references ourself
-    const value = try interpreter.interpreter.importFromPath(argument.asString(), interpreter.filePath);
-    return value.takeReference(interpreter.allocator) catch return NativeError.Unknown;
+    return (try interpreter.interpreter.importFromPath(argument.asString(), interpreter.filePath)).takeReference(interpreter.allocator) catch return NativeError.Unknown;
 }
 
 pub fn importFromPath(self: *Interpreter, path: []const u8, filePath: []const u8) NativeError!VariableValue {
     // Resolve the path
     var resolvedPath = std.fs.path.resolve(self.allocator, &[2][]const u8{ std.fs.path.dirname(filePath) orelse return NativeError.Unknown, path }) catch return NativeError.Unknown;
-    defer self.allocator.free(resolvedPath);
 
     if (self.flags.extremelyVerbose) {
         std.debug.print("Importing from path: {s}\n", .{resolvedPath});
@@ -81,8 +79,7 @@ pub fn importFromPath(self: *Interpreter, path: []const u8, filePath: []const u8
             resolvedPath = self.allocator.realloc(resolvedPath, resolvedPath.len + 5) catch return NativeError.Unknown;
             std.mem.copyForwards(u8, resolvedPath[resolvedPath.len - 5 ..], ".tale");
         }
-        const module = try self.importModule(resolvedPath);
-        return module;
+        return try self.importModule(resolvedPath);
     } else {
         return self.importString(resolvedPath);
     }
@@ -90,10 +87,12 @@ pub fn importFromPath(self: *Interpreter, path: []const u8, filePath: []const u8
 
 pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableValue {
     if (self.loadedModules.contains(path)) {
+        defer self.allocator.free(path);
         return self.loadedModules.get(path).?;
     }
 
-    const module: Module = Module.load(self, path) catch return NativeError.Unknown;
+    var module: Module = Module.load(self, path) catch return NativeError.Unknown;
+    errdefer module.deinit({});
 
     const moduleVariable = VariableValue.fromModule(module, self.allocator) catch return NativeError.Unknown;
 
@@ -104,6 +103,7 @@ pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableVa
 }
 
 pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableValue {
+    defer self.allocator.free(path);
     if (self.loadedModules.contains(path)) {
         return self.loadedModules.get(path).?;
     }
@@ -117,7 +117,9 @@ pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableVa
     };
     defer file.close();
 
-    const buffer = file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0) catch return NativeError.Unknown;
+    const file_size = (file.stat() catch return NativeError.Unknown).size;
+    const buffer = self.allocator.alloc(u8, file_size) catch return NativeError.Unknown;
+    _ = file.readAll(buffer) catch return NativeError.Unknown;
     const stringVariable = VariableValue.fromString(buffer, true);
 
     const duplicatedPath = self.allocator.dupe(u8, path) catch return NativeError.Unknown;

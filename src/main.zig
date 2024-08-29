@@ -28,6 +28,10 @@ pub fn main() !void {
     };
     try instance.entry();
     instance.deinit();
+
+    if (instance.hadError) {
+        std.process.exit(65);
+    }
 }
 
 pub fn deinit(self: *Main) void {
@@ -82,8 +86,9 @@ fn enterRepl(self: *Main) !void {
 
 fn enterFile(self: *Main) !void {
     const filePath = try std.fs.realpathAlloc(self.allocator, self.args.?.mode.RunFile);
-    defer self.allocator.free(filePath);
-
-    var module: Module = Module.load(&self.interpreter, filePath) catch |err| return err;
-    module.deinit({});
+    var module = self.interpreter.importModule(filePath) catch {
+        self.hadError = true;
+        return;
+    };
+    _ = module.Module.deinit({});
 }

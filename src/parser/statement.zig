@@ -4,7 +4,7 @@ const Token = @import("../token.zig").Token;
 
 pub const Statement = union(enum) {
     Expression: struct { expression: *const Expression },
-    Let: struct { name: Token, initializer: *const Expression },
+    Let: struct { name: Token, initializer: *const Expression, exported: bool },
     Block: struct { statements: std.ArrayList(*Statement) },
 
     // Control flow
@@ -51,9 +51,9 @@ pub const Statement = union(enum) {
         alloc.* = .{ .Expression = .{ .expression = value } };
         return alloc;
     }
-    pub fn let(allocator: std.mem.Allocator, name: Token, initializer: *const Expression) !*Statement {
+    pub fn let(allocator: std.mem.Allocator, name: Token, initializer: *const Expression, exported: bool) !*Statement {
         const alloc = try allocator.create(Statement);
-        alloc.* = .{ .Let = .{ .name = name, .initializer = initializer } };
+        alloc.* = .{ .Let = .{ .name = name, .initializer = initializer, .exported = exported } };
         return alloc;
     }
     pub fn block(allocator: std.mem.Allocator, statements: std.ArrayList(*Statement)) !*Statement {

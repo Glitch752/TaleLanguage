@@ -72,10 +72,13 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInte
 pub fn deinit(self: *ModuleInterpreter) void {
     self.rootEnvironment.deinit(self.allocator);
     self.expressionDefinitionDepth.deinit(self.allocator);
+    self.allocator.free(self.filePath);
 }
 
 pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, filePath: []const u8) !void {
+    if (self.originalBuffer.len != 0) self.allocator.free(self.originalBuffer);
     self.originalBuffer = originalBuffer;
+    if (self.filePath.len != 0) self.allocator.free(self.filePath);
     self.filePath = filePath;
 
     self.activeEnvironment = &self.rootEnvironment;

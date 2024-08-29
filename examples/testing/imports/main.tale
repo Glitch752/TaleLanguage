@@ -1,9 +1,9 @@
-const vector3 = import('./vector3.tale');
-const Vec3 = vector3.Vec3;
+let vector3 = import('./vector3.tale');
+let Vec3 = vector3.Vec3;
 
-const v = new Vec3(1, 2, 3);
+let v = Vec3(1, 2, 3);
 v.print();
-v.add(new Vec3(1, 1, 1));
+v.add(Vec3(1, 1, 1));
 v.print();
 v.add(import('./vector3.tale').Vec3(1, 1, 1));
 v.print();

@@ -50,6 +50,7 @@ pub const TokenType = enum {
     BreakKeyword, // break
     ContinueKeyword, // continue
     LetKeyword, // let
+    ExportKeyword, // export
 
     // Literals
     NumberLiteral,
@@ -149,6 +150,7 @@ pub const Token = struct {
         .{ "else", TokenType.ElseKeyword },
 
         .{ "let", TokenType.LetKeyword },
+        .{ "export", TokenType.ExportKeyword },
 
         .{ "for", TokenType.ForKeyword },
         .{ "while", TokenType.WhileKeyword },
