@@ -5,6 +5,10 @@ const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const Interpreter = @import("./interpreter.zig").Interpreter;
 const Main = @import("../main.zig");
 const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFunction;
+const Token = @import("../token.zig").Token;
+const VariableValue = @import("./variable_value.zig").VariableValue;
+const RuntimeError = @import("./interpreterError.zig").RuntimeError;
+const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 
 pub const ModuleReference = RCSP.DeinitializingRcSharedPointer(Module, RCSP.NonAtomic, void);
 pub const ExportedValueSet = std.StringHashMapUnmanaged(u0);
@@ -15,11 +19,21 @@ pub const ModuleError = error{
 
 pub const Module = struct {
     moduleInterpreter: *ModuleInterpreter,
-    exportedValues: ExportedValueSet,
     path: []const u8,
 
-    pub fn getRootEnvironment(self: *Module) *Environment {
-        return self.moduleInterpreter.rootEnvironment;
+    fn getRootEnvironment(self: *const Module) *Environment {
+        return &self.moduleInterpreter.rootEnvironment;
+    }
+    fn isExported(self: *const Module, name: Token) bool {
+        return self.moduleInterpreter.exportedValues.contains(name.lexeme);
+    }
+    /// The interpreter is only used for error handling.
+    pub fn accessExport(self: *const Module, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
+        if (!self.isExported(name)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Module does not export {s}.", .{name.lexeme});
+            return InterpreterError.RuntimeError;
+        }
+        return (try self.getRootEnvironment().get(name, interpreter)).takeReference(interpreter.allocator);
     }
 
     /// Path will be freed by the interpreter when deinitialized; it should not be freed by the caller.
@@ -36,7 +50,6 @@ pub const Module = struct {
 
             return .{
                 .moduleInterpreter = moduleInterpreter,
-                .exportedValues = ExportedValueSet{},
                 .path = path,
             };
         } catch |err| {

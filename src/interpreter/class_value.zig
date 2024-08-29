@@ -20,7 +20,9 @@ pub const ClassInstance = struct {
     environment: *Environment,
     fieldValues: std.StringHashMapUnmanaged(VariableValue),
 
-    pub fn new(interpreter: *ModuleInterpreter, classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
+    pub fn new(classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !ClassInstanceReference {
+        const interpreter = classType.ptr().parentModule;
+
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
         var classTypeParent = classType.ptr().parentEnvironment;
         allocatedEnvironment.* = classTypeParent.createChild(classTypeParent);
@@ -109,6 +111,8 @@ pub const ClassType = struct {
     staticMethods: std.StringHashMapUnmanaged(ClassMethod),
 
     parentEnvironment: *Environment,
+    parentModule: *ModuleInterpreter,
+
     _superClass: ?ClassTypeReferencePointer,
 
     staticFieldValues: std.StringHashMapUnmanaged(VariableValue),
@@ -121,7 +125,9 @@ pub const ClassType = struct {
         return @as(*ClassTypeReference, @ptrCast(self._superClass.?)).*;
     }
 
-    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, allocator: std.mem.Allocator, superClassType: ?ClassTypeReference) !ClassTypeReference {
+    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, moduleInterpreter: *ModuleInterpreter, superClassType: ?ClassTypeReference) !ClassTypeReference {
+        const allocator = moduleInterpreter.allocator;
+
         var instanceMethods = std.StringHashMapUnmanaged(ClassMethod){};
         var staticMethods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
@@ -142,6 +148,8 @@ pub const ClassType = struct {
             .staticMethods = staticMethods,
 
             .parentEnvironment = parentEnvironment,
+            .parentModule = moduleInterpreter,
+
             ._superClass = super,
 
             .staticFieldValues = std.StringHashMapUnmanaged(VariableValue){},

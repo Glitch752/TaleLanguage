@@ -129,10 +129,12 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
       - Static and instance methods can have the same name. You cannot call static methods on instances.
     - [X] Fields: `let Point = class {}; Point.x = 5;`
       - Access: `Point.x`
-- [ ] Imports from other files: `const test = import("test.tale");` (`test` is a namespace with all the exported values)
-  - [ ] Exporting values: `export let x = 5;`
-  - [ ] Exporting classes: `export class Point { constructor(x, y) { this.x = x; this.y = y; } }`
-  - [ ] Circular imports should be handled gracefully
+- [X] Imports from other files: `const test = import("test.tale");` (`test` is a module with all the exported values)
+  - [X] Exporting values: `export let x = 5;`
+  - [X] Exporting any type: `export let Point = class { constructor(x, y) { this.x = x; this.y = y; } }`
+  - [X] Circular imports are handled gracefully
+  - [X] Importing text files: `const text = import("text.txt");` (This is a string containing the file's contents)
+  - [X] Imports can be made anywhere in the file. Side effects are executed immediately, but only occur once per file.
 - [ ] Simple standard library, ~~globally accessible as `Std` (until I implement imports)~~ globally accessible for now:
   - [X] `print` function: `print("Hello, world!");`
   - [ ] `clock` function: `print(clock());` (Returns the time in seconds since the program started running)

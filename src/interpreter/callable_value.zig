@@ -110,10 +110,24 @@ pub const CallableFunction = union(enum) {
                 var environment = try interpreter.enterChildEnvironment(interpreter.activeEnvironment.?, previousEnvironment.?);
                 defer environment.exit(interpreter);
 
-                return try callUserFunction(interpreter, callToken, environment, data.method, arguments);
+                const function = data.method.ptr();
+
+                // Bind the arguments to the scope
+                for (arguments.items, 0..) |argument, index| {
+                    try environment.define(function.parameters.items[index].lexeme, argument, interpreter);
+                }
+
+                // Execute the function body
+                interpreter.interpretStatement(function.body, true) catch |err| {
+                    switch (err) {
+                        InterpreterError.Return => return interpreter.lastReturnValue,
+                        else => return err,
+                    }
+                };
+                return VariableValue.null();
             },
             .ClassType => |data| {
-                return try VariableValue.newClassInstance(data, interpreter, callToken, arguments);
+                return try VariableValue.newClassInstance(data, callToken, arguments);
             },
         }
     }
@@ -136,8 +150,8 @@ pub const CallableFunction = union(enum) {
             .id = functionId,
         }, allocator) };
     }
-    pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator, superClass: ?ClassTypeReference) !CallableFunction {
-        return .{ .ClassType = try ClassType.new(parentEnvironment, expression, allocator, superClass) };
+    pub fn classType(expression: ClassExpression, parentEnvironment: *Environment, parentModule: *ModuleInterpreter, superClass: ?ClassTypeReference) !CallableFunction {
+        return .{ .ClassType = try ClassType.new(parentEnvironment, expression, parentModule, superClass) };
     }
 
     pub fn takeReference(self: CallableFunction) CallableFunction {

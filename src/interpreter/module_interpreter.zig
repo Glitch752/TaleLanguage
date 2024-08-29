@@ -21,6 +21,7 @@ const ClassMethod = @import("./class_value.zig").ClassMethod;
 const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFunction;
 
 const Interpreter = @import("./interpreter.zig").Interpreter;
+const ExportedValueSet = @import("./module_value.zig").ExportedValueSet;
 
 pub const ModuleInterpreter = @This();
 
@@ -38,6 +39,7 @@ activeEnvironment: ?*Environment = null,
 expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 
 interpreter: *Interpreter,
+exportedValues: ExportedValueSet,
 
 pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInterpreter {
     var environment = Environment.init(allocator);
@@ -65,6 +67,7 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInte
         .allocator = allocator,
         .rootEnvironment = environment,
         .expressionDefinitionDepth = expressionDepths,
+        .exportedValues = ExportedValueSet{},
         .interpreter = interpreter,
     };
 }
@@ -73,6 +76,12 @@ pub fn deinit(self: *ModuleInterpreter) void {
     self.rootEnvironment.deinit(self.allocator);
     self.expressionDefinitionDepth.deinit(self.allocator);
     self.allocator.free(self.filePath);
+
+    var exportedValueIter = self.exportedValues.iterator();
+    while (exportedValueIter.next()) |entry| {
+        self.allocator.free(entry.key_ptr.*);
+    }
+    self.exportedValues.deinit(self.allocator);
 }
 
 pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, filePath: []const u8) !void {
@@ -143,6 +152,10 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
         .Let => |values| {
             const value = try self.interpretExpression(values.initializer);
             try self.activeEnvironment.?.define(values.name.lexeme, value, self);
+            if (values.exported) {
+                const duplicatedName = try self.allocator.dupe(u8, values.name.lexeme);
+                try self.exportedValues.put(self.allocator, duplicatedName, 0);
+            }
         },
         .Block => |values| {
             var childEnvironment = if (!avoidDefiningBlockScope) try self.enterNewEnvironment() else self.activeEnvironment.?;
@@ -431,7 +444,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                 try environment.define("super", value.takeWeakReference(), self);
             }
 
-            const class = try VariableValue.newClassType(values, environment, self.allocator, superClass);
+            const class = try VariableValue.newClassType(values, environment, self, superClass);
             // We don't copy the value when defining the class here because we can't create a loop of references
             try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
 
@@ -506,8 +519,11 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
             if (!object.isClassInstance()) {
                 if (!object.isClassType()) {
-                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances or types", .{});
-                    return InterpreterError.RuntimeError;
+                    if (!object.isModuleType()) {
+                        self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances, types, and modules.", .{});
+                        return InterpreterError.RuntimeError;
+                    }
+                    return try object.asModuleType().ptr().accessExport(values.name, self);
                 }
                 var classType = object.asClassType();
                 return try classType.ptr().getStatic(values.name, self);

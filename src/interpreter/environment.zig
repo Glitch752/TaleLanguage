@@ -90,6 +90,7 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
     // We need to copy the name because the string is owned by the parser and will be deallocated
     const wrapper = try self.allocator.create(ValueWrapper);
+    // TODO: Do we still need to copy the name here, in module exported values, and elsewhere?
     wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
 
     try self.values.ensureUnusedCapacity(self.allocator, 2);

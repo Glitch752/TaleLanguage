@@ -73,7 +73,9 @@ pub const VariableValue = union(enum) {
                 _ = self.ClassInstance.deinit(allocator);
             },
             .WeakReference => _ = self.WeakReference.deinit(),
-            .Module => _ = self.Module.deinit({}),
+            .Module => {
+                _ = self.Module.deinit({});
+            },
             else => {},
         }
     }
@@ -168,6 +170,13 @@ pub const VariableValue = union(enum) {
         }
     }
 
+    pub fn isModuleType(self: VariableValue) bool {
+        return self == .Module;
+    }
+    pub fn asModuleType(self: VariableValue) ModuleReference {
+        return self.Module;
+    }
+
     // Type coercion
     pub fn isTruthy(self: VariableValue) bool {
         switch (self) {
@@ -226,11 +235,11 @@ pub const VariableValue = union(enum) {
         return .{ .Function = function };
     }
 
-    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator, superClass: ?ClassTypeReference) !VariableValue {
-        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, allocator, superClass) };
+    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, parentModule: *ModuleInterpreter, superClass: ?ClassTypeReference) !VariableValue {
+        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, parentModule, superClass) };
     }
-    pub fn newClassInstance(classType: ClassTypeReference, interpreter: *ModuleInterpreter, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
-        return .{ .ClassInstance = try ClassInstance.new(interpreter, classType, callToken, arguments) };
+    pub fn newClassInstance(classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
+        return .{ .ClassInstance = try ClassInstance.new(classType, callToken, arguments) };
     }
 
     pub fn classInstance(instance: *ClassInstance) VariableValue {

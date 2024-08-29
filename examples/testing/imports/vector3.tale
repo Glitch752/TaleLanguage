@@ -1,8 +1,8 @@
 export let Vec3 = class {
     constructor(x, y, z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        // this.x = x;
+        // this.y = y;
+        // this.z = z;
     }
     print() {
         print("Vec3(" + string(this.x) + ", " + string(this.y) + ", " + string(this.z) + ") ");
@@ -13,3 +13,5 @@ export let Vec3 = class {
         this.z = this.z + v.z;
     }
 };
+
+export let TestConstant = 10;
