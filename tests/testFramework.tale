@@ -1,0 +1,33 @@
+let std = import("std");
+
+let test = function(name) {
+    // let module = import("testModules/" + name);
+    // let testName = module.TEST_NAME;
+    // let expectedAssertions = module.EXPECTED_ASSERTIONS;
+    
+    // let assertionsRun = 0;
+    // let anyAssertionsFailed = false;
+    let assert = function(condition, test) {
+    //     assertionsRun = assertionsRun + 1;
+    //     if (!condition) {
+    //         std.println("  Test '" + testName + "': Assertion failed");
+    //         anyAssertionsFailed = true;
+    //     }
+    };
+
+    // module.run(assert);
+
+    // if (anyAssertionsFailed) {
+    //     std.println("! Test '" + testName + "' failed: Some assertions failed");
+    //     return;
+    // }
+
+    // if (assertionsRun != expectedAssertions) {
+    //     std.println("! Test '" + testName + "' failed: Expected " + expectedAssertions + " assertions, but ran " + assertionsRun);
+    //     return;
+    // }
+
+    // std.println("! Test '" + testName + "' passed");
+};
+
+test("functionCall");

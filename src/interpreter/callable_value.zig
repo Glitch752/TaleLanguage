@@ -31,12 +31,6 @@ const UserFunction = struct {
     id: u32,
 
     pub fn deinit(self: *UserFunction, allocator: std.mem.Allocator) void {
-        for (self.parameters.items) |parameter| {
-            allocator.free(parameter.lexeme);
-            parameter.deinit(allocator);
-        }
-        self.parameters.deinit(allocator);
-
         self.parentEnvironment.unreference(allocator);
     }
 };
@@ -62,7 +56,9 @@ pub const CallableFunction = union(enum) {
 
     pub fn deinit(self: *CallableFunction, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .User => _ = self.User.deinit(allocator),
+            .User => {
+                _ = self.User.deinit(allocator);
+            },
             .BoundClassMethod => {
                 _ = self.BoundClassMethod.method.deinit(allocator);
                 _ = self.BoundClassMethod.classInstance.deinit(allocator);
@@ -128,15 +124,10 @@ pub const CallableFunction = union(enum) {
         return .{ .Native = .{ .arity = arity, .body = function } };
     }
     pub fn user(function: FunctionExpression, parentEnvironment: *Environment, parentInterpreter: *ModuleInterpreter, allocator: std.mem.Allocator) !CallableFunction {
-        var parameters = std.ArrayListUnmanaged(Token){};
-        for (function.parameters.items) |parameter| {
-            try parameters.append(allocator, try parameter.clone(allocator));
-        }
-
         functionId += 1;
         parentEnvironment.referenceCount += 1;
         return .{ .User = try UserFunctionReference.init(.{
-            .parameters = parameters,
+            .parameters = function.parameters,
             .body = function.body,
             .parentEnvironment = parentEnvironment,
             .parentInterpreter = parentInterpreter,

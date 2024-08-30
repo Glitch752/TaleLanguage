@@ -33,19 +33,39 @@ pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
     try globalModules.put(allocator, "std", try Module.makeNativeModule("std", allocator, .{
         .{ .name = "print", .value = try VariableValue.nativeFunction(1, &natives.print) },
         .{ .name = "println", .value = try VariableValue.nativeFunction(1, natives.println) },
+
         .{ .name = "sin", .value = try VariableValue.nativeFunction(1, &natives.sin) },
         .{ .name = "cos", .value = try VariableValue.nativeFunction(1, &natives.cos) },
         .{ .name = "tan", .value = try VariableValue.nativeFunction(1, &natives.tan) },
+        .{ .name = "asin", .value = try VariableValue.nativeFunction(1, &natives.asin) },
+        .{ .name = "acos", .value = try VariableValue.nativeFunction(1, &natives.acos) },
+        .{ .name = "atan", .value = try VariableValue.nativeFunction(1, &natives.atan) },
+
         .{ .name = "exp", .value = try VariableValue.nativeFunction(1, &natives.exp) },
         .{ .name = "exp2", .value = try VariableValue.nativeFunction(1, &natives.exp2) },
         .{ .name = "log", .value = try VariableValue.nativeFunction(1, &natives.log) },
         .{ .name = "log2", .value = try VariableValue.nativeFunction(1, &natives.log2) },
         .{ .name = "log10", .value = try VariableValue.nativeFunction(1, &natives.log10) },
+        .{ .name = "pow", .value = try VariableValue.nativeFunction(2, &natives.pow) },
+        .{ .name = "sqrt", .value = try VariableValue.nativeFunction(1, &natives.sqrt) },
         .{ .name = "floor", .value = try VariableValue.nativeFunction(1, &natives.floor) },
+        .{ .name = "ceil", .value = try VariableValue.nativeFunction(1, &natives.ceil) },
+        .{ .name = "round", .value = try VariableValue.nativeFunction(1, &natives.round) },
+        .{ .name = "abs", .value = try VariableValue.nativeFunction(1, &natives.abs) },
+
+        .{ .name = "PI", .value = VariableValue.fromNumber(std.math.pi) },
+        .{ .name = "E", .value = VariableValue.fromNumber(std.math.e) },
+        .{ .name = "PHI", .value = VariableValue.fromNumber(std.math.phi) },
+
         .{ .name = "substring", .value = try VariableValue.nativeFunction(3, &natives.substring) },
         .{ .name = "intChar", .value = try VariableValue.nativeFunction(1, &natives.intChar) },
+        .{ .name = "charInt", .value = try VariableValue.nativeFunction(1, &natives.charInt) },
         .{ .name = "length", .value = try VariableValue.nativeFunction(1, &natives.length) },
         .{ .name = "string", .value = try VariableValue.nativeFunction(1, &natives.toString) },
+
+        .{ .name = "clock", .value = try VariableValue.nativeFunction(0, &natives.clock) },
+        .{ .name = "panic", .value = try VariableValue.nativeFunction(1, &natives.panic) },
+        .{ .name = "assert", .value = try VariableValue.nativeFunction(1, &natives.assert) },
     }));
 
     return Interpreter{

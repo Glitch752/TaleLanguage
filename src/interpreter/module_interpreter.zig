@@ -385,12 +385,6 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
             var argumentResults = std.ArrayList(VariableValue).init(self.allocator);
             defer argumentResults.deinit();
-            errdefer {
-                for (argumentResults.items) |value| {
-                    var val = value;
-                    val.deinit(self.allocator);
-                }
-            }
 
             for (values.arguments.items) |argument| {
                 var value = try self.interpretExpression(argument);
@@ -402,6 +396,10 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             return callable.call(self, values.startToken, argumentResults) catch |err| switch (err) {
                 NativeError.InvalidOperand => {
                     self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Invalid operand", .{});
+                    return InterpreterError.RuntimeError;
+                },
+                NativeError.Panic => {
+                    self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Panic", .{});
                     return InterpreterError.RuntimeError;
                 },
                 else => {

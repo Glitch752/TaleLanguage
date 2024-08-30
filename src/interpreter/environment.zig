@@ -57,11 +57,6 @@ pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
     }
 }
 
-/// Used to circumvent a (compiler bug?) issue where segfaults occur if we don't use value names in a certain way
-fn discard(args: anytype) void {
-    _ = args;
-}
-
 pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {

@@ -135,6 +135,9 @@ pub const Module = union(enum) {
                 var iter = values.exports.iterator();
                 while (iter.next()) |entry| {
                     entry.value_ptr.deinit(allocator);
+                    if (entry.value_ptr.* == .Module) {
+                        entry.value_ptr.Module.deinit(allocator);
+                    }
                 }
                 values.exports.deinit(allocator);
                 allocator.destroy(values.exports);

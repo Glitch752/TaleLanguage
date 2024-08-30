@@ -4,78 +4,46 @@ This is a to-be-compiler interpreter for a custom language I made to learn Zig.
 I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/) and [Let's Build a Simple Interpreter](https://ruslanspivak.com/lsbasi-part1/).
 
 # Demo of the language
-This isn't a particularly good piece of code: it uses string manipulation hacks to work around the current lack of arrays, as well as temporary global functions I added. However, it demonstrates a relatively complicated program works in Tale--a port of `donut.c`. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays.
-```
-let tmr1 = null;
-let tmr2 = null;
-let A = 1;
-let B = 1;
-
+This isn't a particularly good piece of code: it uses string manipulation hacks to work around the current lack of arrays, as well as temporary global functions I added. However, it demonstrates a relatively complicated program works in Tale--a port of `donut.c`. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays. The code is compacted significantly to fit it in the README, but the original code is in `examples/working/donut.tale`.
+```js
+let Std = import("std");
+let tmr1 = null; let tmr2 = null; let A = 1; let B = 1;
 let asciiframe = function() {
-    A = A + 0.07;
-    B = B + 0.03;
-
-    let sinA = sin(A);
-    let cosA = cos(A);
-    let sinB = sin(B);
-    let cosB = cos(B);
-
-    let output = "";
-    let zBuffer = "";
-
-    let k = 0;
-    while(k < 1760) {
+    A = A + 0.07; B = B + 0.03;
+    let sinA = Std.sin(A); let cosA = Std.cos(A); let sinB = Std.sin(B); let cosB = Std.cos(B);
+    let output = ""; let zBuffer = "";
+    let k = 0; while(k < 1760) {
         zBuffer = zBuffer + " ";
-        if(k % 80 == 79) {
-            output = output + "\n";
-        } else {
-            output = output + " ";
-        }
+        if(k % 80 == 79) output = output + "\n";
+        else output = output + " ";
         k = k + 1;
     }
-
-    let j = 0; // J is theta
-    while(j < 6.28) {
-        let jSin = sin(j);
-        let jCos = cos(j);
-
-        let i = 0; // I is phi
-        while(i < 6.28) {
-            let iSin = sin(i);
-            let iCos = cos(i);
-
-            let h = jCos + 2;
-            let d = 1 / (iSin * h * sinA + jSin * cosA + 5);
-            let t = iSin * h * cosA - jSin * sinA;
-
-            let x = floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
-            let y = floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
-
+    let j = 0; while(j < 6.28) { // J is theta
+        let jSin = Std.sin(j); let jCos = Std.cos(j);
+        let i = 0; while(i < 6.28) { // I is phi
+            let iSin = Std.sin(i); let iCos = Std.cos(i);
+            let h = jCos + 2; let d = 1 / (iSin * h * sinA + jSin * cosA + 5); let t = iSin * h * cosA - jSin * sinA;
+            let x = Std.floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
+            let y = Std.floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
             let o = x + 80 * y;
-
-            let depthChar = substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", floor(d * 100), floor(d * 100) + 1);
-            if(y < 22 && y >= 0 && x >= 0 && x < 79 && intChar(depthChar) > intChar(substring(zBuffer, o, o + 1))) {
+            let depthChar = Std.substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", Std.floor(d * 100), Std.floor(d * 100) + 1);
+            if(y < 22 && y >= 0 && x >= 0 && x < 79 && Std.intChar(depthChar) > Std.intChar(Std.substring(zBuffer, o, o + 1))) {
                 let N = 8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB);
-
-                zBuffer = substring(zBuffer, 0, o) + depthChar + substring(zBuffer, o + 1, length(zBuffer));
+                zBuffer = Std.substring(zBuffer, 0, o) + depthChar + Std.substring(zBuffer, o + 1, Std.length(zBuffer));
                 let idx = 0;
                 if(N > 0) idx = N;
-
-                output = substring(output, 0, o) + substring(".,-~:;=!*#$@", idx, idx + 1) + substring(output, o + 1, length(output));
+                output = Std.substring(output, 0, o) + Std.substring(".,-~:;=!*#$@", idx, idx + 1) + Std.substring(output, o + 1, Std.length(output));
             }
-
             i = i + 0.02;
         }
         j = j + 0.07;
     }
-
-    print(output);
+    Std.print(output);
 };
-
-while(true) {
-    asciiframe();
-}
+while(true) asciiframe();
 ```
+
+There are many other examples of the language in the `examples` directory. The `working` directory contains examples that are known to work, while the `testing` directory contains examples I want to eventually work, am currently working on fixing, or are known not to work. `tests` also contains tests for the language, which display many features of the language.
 
 # TODO
 - [x] Implement a lexer
@@ -135,15 +103,29 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] Circular imports are handled gracefully
   - [X] Importing text files: `const text = import("text.txt");` (This is a string containing the file's contents)
   - [X] Imports can be made anywhere in the file. Side effects are executed immediately, but only occur once per file.
-- [ ] Simple standard library, ~~globally accessible as `Std` (until I implement imports)~~ globally accessible for now:
-  - [X] `print` function: `print("Hello, world!");`
-  - [ ] `clock` function: `print(clock());` (Returns the time in seconds since the program started running)
-  - [ ] `panic` function: `panic("Something went wrong!");` (Throws an irrecoverable error)
-  - [ ] `assert` function: `assert(5 == 5);` (Panics if the condition is false)
+- [X] Simple standard library, accessible through the `std` module (Examples assume the file has `let Std = import("std");`):
+  - [X] `print` and `println` functions: `Std.print("Hello, world!");`
+  - [X] Math functions:
+    - [X] Trig functions (in radians): `sin`, `cos`, `tan`: `Std.print(Std.sin(3.14));`
+    - [X] Inverse trig functions (in radians): `asin`, `acos`, `atan`: `Std.print(Std.atan(1));`
+    - [X] `PI`, `E`, and `PHI` constants: `Std.print(Std.PI);`
+    - [X] `floor`, `ceil`, and `round` functions: `Std.print(Std.floor(5.5));`
+    - [X] `exp`, `exp2`, `log`, `log2`, and `log10` functions: `Std.print(Std.exp(5));`
+    - [X] `pow` and `sqrt` functions: `Std.print(Std.sqrt(25));`
+    - [X] `abs` function: `Std.print(Std.abs(-5));`
+    - [X] `min` and `max` functions: `Std.print(Std.min(5, 3));`
+  - [X] String functions:
+    - [X] `length` function: `Std.print(Std.length("Hello, world!"));`
+    - [X] `string` function: `Std.print(Std.string(5));` (converts any value to a string)
+    - [X] `substring` function: `Std.print(Std.substring("Hello, world!", 0, 5));`
+    - [X] `intChar` function: `Std.print(Std.intChar("A"));` (Converts a single-character string to its ASCII value)
+    - [X] `charInt` function: `Std.print(Std.charInt(65));` (Converts an ASCII value to a single-character string)
+  - [X] `clock` function: `Std.print(Std.clock());` (Returns a calendar timestamp, in milliseconds, relative to UTC 1970-01-01)
+  - [X] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
+  - [X] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
 
 ## Considerations for the future
 - Static typing
-- How should imports work (and how should we change the standard library so it's not just a global object)?
 - How should we handle errors?
 - Should statements be expressions? (E.g. `let x = if (true) { 5 } else { 3 }`)
 

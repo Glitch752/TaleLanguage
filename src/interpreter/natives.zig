@@ -3,7 +3,7 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 
 /// TODO: Payload
-pub const NativeError = error{ InvalidOperand, Unknown };
+pub const NativeError = error{ InvalidOperand, Unknown, Panic };
 
 /// NOTE: Having all these globals is not the end goal, but they're provided to allow testing out more complex programs.
 /// Arity: 1
@@ -83,6 +83,51 @@ pub fn tan(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableVal
     switch (argument) {
         .Number => |value| {
             return VariableValue.fromNumber(@tan(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn asin(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(std.math.asin(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn acos(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(std.math.acos(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn atan(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(std.math.atan(value));
         },
         else => {},
     }
@@ -180,7 +225,106 @@ pub fn floor(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableV
     return NativeError.InvalidOperand;
 }
 
-// Arity: 3
+/// Arity: 1
+pub fn ceil(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(@ceil(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn round(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(@round(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn abs(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(@abs(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 1
+pub fn pow(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const base = arguments.items[0];
+    const exponent = arguments.items[1];
+
+    if (base != .Number or exponent != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    return VariableValue.fromNumber(std.math.pow(f64, base.asNumber(), exponent.asNumber()));
+}
+
+/// Arity: 1
+pub fn sqrt(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const argument = arguments.items[0];
+
+    switch (argument) {
+        .Number => |value| {
+            return VariableValue.fromNumber(@sqrt(value));
+        },
+        else => {},
+    }
+
+    return NativeError.InvalidOperand;
+}
+
+/// Arity: 2
+pub fn min(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const first = arguments.items[0];
+    const second = arguments.items[1];
+
+    if (first != .Number or second != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    return VariableValue.fromNumber(@min(first.asNumber(), second.asNumber()));
+}
+
+/// Arity: 2
+pub fn max(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const first = arguments.items[0];
+    const second = arguments.items[1];
+
+    if (first != .Number or second != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    return VariableValue.fromNumber(@max(first.asNumber(), second.asNumber()));
+}
+
+/// Arity: 3
 pub fn substring(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
     const start = arguments.items[1];
@@ -202,7 +346,7 @@ pub fn substring(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Varia
     return VariableValue.fromString(newString, true);
 }
 
-// Arity: 1
+/// Arity: 1
 pub fn intChar(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
 
@@ -221,7 +365,25 @@ pub fn intChar(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variabl
     return VariableValue.fromNumber(@floatFromInt(@as(u32, @intCast(stringBytes[0]))));
 }
 
-// Arity: 1
+/// Arity: 1
+pub fn charInt(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    const number = arguments.items[0];
+
+    if (number != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    const numberValue = number.asNumber();
+
+    if (numberValue < 0 or numberValue > 255) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringValue = interpreter.allocator.dupe(u8, &[_:1]u8{@intFromFloat(numberValue)}) catch return NativeError.Unknown;
+    return VariableValue.fromString(stringValue, true);
+}
+
+/// Arity: 1
 pub fn length(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
 
@@ -234,4 +396,43 @@ pub fn length(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variable
     _ = interpreter;
 
     return VariableValue.fromNumber(@floatFromInt(@as(u32, @intCast(stringBytes.len))));
+}
+
+/// Arity: 0
+pub fn clock(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = arguments;
+    _ = interpreter;
+
+    const time = std.time.milliTimestamp();
+    return VariableValue.fromNumber(@floatFromInt(time));
+}
+
+/// Arity: 1
+pub fn panic(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const message = arguments.items[0];
+
+    if (message != .String) {
+        return NativeError.InvalidOperand;
+    }
+
+    std.debug.print("Program panicked: {s}\n", .{message.String.string});
+    return NativeError.Panic;
+}
+
+/// Arity: 1
+pub fn assert(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const condition = arguments.items[0];
+
+    if (condition != .Boolean) {
+        return NativeError.InvalidOperand;
+    }
+
+    if (!condition.Boolean) {
+        std.debug.print("Program panicked: assertion did not hold true!\n", .{});
+        return NativeError.Panic;
+    }
+
+    return .Null;
 }

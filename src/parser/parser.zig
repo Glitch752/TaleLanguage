@@ -225,7 +225,7 @@ fn consumeStatement(self: *Parser) anyerror!*Statement {
 }
 
 fn consumeReturnStatement(self: *Parser) anyerror!*Statement {
-    const value = if (self.matchToken(TokenType.Semicolon))
+    const value = if (self.peek().type == .Semicolon)
         try Expression.literal(self.allocator, TokenLiteral.Null)
     else
         try self.consumeExpression();

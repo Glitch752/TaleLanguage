@@ -73,21 +73,13 @@ fn endScope(self: *Resolver) !void {
         return ResolverError.Unknown;
     }
 
-    var iter = node.?.data.iterator();
-    while (iter.next()) |entry| {
-        const key = entry.key_ptr.*;
-        if (std.mem.eql(u8, key, "this") or std.mem.eql(u8, key, "super")) continue; // A special case is a bit hacky, but it's fine
-
-        self.interpreter.allocator.free(key);
-    }
     node.?.data.deinit(self.interpreter.allocator);
     self.interpreter.allocator.destroy(node.?);
 }
 
 fn declare(self: *Resolver, name: Token) anyerror!void {
     if (self.scopes.len == 0) return;
-    const duplicatedName = try self.interpreter.allocator.dupe(u8, name.lexeme);
-    const last = try self.scopes.last.?.data.fetchPut(self.interpreter.allocator, duplicatedName, false);
+    const last = try self.scopes.last.?.data.fetchPut(self.interpreter.allocator, name.lexeme, false);
     if (last != null) {
         try self.errorOn(name, "Variable with this name already declared in this scope", .{});
     }

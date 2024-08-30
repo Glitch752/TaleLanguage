@@ -216,7 +216,7 @@ pub const VariableValue = union(enum) {
             .StringLiteral => |value| return .{ .String = .{ .string = value, .allocated = false } },
             .Identifier => |value| return .{ .String = .{ .string = value, .allocated = false } }, // Identifiers don't exist yet
             .True => return .{ .Boolean = true },
-            .False => return .{ .Boolean = true },
+            .False => return .{ .Boolean = false },
             else => return .{ .Null = {} },
         }
     }

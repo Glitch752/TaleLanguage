@@ -1,0 +1,7 @@
+let std = import("std");
+let assert = std.assert;
+
+assert(false);
+
+// Code here will not run
+std.println("This will not run");

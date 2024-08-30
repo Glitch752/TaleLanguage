@@ -1,0 +1,7 @@
+let std = import("std");
+let assert = std.assert;
+
+let value1 = std.PI;
+let value2 = std.atan(1.0) * 4.0;
+assert(value1 == value2);
+std.println(std.string(value1) + " == " + std.string(value2));

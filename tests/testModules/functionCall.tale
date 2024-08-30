@@ -1,0 +1,13 @@
+export let TEST_NAME = "Function call";
+export let EXPECTED_ASSERTIONS = 1;
+
+export let run = function(assert) {
+    let variable = 0;
+    let increment = function() {
+        variable = 1;
+    };
+
+    increment();
+    increment();
+    assert(variable == 2);
+};
