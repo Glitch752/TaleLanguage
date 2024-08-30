@@ -20,17 +20,17 @@ flags: ArgsFlags,
 loadedModules: std.StringHashMapUnmanaged(VariableValue),
 
 pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
-    return Interpreter{
-        .allocator = allocator,
-        .flags = flags,
-        .loadedModules = std.StringHashMapUnmanaged(VariableValue){},
-    };
+    return Interpreter{ .allocator = allocator, .flags = flags, .loadedModules = std.StringHashMapUnmanaged(VariableValue){} };
 }
 
 pub fn deinit(self: *Interpreter) void {
     var iter = self.loadedModules.iterator();
     while (iter.next()) |entry| {
         entry.value_ptr.deinit(self.allocator);
+        if (entry.value_ptr.* == .Module) {
+            entry.value_ptr.*.Module.deinit();
+            self.allocator.destroy(entry.value_ptr.Module);
+        }
         self.allocator.free(entry.key_ptr.*);
     }
     self.loadedModules.deinit(self.allocator);
@@ -49,7 +49,10 @@ pub fn runFile(self: *Interpreter, filePath: []const u8, interpreter: *ModuleInt
     defer file.close();
 
     const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
-    defer self.allocator.free(buffer);
+    defer {
+        self.allocator.free(buffer);
+        interpreter.originalBuffer = &[0]u8{};
+    }
 
     return try self.run(filePath, buffer, interpreter);
 }
@@ -91,10 +94,11 @@ pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableVa
         return self.loadedModules.get(path).?;
     }
 
-    var module: Module = Module.load(self, path) catch return NativeError.Unknown;
-    errdefer module.deinit({});
+    var module = self.allocator.create(Module) catch return NativeError.Unknown;
+    module.* = Module.load(self, path) catch return NativeError.Unknown;
+    errdefer module.deinit();
 
-    const moduleVariable = VariableValue.fromModule(module, self.allocator) catch return NativeError.Unknown;
+    const moduleVariable = VariableValue.fromModule(module) catch return NativeError.Unknown;
 
     const duplicatedPath = self.allocator.dupe(u8, path) catch return NativeError.Unknown;
     self.loadedModules.put(self.allocator, duplicatedPath, moduleVariable) catch return NativeError.Unknown;
@@ -132,7 +136,6 @@ pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableVa
 pub fn run(self: *Interpreter, filePath: []const u8, source: []const u8, interpreter: *ModuleInterpreter) !bool {
     // LEXING -------------------------------------
     var sourceLexer = lexer.init(self.allocator, filePath, source);
-    defer sourceLexer.deinit();
     const tokens = try sourceLexer.getAllTokens() orelse return true;
 
     if (self.flags.debugTokens) {
@@ -158,22 +161,21 @@ pub fn run(self: *Interpreter, filePath: []const u8, source: []const u8, interpr
     var sourceParser = try parser.init(tokens, filePath, source, self.flags, self.allocator);
     defer sourceParser.deinit();
 
-    var program = sourceParser.parse() catch return true;
-    defer program.deinit();
+    const program = sourceParser.parse() catch return true;
 
     var sourceResolver = resolver.init(interpreter, source, filePath);
     defer sourceResolver.deinit();
 
-    sourceResolver.resolveProgram(&program) catch return true;
+    sourceResolver.resolveProgram(program) catch return true;
 
     if (self.flags.debugAST) {
         const printer = ASTPrinter.init(self.allocator);
-        try printer.printProgram(&program);
+        try printer.printProgram(program);
         std.debug.print("\n\n", .{});
     }
 
     // INTERPRETING -------------------------------------
-    try interpreter.run(&program, source, filePath);
+    try interpreter.run(program, source, filePath);
     if (interpreter.runtimeError != null) return true;
 
     return false;

@@ -18,7 +18,6 @@ const ClassType = @import("./class_value.zig").ClassType;
 const ClassTypeReference = @import("./class_value.zig").ClassTypeReference;
 
 const Module = @import("./module_value.zig").Module;
-const ModuleReference = @import("./module_value.zig").ModuleReference;
 
 const RCSP = @import("../rcsp.zig");
 
@@ -55,7 +54,7 @@ pub const VariableValue = union(enum) {
         }
     },
 
-    Module: ModuleReference,
+    Module: *Module,
 
     Null,
 
@@ -73,9 +72,7 @@ pub const VariableValue = union(enum) {
                 _ = self.ClassInstance.deinit(allocator);
             },
             .WeakReference => _ = self.WeakReference.deinit(),
-            .Module => {
-                _ = self.Module.deinit({});
-            },
+            // No need to deinitialize modules because they stay loaded until the program ends and are all unloaded at once.
             else => {},
         }
     }
@@ -87,7 +84,6 @@ pub const VariableValue = union(enum) {
             .ClassType => |value| return .{ .ClassType = value.takeReference() },
             .Function => |value| return .{ .Function = value.takeReference() },
             .String => |value| return .{ .String = .{ .string = try allocator.dupe(u8, value.string), .allocated = true } },
-            .Module => |value| return .{ .Module = value.strongClone() },
             else => return self,
         }
     }
@@ -173,7 +169,7 @@ pub const VariableValue = union(enum) {
     pub fn isModuleType(self: VariableValue) bool {
         return self == .Module;
     }
-    pub fn asModuleType(self: VariableValue) ModuleReference {
+    pub fn asModuleType(self: VariableValue) *Module {
         return self.Module;
     }
 
@@ -198,8 +194,8 @@ pub const VariableValue = union(enum) {
     }
 
     // Constructors
-    pub fn fromModule(module: Module, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Module = try ModuleReference.init(module, allocator) };
+    pub fn fromModule(module: *Module) !VariableValue {
+        return .{ .Module = module };
     }
 
     pub fn fromNumber(number: f64) VariableValue {
@@ -235,8 +231,8 @@ pub const VariableValue = union(enum) {
         return .{ .Function = function };
     }
 
-    pub fn newClassType(class: ClassExpression, activeEnvironment: *Environment, parentModule: *ModuleInterpreter, superClass: ?ClassTypeReference) !VariableValue {
-        return .{ .ClassType = try CallableFunction.classType(class, activeEnvironment, parentModule, superClass) };
+    pub fn newClassType(class: ClassExpression, interpreter: *ModuleInterpreter, activeEnvironment: *Environment, superClass: ?ClassTypeReference) !VariableValue {
+        return .{ .ClassType = try CallableFunction.classType(class, interpreter, activeEnvironment, superClass) };
     }
     pub fn newClassInstance(classType: ClassTypeReference, callToken: Token, arguments: std.ArrayList(VariableValue)) !VariableValue {
         return .{ .ClassInstance = try ClassInstance.new(classType, callToken, arguments) };
@@ -268,7 +264,7 @@ pub const VariableValue = union(enum) {
             .ClassType => |value| return value.ClassType.ptr().toString(allocator),
             .ClassInstance => |value| return value.ptr().toString(allocator),
             .WeakReference => |value| return value.toString(allocator),
-            .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.ptr().path}),
+            .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.path}),
         }
     }
 };

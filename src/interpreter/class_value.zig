@@ -125,15 +125,18 @@ pub const ClassType = struct {
         return @as(*ClassTypeReference, @ptrCast(self._superClass.?)).*;
     }
 
-    pub fn new(parentEnvironment: *Environment, expression: ClassExpression, moduleInterpreter: *ModuleInterpreter, superClassType: ?ClassTypeReference) !ClassTypeReference {
-        const allocator = moduleInterpreter.allocator;
+    pub fn new(parentEnvironment: *Environment, interpreter: *ModuleInterpreter, expression: ClassExpression, superClassType: ?ClassTypeReference) !ClassTypeReference {
+        const allocator = interpreter.allocator;
 
         var instanceMethods = std.StringHashMapUnmanaged(ClassMethod){};
         var staticMethods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
             const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
             const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
-            try (if (method.static) staticMethods else instanceMethods).put(allocator, duplicatedName, ClassMethod.new(try method.name.clone(allocator), function));
+
+            const value = ClassMethod.new(try method.name.clone(allocator), function);
+            var map = if (method.static) &staticMethods else &instanceMethods;
+            try map.put(allocator, duplicatedName, value);
         }
 
         var super: ?ClassTypeReferencePointer = null;
@@ -148,7 +151,7 @@ pub const ClassType = struct {
             .staticMethods = staticMethods,
 
             .parentEnvironment = parentEnvironment,
-            .parentModule = moduleInterpreter,
+            .parentModule = interpreter,
 
             ._superClass = super,
 

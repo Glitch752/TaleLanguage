@@ -10,7 +10,6 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const RuntimeError = @import("./interpreterError.zig").RuntimeError;
 const InterpreterError = @import("./interpreterError.zig").InterpreterError;
 
-pub const ModuleReference = RCSP.DeinitializingRcSharedPointer(Module, RCSP.NonAtomic, void);
 pub const ExportedValueSet = std.StringHashMapUnmanaged(u0);
 
 pub const ModuleError = error{
@@ -58,7 +57,7 @@ pub const Module = struct {
         };
     }
 
-    pub fn deinit(self: *Module, _: void) void {
+    pub fn deinit(self: *Module) void {
         self.moduleInterpreter.deinit();
         self.moduleInterpreter.allocator.destroy(self.moduleInterpreter);
     }

@@ -23,6 +23,8 @@ const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFun
 const Interpreter = @import("./interpreter.zig").Interpreter;
 const ExportedValueSet = @import("./module_value.zig").ExportedValueSet;
 
+const Module = @import("./module_value.zig").Module;
+
 pub const ModuleInterpreter = @This();
 
 allocator: std.mem.Allocator,
@@ -444,7 +446,8 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                 try environment.define("super", value.takeWeakReference(), self);
             }
 
-            const class = try VariableValue.newClassType(values, environment, self, superClass);
+            const class = try VariableValue.newClassType(values, self, environment, superClass);
+
             // We don't copy the value when defining the class here because we can't create a loop of references
             try environment.define("this", class.takeWeakReference(), self); // "this" is defined here because static methods should access the class type itself
 
@@ -523,7 +526,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                         self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances, types, and modules.", .{});
                         return InterpreterError.RuntimeError;
                     }
-                    return try object.asModuleType().ptr().accessExport(values.name, self);
+                    return try object.asModuleType().accessExport(values.name, self);
                 }
                 var classType = object.asClassType();
                 return try classType.ptr().getStatic(values.name, self);

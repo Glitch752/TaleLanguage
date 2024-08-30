@@ -26,7 +26,7 @@ pub fn print(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableV
                 .ClassType => std.debug.print("<weak class type>", .{}),
             }
         },
-        .Module => |module| std.debug.print("<module {s}>", .{module.ptr().path}),
+        .Module => |module| std.debug.print("<module {s}>", .{module.path}),
     }
 
     return .Null;

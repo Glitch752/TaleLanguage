@@ -76,11 +76,11 @@ pub fn init(tokens: []Token, filePath: []const u8, originalBuffer: []const u8, f
     return .{ .tokens = tokens, .filePath = filePath, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
 }
 
-pub fn parse(self: *Parser) anyerror!Program {
+pub fn parse(self: *Parser) anyerror!*const Program {
     self.hasError = false;
 
     var program = Program.init(self.allocator);
-    errdefer program.deinit();
+    errdefer program.deinit(self.allocator);
 
     var hadError = false;
     while (!self.isAtEnd()) {
@@ -102,7 +102,9 @@ pub fn parse(self: *Parser) anyerror!Program {
         return ParseErrorEnum.Unknown;
     }
 
-    return program;
+    const programAllocated = try self.allocator.create(Program);
+    programAllocated.* = program;
+    return programAllocated;
 }
 
 pub fn parseExpression(self: *Parser) anyerror!*Expression {

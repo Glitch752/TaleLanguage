@@ -9,13 +9,7 @@ const Token = @import("../token.zig").Token;
 
 pub const Environment = @This();
 
-// TODO: Remove this
-const ValueWrapper = struct {
-    value: VariableValue,
-    name: []const u8,
-};
-
-const ValueMap = std.StringHashMapUnmanaged(*ValueWrapper);
+const ValueMap = std.StringHashMapUnmanaged(VariableValue);
 
 allocator: std.mem.Allocator,
 values: ValueMap,
@@ -71,13 +65,8 @@ fn discard(args: anytype) void {
 pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
-        const wrapper = entry.value_ptr.*;
-        discard(.{wrapper.name});
-
-        wrapper.value.deinit(allocator);
-        self.allocator.free(wrapper.name);
-
-        self.allocator.destroy(wrapper);
+        entry.value_ptr.deinit(allocator);
+        self.allocator.free(entry.key_ptr.*);
     }
     self.values.deinit(self.allocator);
 
@@ -88,21 +77,17 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
-    // We need to copy the name because the string is owned by the parser and will be deallocated
-    const wrapper = try self.allocator.create(ValueWrapper);
-    // TODO: Do we still need to copy the name here, in module exported values, and elsewhere?
-    wrapper.* = .{ .value = value, .name = try self.allocator.dupe(u8, name) };
+    const duplicatedName = try self.allocator.dupe(u8, name);
 
     try self.values.ensureUnusedCapacity(self.allocator, 2);
-    const previousValue = self.values.fetchPutAssumeCapacity(wrapper.name, wrapper);
+    const previousValue = self.values.fetchPutAssumeCapacity(duplicatedName, value);
 
     if (previousValue != null) {
         std.debug.assert(interpreter != null); // Tried to define a variable that already exists when the interpreter is not available.
 
-        const prev = previousValue.?.value;
-        self.allocator.free(prev.name);
+        var prev = previousValue.?;
+        self.allocator.free(prev.key);
         prev.value.deinit(interpreter.?.allocator);
-        self.allocator.destroy(prev);
     }
 }
 
@@ -118,14 +103,14 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
         return;
     }
 
-    pointer.?.*.value.deinit(interpreter.allocator);
+    pointer.?.*.deinit(interpreter.allocator);
 
-    pointer.?.*.value = value;
+    pointer.?.* = value;
 }
 
 pub fn get(self: *Environment, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
     const entry = self.values.get(name.lexeme);
-    if (entry != null) return entry.?.value;
+    if (entry != null) return entry.?;
 
     if (self.parent != null) {
         return try self.parent.?.get(name, interpreter);
@@ -150,7 +135,7 @@ pub fn getAtDepth(self: *Environment, name: Token, depth: u32, interpreter: *Mod
     const environment = try self.ancestorAtDepth(depth);
 
     const entry = environment.values.get(name.lexeme);
-    if (entry != null) return entry.?.value;
+    if (entry != null) return entry.?;
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s} at depth {d}, which is undefined.", .{ name.lexeme, depth });
     return InterpreterError.RuntimeError;
@@ -160,10 +145,22 @@ pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Toke
     const environment = try self.ancestorAtDepth(depth);
 
     const entry = environment.values.get(lexeme);
-    if (entry != null) return entry.?.value;
+    if (entry != null) return entry.?;
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, errorToken, "Tried to access {s} at depth {d}, which is undefined.", .{ lexeme, depth });
     return InterpreterError.RuntimeError;
+}
+
+/// For debugging purposes only
+pub fn getLexemeDebug(self: *Environment, lexeme: []const u8) VariableValue {
+    const entry = self.values.get(lexeme);
+    if (entry != null) return entry.?;
+
+    if (self.parent != null) {
+        return self.parent.?.getLexemeDebug(lexeme);
+    }
+
+    std.debug.panic("Tried to access {s}, which is undefined.", .{lexeme});
 }
 
 pub fn lexemeExistsAtDepth(self: *Environment, lexeme: []const u8, depth: u32) bool {
@@ -180,9 +177,9 @@ pub fn assignAtDepth(self: *Environment, name: Token, value: VariableValue, dept
         return;
     }
 
-    pointer.?.*.value.deinit(interpreter.allocator);
+    pointer.?.*.deinit(interpreter.allocator);
 
-    pointer.?.*.value = value;
+    pointer.?.* = value;
 }
 
 pub fn repeat(count: usize, character: u8, allocator: std.mem.Allocator) ![]const u8 {

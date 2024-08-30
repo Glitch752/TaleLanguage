@@ -86,9 +86,9 @@ fn enterRepl(self: *Main) !void {
 
 fn enterFile(self: *Main) !void {
     const filePath = try std.fs.realpathAlloc(self.allocator, self.args.?.mode.RunFile);
-    var module = self.interpreter.importModule(filePath) catch {
+    _ = self.interpreter.importModule(filePath) catch {
         self.hadError = true;
         return;
     };
-    _ = module.Module.deinit({});
+    // No need to deinitialize the module since it will be deinitialized by the interpreter
 }
