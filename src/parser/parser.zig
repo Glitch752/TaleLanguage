@@ -76,7 +76,7 @@ pub fn init(tokens: []Token, filePath: []const u8, originalBuffer: []const u8, f
     return .{ .tokens = tokens, .filePath = filePath, .originalBuffer = originalBuffer, .flags = flags, .allocator = allocator };
 }
 
-pub fn parse(self: *Parser) anyerror!*const Program {
+pub fn parse(self: *Parser) anyerror!*Program {
     self.hasError = false;
 
     var program = Program.init(self.allocator);
@@ -117,10 +117,6 @@ pub fn parseExpression(self: *Parser) anyerror!*Expression {
     }
 
     return expression;
-}
-
-pub fn deinit(self: *Parser) void {
-    _ = self;
 }
 
 /// Sets "hasError" to true and prints an error message on the current token.

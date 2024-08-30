@@ -12,15 +12,26 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const NativeError = @import("./natives.zig").NativeError;
 const Module = @import("./module_value.zig").Module;
 
+const Program = @import("../parser/program.zig").Program;
+
 pub const Interpreter = @This();
 
 allocator: std.mem.Allocator,
 flags: ArgsFlags,
 
+lexers: std.ArrayListUnmanaged(lexer), // Used to deallocate lexers after the program is run
+programs: std.ArrayListUnmanaged(*Program), // Used to deallocate programs after the program is run
+
 loadedModules: std.StringHashMapUnmanaged(VariableValue),
 
 pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
-    return Interpreter{ .allocator = allocator, .flags = flags, .loadedModules = std.StringHashMapUnmanaged(VariableValue){} };
+    return Interpreter{
+        .allocator = allocator,
+        .flags = flags,
+        .loadedModules = std.StringHashMapUnmanaged(VariableValue){},
+        .lexers = std.ArrayListUnmanaged(lexer){},
+        .programs = std.ArrayListUnmanaged(*Program){},
+    };
 }
 
 pub fn deinit(self: *Interpreter) void {
@@ -34,13 +45,24 @@ pub fn deinit(self: *Interpreter) void {
         self.allocator.free(entry.key_ptr.*);
     }
     self.loadedModules.deinit(self.allocator);
+
+    for (self.lexers.items) |lexerValue| {
+        var l = lexerValue;
+        l.deinit();
+    }
+    self.lexers.deinit(self.allocator);
+
+    for (self.programs.items) |program| {
+        program.deinit(self.allocator);
+    }
+    self.programs.deinit(self.allocator);
 }
 
 /// Returns if there was an error.
-pub fn runFile(self: *Interpreter, filePath: []const u8, interpreter: *ModuleInterpreter) !bool {
-    const file = std.fs.cwd().openFile(filePath, .{ .mode = .read_only }) catch |err| switch (err) {
+pub fn runFile(self: *Interpreter, interpreter: *ModuleInterpreter) !bool {
+    const file = std.fs.cwd().openFile(interpreter.filePath, .{ .mode = .read_only }) catch |err| switch (err) {
         error.FileNotFound => {
-            std.debug.print("File not found: {s}\n", .{ .name_string = filePath });
+            std.debug.print("File not found: {s}\n", .{ .name_string = interpreter.filePath });
             return true;
         },
         else => return err,
@@ -48,13 +70,10 @@ pub fn runFile(self: *Interpreter, filePath: []const u8, interpreter: *ModuleInt
 
     defer file.close();
 
-    const buffer = try file.readToEndAllocOptions(self.allocator, std.math.maxInt(usize), null, @alignOf(u8), 0);
-    defer {
-        self.allocator.free(buffer);
-        interpreter.originalBuffer = &[0]u8{};
-    }
-
-    return try self.run(filePath, buffer, interpreter);
+    const file_size = (file.stat() catch return NativeError.Unknown).size;
+    const buffer = self.allocator.alloc(u8, file_size) catch return NativeError.Unknown;
+    _ = file.readAll(buffer) catch return NativeError.Unknown;
+    return try self.run(buffer, interpreter);
 }
 
 /// Arity: 1
@@ -133,10 +152,11 @@ pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableVa
 }
 
 /// Returns if there was an error.
-pub fn run(self: *Interpreter, filePath: []const u8, source: []const u8, interpreter: *ModuleInterpreter) !bool {
+pub fn run(self: *Interpreter, source: []const u8, interpreter: *ModuleInterpreter) !bool {
     // LEXING -------------------------------------
-    var sourceLexer = lexer.init(self.allocator, filePath, source);
+    var sourceLexer = lexer.init(self.allocator, interpreter.filePath, source);
     const tokens = try sourceLexer.getAllTokens() orelse return true;
+    try self.lexers.append(self.allocator, sourceLexer);
 
     if (self.flags.debugTokens) {
         std.debug.print("Tokens:\n", .{});
@@ -158,12 +178,11 @@ pub fn run(self: *Interpreter, filePath: []const u8, source: []const u8, interpr
     }
 
     // PARSING -------------------------------------
-    var sourceParser = try parser.init(tokens, filePath, source, self.flags, self.allocator);
-    defer sourceParser.deinit();
-
+    var sourceParser = try parser.init(tokens, interpreter.filePath, source, self.flags, self.allocator);
     const program = sourceParser.parse() catch return true;
+    try self.programs.append(self.allocator, program);
 
-    var sourceResolver = resolver.init(interpreter, source, filePath);
+    var sourceResolver = resolver.init(interpreter, source, interpreter.filePath);
     defer sourceResolver.deinit();
 
     sourceResolver.resolveProgram(program) catch return true;
@@ -175,7 +194,7 @@ pub fn run(self: *Interpreter, filePath: []const u8, source: []const u8, interpr
     }
 
     // INTERPRETING -------------------------------------
-    try interpreter.run(program, source, filePath);
+    try interpreter.run(program, source);
     if (interpreter.runtimeError != null) return true;
 
     return false;

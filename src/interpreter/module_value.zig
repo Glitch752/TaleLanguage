@@ -32,16 +32,16 @@ pub const Module = struct {
             interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Module does not export {s}.", .{name.lexeme});
             return InterpreterError.RuntimeError;
         }
-        return (try self.getRootEnvironment().get(name, interpreter)).takeReference(interpreter.allocator);
+        return (try self.getRootEnvironment().getSelf(name, interpreter)).takeReference(interpreter.allocator);
     }
 
     /// Path will be freed by the interpreter when deinitialized; it should not be freed by the caller.
     pub fn load(interpreter: *Interpreter, path: []const u8) !Module {
         try {
             var moduleInterpreter = try interpreter.allocator.create(ModuleInterpreter);
-            moduleInterpreter.* = try ModuleInterpreter.init(interpreter.allocator, interpreter);
+            moduleInterpreter.* = try ModuleInterpreter.init(interpreter.allocator, interpreter, path);
 
-            const err = try interpreter.runFile(path, moduleInterpreter);
+            const err = try interpreter.runFile(moduleInterpreter);
             if (err) {
                 moduleInterpreter.deinit();
                 return ModuleError.InterpreterError;

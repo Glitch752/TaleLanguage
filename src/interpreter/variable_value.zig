@@ -224,8 +224,8 @@ pub const VariableValue = union(enum) {
     pub fn nativeFunction(arity: u32, function: CallableNativeFunction) !VariableValue {
         return .{ .Function = CallableFunction.native(arity, function) };
     }
-    pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, allocator: std.mem.Allocator) !VariableValue {
-        return .{ .Function = try CallableFunction.user(function, activeEnvironment, allocator) };
+    pub fn newFunction(function: FunctionExpression, activeEnvironment: *Environment, activeInterpreter: *ModuleInterpreter, allocator: std.mem.Allocator) !VariableValue {
+        return .{ .Function = try CallableFunction.user(function, activeEnvironment, activeInterpreter, allocator) };
     }
     pub fn newFunctionReference(function: CallableFunction) VariableValue {
         return .{ .Function = function };

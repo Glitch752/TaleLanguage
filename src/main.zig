@@ -59,7 +59,7 @@ fn entry(self: *Main) !void {
 }
 
 fn enterRepl(self: *Main) !void {
-    var astInterpreter = try ModuleInterpreter.init(self.allocator, &self.interpreter);
+    var astInterpreter = try ModuleInterpreter.init(self.allocator, &self.interpreter, "repl");
     errdefer astInterpreter.deinit();
 
     const stdin = std.io.getStdIn().reader();
@@ -80,7 +80,7 @@ fn enterRepl(self: *Main) !void {
             break;
         }
 
-        _ = try self.interpreter.run("repl", line, &astInterpreter);
+        _ = try self.interpreter.run(line, &astInterpreter);
     }
 }
 

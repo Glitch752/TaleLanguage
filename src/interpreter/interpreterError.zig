@@ -23,7 +23,7 @@ pub const RuntimeError = struct {
                 .message = message,
                 .allocatedMessage = false,
                 .token = token,
-                .originalBuffer = interpreter.originalBuffer,
+                .originalBuffer = interpreter.buffer,
                 .filePath = interpreter.filePath,
             };
         };
@@ -32,7 +32,7 @@ pub const RuntimeError = struct {
             .message = formattedMessage,
             .allocatedMessage = true,
             .token = token,
-            .originalBuffer = interpreter.originalBuffer,
+            .originalBuffer = interpreter.buffer,
             .filePath = interpreter.filePath,
         };
     }

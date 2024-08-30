@@ -1,6 +1,9 @@
 let vector3 = import('./vector3.tale');
 let Vec3 = vector3.Vec3;
 
+print(import('./vector3.tale').TestConstant);
+print("\n");
+
 let v = Vec3(1, 2, 3);
 v.print();
 v.add(Vec3(1, 1, 1));

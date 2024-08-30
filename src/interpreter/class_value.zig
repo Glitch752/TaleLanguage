@@ -131,7 +131,7 @@ pub const ClassType = struct {
         var instanceMethods = std.StringHashMapUnmanaged(ClassMethod){};
         var staticMethods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
-            const function = try CallableFunction.user(method.function, parentEnvironment, allocator);
+            const function = try CallableFunction.user(method.function, parentEnvironment, interpreter, allocator);
             const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
 
             const value = ClassMethod.new(try method.name.clone(allocator), function);

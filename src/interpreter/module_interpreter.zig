@@ -32,8 +32,10 @@ runtimeError: ?RuntimeError = null,
 
 lastReturnValue: VariableValue = VariableValue.null(),
 
-originalBuffer: []const u8 = "",
-filePath: []const u8 = "",
+buffer: []const u8 = "",
+oldBuffers: std.ArrayListUnmanaged([]const u8) = std.ArrayListUnmanaged([]const u8){},
+
+filePath: []const u8,
 
 rootEnvironment: Environment,
 activeEnvironment: ?*Environment = null,
@@ -43,7 +45,7 @@ expressionDefinitionDepth: std.AutoHashMapUnmanaged(u32, u32),
 interpreter: *Interpreter,
 exportedValues: ExportedValueSet,
 
-pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInterpreter {
+pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter, filePath: []const u8) !ModuleInterpreter {
     var environment = Environment.init(allocator);
     try environment.define("import", try VariableValue.nativeFunction(1, Interpreter.import), null);
 
@@ -65,19 +67,21 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter) !ModuleInte
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
 
-    return .{
-        .allocator = allocator,
-        .rootEnvironment = environment,
-        .expressionDefinitionDepth = expressionDepths,
-        .exportedValues = ExportedValueSet{},
-        .interpreter = interpreter,
-    };
+    return .{ .allocator = allocator, .rootEnvironment = environment, .expressionDefinitionDepth = expressionDepths, .exportedValues = ExportedValueSet{}, .interpreter = interpreter, .filePath = filePath };
 }
 
 pub fn deinit(self: *ModuleInterpreter) void {
     self.rootEnvironment.deinit(self.allocator);
     self.expressionDefinitionDepth.deinit(self.allocator);
+
     self.allocator.free(self.filePath);
+
+    // Free source buffers
+    self.allocator.free(self.buffer);
+    for (self.oldBuffers.items) |buffer| {
+        self.allocator.free(buffer);
+    }
+    self.oldBuffers.deinit(self.allocator);
 
     var exportedValueIter = self.exportedValues.iterator();
     while (exportedValueIter.next()) |entry| {
@@ -86,11 +90,11 @@ pub fn deinit(self: *ModuleInterpreter) void {
     self.exportedValues.deinit(self.allocator);
 }
 
-pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8, filePath: []const u8) !void {
-    if (self.originalBuffer.len != 0) self.allocator.free(self.originalBuffer);
-    self.originalBuffer = originalBuffer;
-    if (self.filePath.len != 0) self.allocator.free(self.filePath);
-    self.filePath = filePath;
+pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []const u8) !void {
+    if (self.buffer.len != 0) {
+        try self.oldBuffers.append(self.allocator, self.buffer);
+    }
+    self.buffer = originalBuffer;
 
     self.activeEnvironment = &self.rootEnvironment;
 
@@ -103,7 +107,7 @@ pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []
 }
 
 pub fn runExpression(self: *ModuleInterpreter, expression: *const Expression, originalBuffer: []const u8, filePath: []const u8) !VariableValue {
-    self.originalBuffer = originalBuffer;
+    self.buffer = originalBuffer;
     self.filePath = filePath;
 
     self.activeEnvironment = &self.rootEnvironment;
@@ -200,7 +204,7 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
 fn lookUpVariable(self: *ModuleInterpreter, name: Token, expression: *const Expression) !VariableValue {
     const depth = self.expressionDefinitionDepth.get(expression.id);
     if (depth == null) {
-        return try (try self.rootEnvironment.get(name, self)).takeReference(self.allocator);
+        return try (try self.rootEnvironment.getSelf(name, self)).takeReference(self.allocator);
     }
 
     return try (try self.activeEnvironment.?.getAtDepth(name, depth.?, self)).takeReference(self.allocator);
@@ -421,7 +425,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             };
         },
         .Function => |values| {
-            const function = try VariableValue.newFunction(values, self.activeEnvironment.?, self.allocator);
+            const function = try VariableValue.newFunction(values, self.activeEnvironment.?, self, self.allocator);
             return function;
         },
 

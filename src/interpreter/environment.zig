@@ -66,7 +66,6 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         entry.value_ptr.deinit(allocator);
-        self.allocator.free(entry.key_ptr.*);
     }
     self.values.deinit(self.allocator);
 
@@ -77,16 +76,12 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
-    const duplicatedName = try self.allocator.dupe(u8, name);
-
-    try self.values.ensureUnusedCapacity(self.allocator, 2);
-    const previousValue = self.values.fetchPutAssumeCapacity(duplicatedName, value);
+    const previousValue = try self.values.fetchPut(self.allocator, name, value);
 
     if (previousValue != null) {
         std.debug.assert(interpreter != null); // Tried to define a variable that already exists when the interpreter is not available.
 
         var prev = previousValue.?;
-        self.allocator.free(prev.key);
         prev.value.deinit(interpreter.?.allocator);
     }
 }
@@ -108,13 +103,9 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
     pointer.?.* = value;
 }
 
-pub fn get(self: *Environment, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
+pub fn getSelf(self: *Environment, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
     const entry = self.values.get(name.lexeme);
     if (entry != null) return entry.?;
-
-    if (self.parent != null) {
-        return try self.parent.?.get(name, interpreter);
-    }
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
     return InterpreterError.RuntimeError;
@@ -196,9 +187,8 @@ pub fn printVariables(self: *Environment, interpreter: *ModuleInterpreter, inden
     if (indent == 0) std.debug.print("---- Variables -----\n", .{});
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
-        const wrapper = entry.value_ptr.*;
-        const name = wrapper.name;
-        const value = wrapper.value;
+        const name = entry.key_ptr.*;
+        const value = entry.value_ptr.*;
         const string = try value.toString(interpreter.allocator);
         defer interpreter.allocator.free(string);
 

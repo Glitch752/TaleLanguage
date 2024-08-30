@@ -23,7 +23,10 @@ pub const CallableNativeFunction = *const fn (*ModuleInterpreter, std.ArrayList(
 const UserFunction = struct {
     parameters: std.ArrayListUnmanaged(Token),
     body: *const Statement,
+
+    parentInterpreter: *ModuleInterpreter,
     parentEnvironment: *Environment,
+
     /// For debugging.
     id: u32,
 
@@ -97,20 +100,23 @@ pub const CallableFunction = union(enum) {
                 return try data.body(interpreter, arguments);
             },
             .User => |data| {
-                var environment = try interpreter.enterChildEnvironment(data.ptr().parentEnvironment, interpreter.activeEnvironment.?);
-                defer environment.exit(interpreter);
+                const functionInterpreter = data.ptr().parentInterpreter;
 
-                return try callUserFunction(interpreter, callToken, environment, data, arguments);
+                var environment = try functionInterpreter.enterChildEnvironment(data.ptr().parentEnvironment, functionInterpreter.activeEnvironment.?);
+                defer environment.exit(functionInterpreter);
+
+                return try callUserFunction(functionInterpreter, callToken, environment, data, arguments);
             },
             .BoundClassMethod => |data| {
                 const previousEnvironment = interpreter.activeEnvironment;
+                const functionInterpreter = data.method.ptr().parentInterpreter;
 
-                interpreter.activeEnvironment = data.classInstance.ptr().environment;
+                functionInterpreter.activeEnvironment = data.classInstance.ptr().environment;
 
-                var environment = try interpreter.enterChildEnvironment(interpreter.activeEnvironment.?, previousEnvironment.?);
-                defer environment.exit(interpreter);
+                var environment = try functionInterpreter.enterChildEnvironment(functionInterpreter.activeEnvironment.?, previousEnvironment.?);
+                defer environment.exit(functionInterpreter);
 
-                return callUserFunction(interpreter, callToken, environment, data.method, arguments);
+                return callUserFunction(functionInterpreter, callToken, environment, data.method, arguments);
             },
             .ClassType => |data| {
                 return try VariableValue.newClassInstance(data, callToken, arguments);
@@ -121,7 +127,7 @@ pub const CallableFunction = union(enum) {
     pub fn native(arity: u32, function: CallableNativeFunction) CallableFunction {
         return .{ .Native = .{ .arity = arity, .body = function } };
     }
-    pub fn user(function: FunctionExpression, parentEnvironment: *Environment, allocator: std.mem.Allocator) !CallableFunction {
+    pub fn user(function: FunctionExpression, parentEnvironment: *Environment, parentInterpreter: *ModuleInterpreter, allocator: std.mem.Allocator) !CallableFunction {
         var parameters = std.ArrayListUnmanaged(Token){};
         for (function.parameters.items) |parameter| {
             try parameters.append(allocator, try parameter.clone(allocator));
@@ -133,6 +139,7 @@ pub const CallableFunction = union(enum) {
             .parameters = parameters,
             .body = function.body,
             .parentEnvironment = parentEnvironment,
+            .parentInterpreter = parentInterpreter,
             .id = functionId,
         }, allocator) };
     }
