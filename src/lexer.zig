@@ -139,6 +139,7 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
             while (self.position < self.buffer.len and std.ascii.isDigit(self.buffer[self.position])) {
                 number = number * 10 + (self.buffer[self.position] - '0');
                 self.position += 1;
+                while (self.position < self.buffer.len and self.buffer[self.position] == '_') self.position += 1;
             }
             if (self.position < self.buffer.len and self.buffer[self.position] == '.' and std.ascii.isDigit(self.buffer[self.position + 1])) {
                 self.position += 1;
@@ -148,6 +149,7 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
                     decimal += @as(f64, @floatFromInt(self.buffer[self.position] - '0')) * decimalPlace;
                     decimalPlace /= 10.0;
                     self.position += 1;
+                    while (self.position < self.buffer.len and self.buffer[self.position] == '_') self.position += 1;
                 }
                 return try self.addToken(TokenType.NumberLiteral, .{ .NumberLiteral = @as(f64, @floatFromInt(number)) + decimal });
             }
@@ -164,15 +166,31 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
                     isEscaping = false;
 
                     // Handle escape sequences
-                    const escapeChar = escapeSequences.get(self.buffer[self.position .. self.position + 1]);
-                    if (escapeChar != null) {
+                    const escapeIdentifier = self.buffer[self.position .. self.position + 1];
+                    if (std.mem.eql(u8, escapeIdentifier, "x")) {
+                        if (self.position >= self.buffer.len - 2) {
+                            errorPayload.* = TokenizerErrorPayload{ .InvalidCharacter = 0 };
+                            return true;
+                        }
+
+                        // This is a hex escape sequence
                         string = try self.allocator.realloc(string, string.len + 1);
-                        string[string.len - 1] = escapeChar.?;
+                        self.position += 1;
+                        const hex = self.buffer[self.position .. self.position + 2];
+                        const hexValue = try std.fmt.parseInt(u8, hex, 16);
+                        string[string.len - 1] = hexValue;
+                        self.position += 1;
                     } else {
-                        // If it's not a valid escape sequence, just print both characters
-                        string = try self.allocator.realloc(string, string.len + 2);
-                        string[string.len - 2] = self.buffer[self.position - 1];
-                        string[string.len - 1] = self.buffer[self.position];
+                        const escapeChar = escapeSequences.get(escapeIdentifier);
+                        if (escapeChar != null) {
+                            string = try self.allocator.realloc(string, string.len + 1);
+                            string[string.len - 1] = escapeChar.?;
+                        } else {
+                            // If it's not a valid escape sequence, just print both characters
+                            string = try self.allocator.realloc(string, string.len + 2);
+                            string[string.len - 2] = self.buffer[self.position - 1];
+                            string[string.len - 1] = self.buffer[self.position];
+                        }
                     }
                 } else if (self.buffer[self.position] == '\\') {
                     isEscaping = true;

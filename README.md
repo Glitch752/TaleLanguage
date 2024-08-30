@@ -124,8 +124,17 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
   - [X] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
 
+## Important note
+Since all memory in the language is reference-counted, reference cycles are possible (and easy to create). I'm considering switching to a garbage collector to avoid this issue, but for now, it's something to be aware of.
+The following situations are examples of how reference cycles can be created:
+- A class that holds a reference to itself
+- A cycle of classes that hold references to each other
+- A function that has a child function and the child function has more than 1 reference to the parent function (e.g. it's returned, stored in a variable, etc.)
+This is quite limiting, but one of my other goals when making this language was to learn about reference counting, so I hope it's an understandable limitation.
+
 ## Considerations for the future
 - Static typing
+- Should we switch to a garbage collector to avoid reference cycles?
 - How should we handle errors?
 - Should statements be expressions? (E.g. `let x = if (true) { 5 } else { 3 }`)
 

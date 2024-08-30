@@ -4,7 +4,7 @@ export let EXPECTED_ASSERTIONS = 1;
 export let run = function(assert) {
     let variable = 0;
     let increment = function() {
-        variable = 1;
+        variable = variable + 1;
     };
 
     increment();

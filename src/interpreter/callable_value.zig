@@ -56,9 +56,7 @@ pub const CallableFunction = union(enum) {
 
     pub fn deinit(self: *CallableFunction, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .User => {
-                _ = self.User.deinit(allocator);
-            },
+            .User => _ = self.User.deinit(allocator),
             .BoundClassMethod => {
                 _ = self.BoundClassMethod.method.deinit(allocator);
                 _ = self.BoundClassMethod.classInstance.deinit(allocator);
@@ -101,7 +99,7 @@ pub const CallableFunction = union(enum) {
                 var environment = try functionInterpreter.enterChildEnvironment(data.ptr().parentEnvironment, functionInterpreter.activeEnvironment.?);
                 defer environment.exit(functionInterpreter);
 
-                return try callUserFunction(functionInterpreter, callToken, environment, data, arguments);
+                return callUserFunction(functionInterpreter, callToken, environment, data, arguments);
             },
             .BoundClassMethod => |data| {
                 const previousEnvironment = interpreter.activeEnvironment;

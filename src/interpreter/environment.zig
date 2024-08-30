@@ -50,6 +50,18 @@ pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
         interpreter.activeEnvironment = self.previous;
     }
 
+    // If there are and child functions that only have one reference, deinit them since they are no longer accessible outside of the environment.
+    // This isn't a perfect solution, but it's good enough for now.
+    var iter = self.values.iterator();
+    while (iter.next()) |entry| {
+        if (entry.value_ptr.* == .Function) {
+            var function = entry.value_ptr.Function;
+            if (function == .User and function.User.strongCount() == 1) {
+                function.deinit(interpreter.allocator);
+            }
+        }
+    }
+
     self.referenceCount -= 1;
     if (self.referenceCount == 0) {
         std.debug.assert(self.parent != null); // Tried to deinit the root environment

@@ -56,6 +56,10 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter, filePath: [
 }
 
 pub fn deinit(self: *ModuleInterpreter) void {
+    if (self.runtimeError != null) {
+        self.runtimeError.?.printAndDeinit();
+    }
+
     self.rootEnvironment.deinit(self.allocator);
     self.expressionDefinitionDepth.deinit(self.allocator);
 
@@ -97,17 +101,8 @@ pub fn runExpression(self: *ModuleInterpreter, expression: *const Expression, or
 
     self.activeEnvironment = &self.rootEnvironment;
 
-    self.runtimeError = null;
-    const result: ?VariableValue = self.interpretExpression(expression) catch null;
-
-    if (self.runtimeError != null) {
-        self.runtimeError.?.printAndDeinit();
-    }
-    if (result == null) {
-        return VariableValue.null();
-    }
-
-    return result.?;
+    const result: VariableValue = try self.interpretExpression(expression);
+    return result;
 }
 
 pub fn resolve(self: *ModuleInterpreter, expressionId: u32, depth: u32) !void {
