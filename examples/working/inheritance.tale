@@ -1,3 +1,6 @@
+let print = import("std").print;
+let string = import("std").string;
+
 let Point = class {
     constructor(x, y) {
         this.x = x;

@@ -1,16 +1,29 @@
-let i = 0;
-while(i < 20) {
-    i = i + 1;
+let Std = import("std");
 
-    if(i % 3 == 0 && i % 5 == 0) {
-        // Log prints to stdout
-        print("FizzBuzz\n");
-    } else if(i % 3 == 0) {
-        print("Fizz\n");
-    } else if(i % 5 == 0) {
-        print("Buzz\n");
-    } else {
-        print(i);
-        print("\n");
+let main = function() {
+    let i = 0;
+    while(i < 20) {
+        i = i + 1;
+
+        /*
+         Comments can also span multiple lines.
+        */
+        if(i % 3 == 0 && ((i % 3) == 0)) {
+            // Log prints to stdout
+            Std.println("FizzBuzz");
+        }
+        else if(i % 3 == 0) Std.println("Fizz");
+        else if(i % 5 == 0) {
+            Std.println("Buzz");
+        } else {
+            // Not sure how much I like string() as the type cast, but it's the easiest method for now.
+            // Additionally, + as a string concatenation operator itn't my favorite.
+            Std.println(Std.string(i));
+        }
     }
-}
+
+    // Exit code 0
+    return 0;
+};
+
+return main();

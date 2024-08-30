@@ -49,21 +49,6 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter, filePath: [
     var environment = Environment.init(allocator);
     try environment.define("import", try VariableValue.nativeFunction(1, Interpreter.import), null);
 
-    try environment.define("print", try VariableValue.nativeFunction(1, &natives.print), null);
-    try environment.define("sin", try VariableValue.nativeFunction(1, &natives.sin), null);
-    try environment.define("cos", try VariableValue.nativeFunction(1, &natives.cos), null);
-    try environment.define("tan", try VariableValue.nativeFunction(1, &natives.tan), null);
-    try environment.define("exp", try VariableValue.nativeFunction(1, &natives.exp), null);
-    try environment.define("exp2", try VariableValue.nativeFunction(1, &natives.exp2), null);
-    try environment.define("log", try VariableValue.nativeFunction(1, &natives.log), null);
-    try environment.define("log2", try VariableValue.nativeFunction(1, &natives.log2), null);
-    try environment.define("log10", try VariableValue.nativeFunction(1, &natives.log10), null);
-    try environment.define("floor", try VariableValue.nativeFunction(1, &natives.floor), null);
-    try environment.define("substring", try VariableValue.nativeFunction(3, &natives.substring), null);
-    try environment.define("intChar", try VariableValue.nativeFunction(1, &natives.intChar), null);
-    try environment.define("length", try VariableValue.nativeFunction(1, &natives.length), null);
-    try environment.define("string", try VariableValue.nativeFunction(1, &natives.toString), null);
-
     var expressionDepths = std.AutoHashMapUnmanaged(u32, u32){};
     try expressionDepths.put(allocator, 0, 1);
 

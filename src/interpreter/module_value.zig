@@ -26,6 +26,49 @@ pub const Module = union(enum) {
         name: []const u8,
     },
 
+    pub fn makeNativeModule(name: []const u8, allocator: std.mem.Allocator, exports: anytype) !VariableValue {
+        // Ensure that exports is a tuple with all {name: string, value: VariableValue} fields.
+        const exportsType = @TypeOf(exports);
+        const exportsTypeInfo = @typeInfo(exportsType);
+        if (exportsTypeInfo != .Struct) {
+            @compileError("Expected tuple of .{ .name = []const u8, .value = VariableValue }, found " ++ @typeName(exportsType));
+        }
+        const fieldsInfo = exportsTypeInfo.Struct.fields;
+        comptime {
+            // There's probably a better way to do this, but I'm not sure what it is.
+            for (fieldsInfo) |field| {
+                const fieldTypeInfo = @typeInfo(field.type);
+                if (fieldTypeInfo != .Struct) @compileError("Expected tuple of .{ .name = []const u8, .value = VariableValue }, found " ++ @typeName(field.type));
+                const nameField = fieldTypeInfo.Struct.fields[0];
+                const valueField = fieldTypeInfo.Struct.fields[1];
+                if (!std.mem.eql(u8, nameField.name, "name") or !std.mem.eql(u8, valueField.name, "value")) @compileError("Expected tuple of .{ .name = []const u8, .value = VariableValue }, found " ++ @typeName(field.type));
+                const nameTypeInfo = @typeInfo(nameField.type);
+                if (nameTypeInfo != .Pointer or valueField.type != VariableValue) @compileError("Expected tuple of .{ .name = []const u8, .value = VariableValue }, found " ++ @typeName(field.type));
+                const nameChildTypeInfo = @typeInfo(nameTypeInfo.Pointer.child);
+                if (nameChildTypeInfo != .Array or nameChildTypeInfo.Array.child != u8) @compileError("Expected tuple of .{ .name = []const u8, .value = VariableValue }, found " ++ @typeName(field.type));
+            }
+        }
+
+        const exportsMap = try allocator.create(std.StringHashMapUnmanaged(VariableValue));
+        exportsMap.* = std.StringHashMapUnmanaged(VariableValue){};
+
+        const fieldCount = fieldsInfo.len;
+        inline for (0..fieldCount) |i| {
+            const field = @field(exports, fieldsInfo[i].name);
+            try exportsMap.put(allocator, field.name, field.value);
+        }
+
+        const module = try allocator.create(Module);
+        module.* = .{
+            .NativeModule = .{
+                .name = name,
+                .exports = exportsMap,
+            },
+        };
+
+        return VariableValue.fromModule(module);
+    }
+
     pub fn getPath(self: *const Module) []const u8 {
         return switch (self.*) {
             .CodeModule => self.CodeModule.path,
@@ -94,8 +137,7 @@ pub const Module = union(enum) {
                     entry.value_ptr.deinit(allocator);
                 }
                 values.exports.deinit(allocator);
-
-                allocator.free(self.NativeModule.name);
+                allocator.destroy(values.exports);
             },
         }
     }

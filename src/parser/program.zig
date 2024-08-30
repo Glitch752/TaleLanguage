@@ -9,14 +9,14 @@ pub fn init(allocator: std.mem.Allocator) Program {
     return .{ .statements = std.ArrayList(*Statement).init(allocator) };
 }
 
-pub fn deinit(self: *Program, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *Program, allocator: std.mem.Allocator, destroy: bool) void {
     for (self.statements.items) |statement| {
         statement.*.uninit(self.statements.allocator);
     }
 
     self.statements.deinit();
 
-    allocator.destroy(self);
+    if (destroy) allocator.destroy(self);
 }
 
 pub fn addStatement(self: *Program, statement: *Statement) !void {

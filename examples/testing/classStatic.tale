@@ -1,18 +1,23 @@
+let Std = import('std');
+
 let TestClass = class {
     static a() {
-        print("A\n");
+        Std.print("A\n");
     }
 };
 let TestClass2 = class extending TestClass {
     static b() {
-        print("B\n");
+        Std.print("B\n");
     }
 };
+
+// TODO: This line now causes deinitialization issues for some reason.
 TestClass.tc2 = TestClass2;
+
 let TestClass3 = class extending class extending TestClass.tc2 {} {
     static c() {
         super.b();
-        print("C\n");
+        Std.print("C\n");
     }
 };
 

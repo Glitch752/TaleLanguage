@@ -1,1 +1,1 @@
-print("Hi!\n");
+import("std").print("Hi!\n");

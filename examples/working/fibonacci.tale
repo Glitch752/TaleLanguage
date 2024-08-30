@@ -1,10 +1,11 @@
+let Std = import("std");
+
 let a = 0;
 let b = 1;
 let temp = a;
 
 while (a < 1000000000000000000) {
-    print(a);
-    print("\n");
+    Std.println(a);
 
     temp = a;
     a = b;

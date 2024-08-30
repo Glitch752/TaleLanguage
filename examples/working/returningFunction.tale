@@ -1,3 +1,5 @@
+let Std = import("std");
+
 let isMultipleOfFactory = function(n) {
     let otherNumber = n;
     return function(m) {
@@ -13,16 +15,16 @@ let iterations = 100;
 let i = 1;
 while (i <= iterations) {
     if (isMultipleOf3(i) && isMultipleOf5(i)) {
-        print("FizzBuzz");
+        Std.print("FizzBuzz");
     } else if (isMultipleOf3(i)) {
-        print("Fizz");
+        Std.print("Fizz");
     } else if (isMultipleOf5(i)) {
-        print("Buzz");
+        Std.print("Buzz");
     } else {
-        print(i);
+        Std.print(i);
     }
     
     i = i + 1;
 
-    if(i <= iterations) print(", ");
+    if(i <= iterations) Std.print(", ");
 }

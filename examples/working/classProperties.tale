@@ -1,8 +1,10 @@
+let Std = import('std');
+
 let TestClass = class {};
 let test = TestClass();
 
-print(test);
-print("\n---\n");
+Std.print(test);
+Std.print("\n---\n");
 
 test.a = 5;
-print(test.a);
+Std.print(test.a);

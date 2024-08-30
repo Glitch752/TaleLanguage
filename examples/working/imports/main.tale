@@ -1,8 +1,9 @@
+let Std = import('std');
+
 let vector3 = import('./vector3.tale');
 let Vec3 = vector3.Vec3;
 
-print(import('./vector3.tale').TestConstant);
-print("\n");
+Std.println(import('./vector3.tale').TestConstant);
 
 let v = Vec3(1, 2, 3);
 v.print();

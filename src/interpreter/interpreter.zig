@@ -12,6 +12,8 @@ const VariableValue = @import("./variable_value.zig").VariableValue;
 const NativeError = @import("./natives.zig").NativeError;
 const Module = @import("./module_value.zig").Module;
 
+const natives = @import("./natives.zig");
+
 const Program = @import("../parser/program.zig").Program;
 
 pub const Interpreter = @This();
@@ -26,9 +28,25 @@ loadedModules: std.StringHashMapUnmanaged(VariableValue),
 globalModules: std.StringHashMapUnmanaged(VariableValue),
 
 pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
-    const globalModules = std.StringHashMapUnmanaged(VariableValue){};
+    var globalModules = std.StringHashMapUnmanaged(VariableValue){};
 
-    // globalModules.put(allocator, "std", try Module.load())
+    try globalModules.put(allocator, "std", try Module.makeNativeModule("std", allocator, .{
+        .{ .name = "print", .value = try VariableValue.nativeFunction(1, &natives.print) },
+        .{ .name = "println", .value = try VariableValue.nativeFunction(1, natives.println) },
+        .{ .name = "sin", .value = try VariableValue.nativeFunction(1, &natives.sin) },
+        .{ .name = "cos", .value = try VariableValue.nativeFunction(1, &natives.cos) },
+        .{ .name = "tan", .value = try VariableValue.nativeFunction(1, &natives.tan) },
+        .{ .name = "exp", .value = try VariableValue.nativeFunction(1, &natives.exp) },
+        .{ .name = "exp2", .value = try VariableValue.nativeFunction(1, &natives.exp2) },
+        .{ .name = "log", .value = try VariableValue.nativeFunction(1, &natives.log) },
+        .{ .name = "log2", .value = try VariableValue.nativeFunction(1, &natives.log2) },
+        .{ .name = "log10", .value = try VariableValue.nativeFunction(1, &natives.log10) },
+        .{ .name = "floor", .value = try VariableValue.nativeFunction(1, &natives.floor) },
+        .{ .name = "substring", .value = try VariableValue.nativeFunction(3, &natives.substring) },
+        .{ .name = "intChar", .value = try VariableValue.nativeFunction(1, &natives.intChar) },
+        .{ .name = "length", .value = try VariableValue.nativeFunction(1, &natives.length) },
+        .{ .name = "string", .value = try VariableValue.nativeFunction(1, &natives.toString) },
+    }));
 
     return Interpreter{
         .allocator = allocator,
@@ -52,6 +70,16 @@ pub fn deinit(self: *Interpreter) void {
     }
     self.loadedModules.deinit(self.allocator);
 
+    var iter2 = self.globalModules.iterator();
+    while (iter2.next()) |entry| {
+        entry.value_ptr.deinit(self.allocator);
+        if (entry.value_ptr.* == .Module) {
+            entry.value_ptr.*.Module.deinit(self.allocator);
+            self.allocator.destroy(entry.value_ptr.Module);
+        }
+    }
+    self.globalModules.deinit(self.allocator);
+
     for (self.lexers.items) |lexerValue| {
         var l = lexerValue;
         l.deinit();
@@ -59,7 +87,7 @@ pub fn deinit(self: *Interpreter) void {
     self.lexers.deinit(self.allocator);
 
     for (self.programs.items) |program| {
-        program.deinit(self.allocator);
+        program.deinit(self.allocator, true);
     }
     self.programs.deinit(self.allocator);
 }

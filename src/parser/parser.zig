@@ -80,7 +80,7 @@ pub fn parse(self: *Parser) anyerror!*Program {
     self.hasError = false;
 
     var program = Program.init(self.allocator);
-    errdefer program.deinit(self.allocator);
+    errdefer program.deinit(self.allocator, false);
 
     var hadError = false;
     while (!self.isAtEnd()) {

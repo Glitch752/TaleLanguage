@@ -1,13 +1,14 @@
+let Std = import('std');
+
 let TestClass = class {
     constructor(param) {
-        print("TestClass constructor\n");
+        Std.println("TestClass constructor");
         let self = this;
-        // self.number = param;
+        self.number = param;
     }
 
     printNumber() {
-        print(this.number);
-        print("\n");
+        Std.println(this.number);
     }
 
     addNumber(addend) {
@@ -19,12 +20,12 @@ let ClassCopy = TestClass;
 
 let test = TestClass(5);
 test.number = 3;
-// print(test.number);
-// print("\n");
 
-// test.printNumber(); // 5
-// test.addNumber(10);
-// test.printNumber(); // 15
+Std.println(test.number);
 
-// test.number = 20;
-// test.printNumber(); // 20
+test.printNumber(); // 5
+test.addNumber(10);
+test.printNumber(); // 15
+
+test.number = 20;
+test.printNumber(); // 20

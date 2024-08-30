@@ -1,7 +1,0 @@
-let A = class {};
-let B = class {};
-
-let a = A();
-let b = B();
-a.b = b;
-b.a = a;

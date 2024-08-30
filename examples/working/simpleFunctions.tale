@@ -1,9 +1,11 @@
+let Std = import("std");
+
 let run = function(n) {
     if (n >= 1) {
         run(n - 1);
         run(n - 1);
-        print(n);
-        print(" ");
+        Std.print(n);
+        Std.print(" ");
     }
 };
 

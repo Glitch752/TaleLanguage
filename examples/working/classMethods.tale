@@ -1,36 +1,33 @@
+let Std = import('std');
+
 let TestClass = class {
     constructor(constructorValue) {
         this.a = constructorValue;
 
-        print("Constructor\n");
-        print(this.a);
-        print("\n");
+        Std.println("Constructor");
+        Std.println(this.a);
 
         this.b = 4;
     }
 
     method() {
-        print("Method\n");
-        print(this.a);
-        print("\n");
+        Std.println("Method");
+        Std.println(this.a);
 
         return this.a;
     }
 };
 let test = TestClass(5);
 
-print(test); // <isntance>
-print("\n---\n");
+Std.print(test); // <isntance>
+Std.print("\n---\n");
 
-print(test.a); // 5
-print("\n");
+Std.println(test.a); // 5
 
 test.a = 10;
 
-print(test.a); // 10
-print("\n");
+Std.println(test.a); // 10
+Std.print(test.b); // 4
+Std.print("\n---\n");
 
-print(test.b); // 4
-print("\n---\n");
-
-print(test.method()); // 10
+Std.print(test.method()); // 10

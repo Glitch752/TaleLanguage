@@ -1,3 +1,5 @@
+let Std = import("std");
+
 let fibonacci = function(n) {
     if(n == 0) {
         return 0;
@@ -12,8 +14,7 @@ let fibonacci = function(n) {
 let main = function() {
     let i = 0;
     while(i < 20) {
-        print(fibonacci(i));
-        print("\n");
+        Std.println(fibonacci(i));
         i = i + 1;
     }
 };

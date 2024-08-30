@@ -1,3 +1,5 @@
+let Std = import("std");
+
 // Sierpinski triangle
 let layers = 64;
 
@@ -5,21 +7,21 @@ let y = layers - 1;
 while(y >= 0) {
     let i = 0;
     while(i < y) {
-        print(" ");
+        Std.print(" ");
         i = i + 1;
     }
 
     let x = 0;
     while(x + y < layers) {
         if ((x & y) != 0) 
-            print("  "); 
+            Std.print("  "); 
         else
-            print("* "); 
+            Std.print("* "); 
 
         x = x + 1;
     } 
 
-    print("\n");
+    Std.print("\n");
 
     y = y - 1;
 }
