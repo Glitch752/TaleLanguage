@@ -23,14 +23,20 @@ lexers: std.ArrayListUnmanaged(lexer), // Used to deallocate lexers after the pr
 programs: std.ArrayListUnmanaged(*Program), // Used to deallocate programs after the program is run
 
 loadedModules: std.StringHashMapUnmanaged(VariableValue),
+globalModules: std.StringHashMapUnmanaged(VariableValue),
 
 pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
+    const globalModules = std.StringHashMapUnmanaged(VariableValue){};
+
+    // globalModules.put(allocator, "std", try Module.load())
+
     return Interpreter{
         .allocator = allocator,
         .flags = flags,
         .loadedModules = std.StringHashMapUnmanaged(VariableValue){},
         .lexers = std.ArrayListUnmanaged(lexer){},
         .programs = std.ArrayListUnmanaged(*Program){},
+        .globalModules = globalModules,
     };
 }
 
@@ -39,7 +45,7 @@ pub fn deinit(self: *Interpreter) void {
     while (iter.next()) |entry| {
         entry.value_ptr.deinit(self.allocator);
         if (entry.value_ptr.* == .Module) {
-            entry.value_ptr.*.Module.deinit();
+            entry.value_ptr.*.Module.deinit(self.allocator);
             self.allocator.destroy(entry.value_ptr.Module);
         }
         self.allocator.free(entry.key_ptr.*);
@@ -82,7 +88,13 @@ pub fn import(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variable
     if (!argument.isString()) return NativeError.InvalidOperand;
 
     // interpreter.interpreter actually references ourself
-    return (try interpreter.interpreter.importFromPath(argument.asString(), interpreter.filePath)).takeReference(interpreter.allocator) catch return NativeError.Unknown;
+    const self = interpreter.interpreter;
+
+    if (self.globalModules.contains(argument.asString())) {
+        return self.globalModules.get(argument.asString()).?;
+    }
+
+    return (try self.importFromPath(argument.asString(), interpreter.filePath)).takeReference(interpreter.allocator) catch return NativeError.Unknown;
 }
 
 pub fn importFromPath(self: *Interpreter, path: []const u8, filePath: []const u8) NativeError!VariableValue {
@@ -115,7 +127,7 @@ pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableVa
 
     var module = self.allocator.create(Module) catch return NativeError.Unknown;
     module.* = Module.load(self, path) catch return NativeError.Unknown;
-    errdefer module.deinit();
+    errdefer module.deinit(self.allocator);
 
     const moduleVariable = VariableValue.fromModule(module) catch return NativeError.Unknown;
 

@@ -16,23 +16,46 @@ pub const ModuleError = error{
     InterpreterError,
 };
 
-pub const Module = struct {
-    moduleInterpreter: *ModuleInterpreter,
-    path: []const u8,
+pub const Module = union(enum) {
+    CodeModule: struct {
+        moduleInterpreter: *ModuleInterpreter,
+        path: []const u8,
+    },
+    NativeModule: struct {
+        exports: *std.StringHashMapUnmanaged(VariableValue),
+        name: []const u8,
+    },
+
+    pub fn getPath(self: *const Module) []const u8 {
+        return switch (self.*) {
+            .CodeModule => self.CodeModule.path,
+            .NativeModule => self.NativeModule.name,
+        };
+    }
 
     fn getRootEnvironment(self: *const Module) *Environment {
-        return &self.moduleInterpreter.rootEnvironment;
+        return &self.CodeModule.moduleInterpreter.rootEnvironment;
     }
     fn isExported(self: *const Module, name: Token) bool {
-        return self.moduleInterpreter.exportedValues.contains(name.lexeme);
+        return self.CodeModule.moduleInterpreter.exportedValues.contains(name.lexeme);
     }
     /// The interpreter is only used for error handling.
     pub fn accessExport(self: *const Module, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
-        if (!self.isExported(name)) {
-            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Module does not export {s}.", .{name.lexeme});
-            return InterpreterError.RuntimeError;
+        switch (self.*) {
+            .CodeModule => {
+                if (!self.isExported(name)) {
+                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Module does not export {s}.", .{name.lexeme});
+                    return InterpreterError.RuntimeError;
+                }
+                return (try self.getRootEnvironment().getSelf(name, interpreter)).takeReference(interpreter.allocator);
+            },
+            .NativeModule => {
+                const entry = self.NativeModule.exports.get(name.lexeme);
+                if (entry != null) return entry.?;
+                interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Native module does not export {s}.", .{name.lexeme});
+                return InterpreterError.RuntimeError;
+            },
         }
-        return (try self.getRootEnvironment().getSelf(name, interpreter)).takeReference(interpreter.allocator);
     }
 
     /// Path will be freed by the interpreter when deinitialized; it should not be freed by the caller.
@@ -48,8 +71,10 @@ pub const Module = struct {
             }
 
             return .{
-                .moduleInterpreter = moduleInterpreter,
-                .path = path,
+                .CodeModule = .{
+                    .moduleInterpreter = moduleInterpreter,
+                    .path = path,
+                },
             };
         } catch |err| {
             interpreter.allocator.free(path);
@@ -57,8 +82,21 @@ pub const Module = struct {
         };
     }
 
-    pub fn deinit(self: *Module) void {
-        self.moduleInterpreter.deinit();
-        self.moduleInterpreter.allocator.destroy(self.moduleInterpreter);
+    pub fn deinit(self: *Module, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .CodeModule => |values| {
+                values.moduleInterpreter.deinit();
+                allocator.destroy(values.moduleInterpreter);
+            },
+            .NativeModule => |values| {
+                var iter = values.exports.iterator();
+                while (iter.next()) |entry| {
+                    entry.value_ptr.deinit(allocator);
+                }
+                values.exports.deinit(allocator);
+
+                allocator.free(self.NativeModule.name);
+            },
+        }
     }
 };

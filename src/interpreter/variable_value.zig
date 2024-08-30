@@ -264,7 +264,7 @@ pub const VariableValue = union(enum) {
             .ClassType => |value| return value.ClassType.ptr().toString(allocator),
             .ClassInstance => |value| return value.ptr().toString(allocator),
             .WeakReference => |value| return value.toString(allocator),
-            .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.path}),
+            .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.getPath()}),
         }
     }
 };
