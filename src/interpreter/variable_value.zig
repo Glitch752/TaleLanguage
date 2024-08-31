@@ -176,7 +176,7 @@ pub const VariableValue = union(enum) {
     // Type coercion
     pub fn isTruthy(self: VariableValue) bool {
         switch (self) {
-            .Number => |value| return value != 0,
+            .Number => |value| return value != 0 and !std.math.isNan(value),
             .String => |value| return value.string.len != 0,
             .Boolean => |value| return value,
             else => return false,

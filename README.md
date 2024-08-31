@@ -105,11 +105,12 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] Imports can be made anywhere in the file. Side effects are executed immediately, but only occur once per file.
 - [X] Simple standard library, accessible through the `std` module (Examples assume the file has `let Std = import("std");`):
   - [X] `print` and `println` functions: `Std.print("Hello, world!");`
-  - [X] Math functions:
+  - [X] Math values:
     - [X] Trig functions (in radians): `sin`, `cos`, `tan`: `Std.print(Std.sin(3.14));`
     - [X] Inverse trig functions (in radians): `asin`, `acos`, `atan`: `Std.print(Std.atan(1));`
     - [X] `PI`, `E`, and `PHI` constants: `Std.print(Std.PI);`
-    - [X] `floor`, `ceil`, and `round` functions: `Std.print(Std.floor(5.5));`
+    - [X] `INFINITY` and `NEGATIVE_INFINITY` constants: `Std.print(Std.INFINITY);`
+    - [X] `floor`, `ceil`, and `round` functions: `Std.print(Std.floor(5.5));` (`round` rounds to the nearest integer, away from 0)
     - [X] `exp`, `exp2`, `log`, `log2`, and `log10` functions: `Std.print(Std.exp(5));`
     - [X] `pow` and `sqrt` functions: `Std.print(Std.sqrt(25));`
     - [X] `abs` function: `Std.print(Std.abs(-5));`

@@ -52,10 +52,15 @@ pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
         .{ .name = "ceil", .value = try VariableValue.nativeFunction(1, &natives.ceil) },
         .{ .name = "round", .value = try VariableValue.nativeFunction(1, &natives.round) },
         .{ .name = "abs", .value = try VariableValue.nativeFunction(1, &natives.abs) },
+        .{ .name = "min", .value = try VariableValue.nativeFunction(2, &natives.min) },
+        .{ .name = "max", .value = try VariableValue.nativeFunction(2, &natives.max) },
 
         .{ .name = "PI", .value = VariableValue.fromNumber(std.math.pi) },
         .{ .name = "E", .value = VariableValue.fromNumber(std.math.e) },
         .{ .name = "PHI", .value = VariableValue.fromNumber(std.math.phi) },
+        .{ .name = "INFINITY", .value = VariableValue.fromNumber(std.math.inf(f64)) },
+        .{ .name = "NAN", .value = VariableValue.fromNumber(std.math.nan(f64)) },
+        .{ .name = "NEGATIVE_INFINITY", .value = VariableValue.fromNumber(-std.math.inf(f64)) },
 
         .{ .name = "substring", .value = try VariableValue.nativeFunction(3, &natives.substring) },
         .{ .name = "intChar", .value = try VariableValue.nativeFunction(1, &natives.intChar) },
@@ -174,6 +179,8 @@ pub fn importModule(self: *Interpreter, path: []const u8) NativeError!VariableVa
     }
 
     var module = self.allocator.create(Module) catch return NativeError.Unknown;
+    errdefer self.allocator.destroy(module);
+
     module.* = Module.load(self, path) catch return NativeError.Unknown;
     errdefer module.deinit(self.allocator);
 

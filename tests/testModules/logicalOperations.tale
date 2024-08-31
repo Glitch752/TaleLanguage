@@ -1,0 +1,45 @@
+export let TEST_NAME = "Logical operations";
+export let EXPECTED_ASSERTIONS = 35;
+
+export let run = function(assert) {
+    assert(true);
+    assert(!false);
+    assert(true == true);
+    assert(false == false);
+
+    assert(true && true);
+    assert(!(true && false));
+    assert(!(false && true));
+    assert(!(false && false));
+    
+    assert(true || true);
+    assert(true || false);
+    assert(false || true);
+    assert(!(false || false));
+
+    assert(true && true && true);
+    assert(true || false || false);
+    assert(true && true || false);
+    assert(true || true && false);
+    assert(true && (true || false));
+    assert((true && true) || false);
+    assert((true || false) && true);
+    assert(false || (true && true));
+    assert((false || true) && true);
+    assert(false || (true && true));
+    assert((false || true) && true);
+    
+    assert(("truthy" && true) == true); // Assertion 20
+    assert((true && "truthy") == "truthy");
+    assert(("truthy" || true) == "truthy");
+    assert((true || "truthy") == true);
+    assert(("truthy" && false) == false);
+    assert((false && "truthy") == false);
+    assert(("" || "not falsey") == "not falsey");
+    assert(("" && "not falsey") == "");
+
+    assert(!true == false);
+    assert(!false == true);
+    assert(!!true == true);
+    assert(!!false == false);
+};

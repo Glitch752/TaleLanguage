@@ -1,0 +1,36 @@
+export let TEST_NAME = "Strings";
+export let EXPECTED_ASSERTIONS = 26;
+
+export let run = function(assert) {
+    let std = import("std");
+
+    assert(std.length("Hello, world!") == 13);
+    assert(std.substring("Hello, world!", 0, 5) == "Hello");
+    assert(std.substring("Hello, world!", 7, 13) == "world!");
+    assert("Hello, " + "world!" == "Hello, world!");
+
+    assert(std.string(50) == "50");
+    assert(std.string(1000.5) == "1000.5");
+    assert(std.string(true) == "true");
+    assert(std.string(false) == "false");
+    assert(std.string(null) == "null");
+    assert(std.string(std.PI) == "3.141592653589793");
+    assert(std.string(std.E) == "2.718281828459045");
+    assert(std.string(std.PHI) == "1.618033988749895");
+    assert(std.string(std.INFINITY) == "inf");
+    assert(std.string(std.NEGATIVE_INFINITY) == "-inf");
+    assert(std.string(std.NAN) == "nan");
+    
+    assert(std.intChar("D") == 68);
+    assert(std.charInt(68) == "D");
+
+    assert(std.charInt(10) == "\n");
+    assert(std.charInt(13) == "\r");
+    assert(std.charInt(9) == "\t");
+    assert(std.charInt(92) == "\\");
+    assert(std.charInt(34) == "\"");
+    assert(std.charInt(39) == "'");
+    assert(std.charInt(0) == "\x00");
+    assert(std.charInt(127) == "\x7f");
+    assert(std.charInt(255) == "\xff");
+};

@@ -1,0 +1,33 @@
+export let TEST_NAME = "Binary numerical operations";
+export let EXPECTED_ASSERTIONS = 24;
+
+export let run = function(assert) {
+    assert(1 + 1 == 2);
+    assert(1 - 1 == 0);
+    assert(1 * 1 == 1);
+    assert(1 / 1 == 1);
+    assert(1 % 1 == 0);
+    
+    assert(10 + 10 * 10 / 2 - 5 == 55);
+    assert(10 + 10 * (10 / 2) - 5 == 55);
+    assert(3 * 3 % 3 + 3 / 3 == 1);
+    assert(3 * (3 % 3 + 3) / 3 == 3);
+
+    assert(-1 % 2 == 1);
+    assert(-1 % -2 == -1);
+    assert(1 % -2 == 1);
+
+    assert(1_000_000 == 1000000);
+    assert(1_000_000.0_000 == 1000000.0);
+
+    assert(1 == 1.0);
+    assert(1.5 != 1.0);
+    assert(2 > 1);
+    assert(1 < 2);
+    assert(1 <= 1);
+    assert(1 >= 1);
+    assert(1 <= 2);
+    assert(2 >= 1);
+    assert(1 != 2);
+    assert(1 == 1);
+};

@@ -1,0 +1,37 @@
+export let TEST_NAME = "Simple standard library number values and functions";
+export let EXPECTED_ASSERTIONS = 22;
+
+export let run = function(assert) {
+    let std = import("std");
+    
+    assert(std.INFINITY == -std.NEGATIVE_INFINITY);
+    assert(std.NAN != std.NAN);
+    assert(std.NAN != std.INFINITY);
+    assert(std.NAN != std.NEGATIVE_INFINITY);
+
+    assert(1 / 0 == std.INFINITY);
+    assert(-1 / 0 == std.NEGATIVE_INFINITY);
+    assert(0 / 0 != 0 / 0);
+
+    assert(std.round(std.PI * 10_000) / 10_000 == 3.1416);
+    assert(std.round(std.E * 10_000) / 10_000 == 2.7183);
+    assert(std.round(std.PHI * 10_000) / 10_000 == 1.6180);
+    
+    assert(std.abs(-1.0) == 1.0);
+    assert(std.abs(1.0) == 1.0);
+
+    assert(std.floor(1.5) == 1.0);
+    assert(std.floor(-1.5) == -2.0);
+
+    assert(std.ceil(1.5) == 2.0);
+    assert(std.ceil(-1.5) == -1.0);
+
+    assert(std.round(1.5) == 2.0);
+    assert(std.round(-1.5) == -2.0);
+
+    assert(std.min(1.0, 2.0) == 1.0);
+    assert(std.min(2.0, 1.0) == 1.0);
+
+    assert(std.max(1.0, 2.0) == 2.0);
+    assert(std.max(2.0, 1.0) == 2.0);
+};

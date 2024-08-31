@@ -58,6 +58,7 @@ pub fn init(allocator: std.mem.Allocator, interpreter: *Interpreter, filePath: [
 pub fn deinit(self: *ModuleInterpreter) void {
     if (self.runtimeError != null) {
         self.runtimeError.?.printAndDeinit();
+        self.runtimeError = null;
     }
 
     self.rootEnvironment.deinit(self.allocator);
@@ -92,6 +93,7 @@ pub fn run(self: *ModuleInterpreter, program: *const Program, originalBuffer: []
 
     if (self.runtimeError != null) {
         self.runtimeError.?.printAndDeinit();
+        self.runtimeError = null;
     }
 }
 
@@ -305,11 +307,8 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                 },
                 .Negate => {
                     var right = try self.interpretExpression(values.right);
-                    if (right.isBoolean()) {
-                        return VariableValue.fromBoolean(!right.isTruthy());
-                    }
-                    self.runtimeError = RuntimeError.tokenError(self, values.operator, "Operand must be a boolean", .{});
-                    return InterpreterError.RuntimeError;
+                    defer right.deinit(self.allocator);
+                    return VariableValue.fromBoolean(!right.isTruthy()); // We intentionally coerce the value to a boolean here
                 },
                 else => {
                     return VariableValue.null();
@@ -318,17 +317,21 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
         },
         .Logical => |values| {
             var left = try self.interpretExpression(values.left);
-            errdefer left.deinit(self.allocator);
+            {
+                errdefer left.deinit(self.allocator);
 
-            if (values.operator.type == .Or) {
-                if (left.isTruthy()) {
-                    return left;
-                }
-            } else {
-                if (!left.isTruthy()) {
-                    return left;
+                if (values.operator.type == .Or) {
+                    if (left.isTruthy()) {
+                        return left;
+                    }
+                } else {
+                    if (!left.isTruthy()) {
+                        return left;
+                    }
                 }
             }
+
+            left.deinit(self.allocator);
 
             const right = try self.interpretExpression(values.right);
             errdefer right.deinit(self.allocator);

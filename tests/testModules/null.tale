@@ -1,0 +1,10 @@
+export let TEST_NAME = "Null";
+export let EXPECTED_ASSERTIONS = 3;
+
+export let run = function(assert) {
+    let std = import("std");
+    
+    assert(null == null);
+    assert(null != 0);
+    assert(!(!null) == false);
+};

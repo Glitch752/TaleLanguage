@@ -560,6 +560,12 @@ fn consumeFactor(self: *Parser) anyerror!*Expression {
 fn consumeUnary(self: *Parser) anyerror!*Expression {
     if (self.matchToken(TokenType.Negate) or self.matchToken(TokenType.Minus)) {
         const operator = self.peekPrevious();
+
+        if (self.peek().type == TokenType.Negate or self.peek().type == TokenType.Minus) {
+            const right = try self.consumeUnary();
+            errdefer right.uninit(self.allocator);
+            return try Expression.unary(self.allocator, operator, right);
+        }
         const right = try self.consumeFunctionCall();
         errdefer right.uninit(self.allocator);
 

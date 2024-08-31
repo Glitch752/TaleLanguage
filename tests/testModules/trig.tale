@@ -1,0 +1,47 @@
+export let TEST_NAME = "Trig functions";
+export let EXPECTED_ASSERTIONS = 29;
+
+export let run = function(assert) {
+    let std = import("std");
+
+    let assertEql = function(a, b) {
+        assert(std.abs(a - b) < 0.000001);
+    };
+    
+    assertEql(std.sin(0.0), 0.0);
+    assertEql(std.sin(std.PI / 2.0), 1.0);
+    assertEql(std.sin(std.PI), 0.0);
+    assertEql(std.sin(3.0 * std.PI / 2.0), -1.0);
+
+    assertEql(std.cos(0.0), 1.0);
+    assertEql(std.cos(std.PI / 2.0), 0.0);
+    assertEql(std.cos(std.PI), -1.0);
+    assertEql(std.cos(3.0 * std.PI / 2.0), 0.0);
+
+    assertEql(std.tan(0.0), 0.0);
+    assertEql(std.tan(std.PI / 4.0), 1.0);
+    assertEql(std.tan(-std.PI / 4.0), -1.0);
+
+    // PI can't be represented in binary, so tan(PI / 2) is not exactly infinity -- it's 16331239353195370.0. This is expected behavior.
+    assertEql(std.tan(std.PI / 2.0), 16331239353195370);
+    assertEql(std.tan(-std.PI / 2.0), -16331239353195370);
+    assertEql(std.tan(std.PI), 0.0);
+
+    assertEql(std.asin(0.0), 0.0);
+    assertEql(std.asin(1.0), std.PI / 2.0);
+    assertEql(std.asin(-1.0), -std.PI / 2.0);
+    assertEql(std.asin(0.5), std.PI / 6.0);
+    assertEql(std.asin(-0.5), -std.PI / 6.0);
+
+    assertEql(std.acos(0.0), std.PI / 2.0);
+    assertEql(std.acos(1.0), 0.0);
+    assertEql(std.acos(-1.0), std.PI);
+    assertEql(std.acos(0.5), std.PI / 3.0);
+    assertEql(std.acos(-0.5), 2.0 * std.PI / 3.0);
+    
+    assertEql(std.atan(1.0) * 4.0, std.PI);
+    assertEql(std.atan(0.0), 0.0);
+    assertEql(std.atan(-1.0) * 4.0, -std.PI);
+    assertEql(std.atan(std.tan(0.0)), 0.0);
+    assertEql(std.atan(std.tan(std.PI / 4.0)), std.PI / 4.0);
+};

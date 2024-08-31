@@ -1,0 +1,37 @@
+export let TEST_NAME = "Exponentials";
+export let EXPECTED_ASSERTIONS = 20;
+
+export let run = function(assert) {
+    let std = import("std");
+    
+    let assertEql = function(a, b) {
+        assert(std.abs(a - b) < 0.000001);
+    };
+    
+    assertEql(std.exp(0.0), 1.0);
+    assertEql(std.exp(1.0), 2.718281828459045);
+    assertEql(std.exp(2.0), 7.3890560989306495);
+    
+    assertEql(std.exp2(0.0), 1.0);
+    assertEql(std.exp2(1.0), 2.0);
+    assertEql(std.exp2(2.0), 4.0);
+
+    assertEql(std.log(1.0), 0.0);
+    assertEql(std.log(2.718281828459045), 1.0);
+    assertEql(std.log(7.3890560989306495), 2.0);
+    
+    assertEql(std.log2(1.0), 0.0);
+    assertEql(std.log2(2.0), 1.0);
+    assertEql(std.log2(4.0), 2.0);
+
+    assertEql(std.log10(1.0), 0.0);
+    assertEql(std.log10(10.0), 1.0);
+
+    assertEql(std.pow(2.0, 3.0), 8.0);
+    assertEql(std.pow(2.0, 0.5), 1.4142135623730951);
+    assertEql(std.pow(2.0, -1.0), 0.5);
+
+    assertEql(std.sqrt(1.0), 1.0);
+    assertEql(std.sqrt(2.0), 1.4142135623730951);
+    assertEql(std.sqrt(4.0), 2.0);
+};

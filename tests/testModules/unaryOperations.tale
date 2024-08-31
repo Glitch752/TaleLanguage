@@ -1,0 +1,21 @@
+export let TEST_NAME = "Unary numerical operations";
+export let EXPECTED_ASSERTIONS = 14;
+
+export let run = function(assert) {
+    let std = import("std");
+
+    assert(-1 == -1);
+    assert(-(-1) == 1);
+    assert(!true == false);
+    assert(!false == true);
+    assert(!!true == true);
+    assert(!!0 == false);
+    assert(!!1 == true);
+    assert(!!-1 == true);
+    assert(!!std.NAN == false);
+    assert(!!std.INFINITY == true);
+    assert(!!std.NEGATIVE_INFINITY == true);
+    assert(!!"" == false);
+    assert(!!"a" == true);
+    assert(!!null == false);
+};
