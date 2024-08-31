@@ -15,11 +15,19 @@ const Resolver = @This();
 
 const ResolverError = error{Unknown};
 
+const ClassState = enum {
+    None,
+    Class,
+    SubClass,
+};
+
 interpreter: *ModuleInterpreter,
 scopes: Scopes,
 
 originalBuffer: []const u8 = "",
 filePath: []const u8 = "",
+
+currentClassState: ClassState = .None,
 
 pub fn init(interpreter: *ModuleInterpreter, originalBuffer: []const u8, filePath: []const u8) Resolver {
     return .{
@@ -186,6 +194,11 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
         },
 
         .Class => |values| {
+            const previousClassState = self.currentClassState;
+            defer self.currentClassState = previousClassState;
+
+            self.currentClassState = .Class;
+
             try self.beginScope();
             try self.scopes.last.?.data.put(self.interpreter.allocator, "this", true);
 
@@ -194,6 +207,8 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
 
                 try self.beginScope();
                 try self.scopes.last.?.data.put(self.interpreter.allocator, "super", true);
+
+                self.currentClassState = .SubClass;
             }
 
             for (values.methods.items) |method| {
@@ -217,13 +232,13 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             try self.endScope();
         },
         .This => |token| {
-            if (self.scopes.len == 0) {
+            if (self.scopes.len == 0 or self.currentClassState == .None) {
                 try self.errorOn(token, "Cannot use 'this' outside of a class", .{});
             }
             try self.resolveLocal(expression, token);
         },
         .Super => |call| {
-            if (self.scopes.len == 0) {
+            if (self.scopes.len == 0 or self.currentClassState != .SubClass) {
                 try self.errorOn(call.superToken, "Cannot use 'super' outside of a class", .{});
             }
 
