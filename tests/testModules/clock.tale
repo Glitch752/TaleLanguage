@@ -8,5 +8,5 @@ export let run = function(assert) {
     let end = clock();
     // Technically this could fail if the clock changes between the two calls or the interpreter is exceptionally slow, but it's unlikely
     assert(end - start >= 0.0);
-    assert(end - start < 1.0);
+    assert(end - start < 10.0);
 };

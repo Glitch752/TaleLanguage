@@ -8,8 +8,7 @@ let failedAssertions = 0;
 let test = function(name) {
     totalTests = totalTests + 1;
 
-    // let module = import("testModules/" + name);
-    let module = import("testModules/null");
+    let module = import("testModules/" + name);
     let testName = module.TEST_NAME;
     let expectedAssertions = module.EXPECTED_ASSERTIONS;
     

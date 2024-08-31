@@ -550,7 +550,7 @@ fn propertyAccess(self: *ModuleInterpreter, object: *const Expression, startToke
     return try instance.ptr().get(startToken, lexeme, instance, self);
 }
 
-fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, startToken: Token, value: *const Expression, lexeme: []const u8) !VariableValue {
+fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, startToken: Token, value: *const Expression, name: []const u8) !VariableValue {
     var objectValue = try self.interpretExpression(object);
     defer objectValue.deinit(self.allocator);
 
@@ -559,13 +559,13 @@ fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, start
 
     if (!objectValue.isClassInstance()) {
         if (!objectValue.isClassType()) {
-            self.runtimeError = RuntimeError.tokenError(self, startToken, "Can only assign properties on class instances or class types. Accessing {s} on value {s}.", .{ lexeme, objectValue.typeNameString() });
+            self.runtimeError = RuntimeError.tokenError(self, startToken, "Can only assign properties on class instances or class types. Accessing {s} on value {s}.", .{ name, objectValue.typeNameString() });
             return InterpreterError.RuntimeError;
         }
         var classType = objectValue.referenceClassType();
         defer _ = classType.deinit(self.allocator);
 
-        try classType.unsafePtr().setStatic(startToken, lexeme, valueValue, self);
+        try classType.unsafePtr().setStatic(startToken, name, valueValue, self);
         if (self.runtimeError != null) return InterpreterError.RuntimeError;
 
         return valueValue;
@@ -574,7 +574,7 @@ fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, start
     var instance = objectValue.referenceClassInstance();
     defer _ = instance.deinit(self.allocator);
 
-    try instance.unsafePtr().set(startToken, lexeme, valueValue, self);
+    try instance.unsafePtr().set(startToken, name, valueValue, self);
     if (self.runtimeError != null) return InterpreterError.RuntimeError;
 
     return valueValue;

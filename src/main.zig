@@ -19,8 +19,9 @@ interpreter: Interpreter,
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer std.debug.assert(gpa.deinit() == .ok);
-    const allocator = gpa.allocator();
-    // const allocator = std.heap.c_allocator;
+
+    const useUnsafeAllocator = @import("builtin").mode != std.builtin.OptimizeMode.Debug and @import("builtin").mode != std.builtin.OptimizeMode.ReleaseSafe;
+    var allocator = if (useUnsafeAllocator) std.heap.raw_c_allocator else gpa.allocator();
 
     var instance = Main{
         .allocator = allocator,

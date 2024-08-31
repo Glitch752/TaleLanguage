@@ -58,6 +58,7 @@ pub fn exit(self: *Environment, interpreter: *ModuleInterpreter) void {
             var function = entry.value_ptr.Function;
             if (function == .User and function.User.strongCount() == 1) {
                 function.deinit(interpreter.allocator);
+                _ = self.values.remove(entry.key_ptr.*);
             }
         }
     }

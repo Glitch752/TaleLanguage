@@ -145,7 +145,7 @@ I don't currently provide builds since I'm still developing the basic features a
 ```sh
 git clone https://github.com/Glitch752/TaleLanguage/
 cd TaleLanguage
-zig build -Doptimize=ReleaseFast
+zig build --release=fast
 ./zig-out/bin/ZigCompiler ./examples/working/donut.tale
 ```
 (And replace `.\examples\working\donut.tale` with the path to your source file)

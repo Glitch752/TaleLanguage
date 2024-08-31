@@ -100,7 +100,7 @@ pub const ClassInstance = struct {
         }
 
         const duplicatedName = try interpreter.allocator.dupe(u8, name); // We need to duplicate the name because it may be dynamically allocated.
-        try self.fieldValues.put(interpreter.allocator, duplicatedName, value);
+        try self.fieldValues.putNoClobber(interpreter.allocator, duplicatedName, value);
     }
 };
 
@@ -220,7 +220,7 @@ pub const ClassType = struct {
         }
 
         const duplicatedName = try interpreter.allocator.dupe(u8, lexeme); // We need to duplicate the name because it may be dynamically allocated.
-        try self.staticFieldValues.put(interpreter.allocator, duplicatedName, value);
+        try self.staticFieldValues.putNoClobber(interpreter.allocator, duplicatedName, value);
     }
 
     fn getStaticMethod(self: *const ClassType, name: []const u8) ?ClassMethod {
@@ -232,7 +232,7 @@ pub const ClassType = struct {
     }
 
     pub fn getArity(self: *const ClassType) u32 {
-        const constructorMethod = self.instanceMethods.get("constructor");
+        const constructorMethod = self.getInstanceMethod("constructor");
 
         if (constructorMethod == null) {
             return 0;
