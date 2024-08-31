@@ -141,8 +141,7 @@ pub fn interpretStatement(self: *ModuleInterpreter, statement: *const Statement,
             const value = try self.interpretExpression(values.initializer);
             try self.activeEnvironment.?.define(values.name.lexeme, value, self);
             if (values.exported) {
-                const duplicatedName = try self.allocator.dupe(u8, values.name.lexeme);
-                try self.exportedValues.put(self.allocator, duplicatedName, 0);
+                try self.exportedValues.put(self.allocator, values.name.lexeme, 0);
             }
         },
         .Block => |values| {
@@ -458,7 +457,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
                     return InterpreterError.RuntimeError;
                 }
 
-                return superClassReference.ptr().getStatic(call.method.?, self);
+                return superClassReference.ptr().getStatic(call.method.?, call.method.?.lexeme, self);
             }
 
             const object = try self.activeEnvironment.?.getLexemeAtDepth("this", call.superToken, depth.? - 1, self);
@@ -502,54 +501,85 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
         },
 
         .PropertyAccess => |values| {
-            var object = try self.interpretExpression(values.object);
-            defer object.deinit(self.allocator);
-
-            if (!object.isClassInstance()) {
-                if (!object.isClassType()) {
-                    if (!object.isModuleType()) {
-                        self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances, class types, and modules. Accessing {s} on value {s}.", .{ values.name.lexeme, object.typeNameString() });
-                        return InterpreterError.RuntimeError;
-                    }
-                    return try object.asModuleType().accessExport(values.name, self);
-                }
-                var classType = object.referenceClassType();
-                defer _ = classType.deinit(self.allocator);
-                return try classType.ptr().getStatic(values.name, self);
-            }
-
-            var instance = object.referenceClassInstance();
-            defer _ = instance.deinit(self.allocator);
-            return try instance.ptr().get(values.name, instance, self);
+            return try self.propertyAccess(values.object, values.name, values.name.lexeme);
         },
         .PropertyAssignment => |values| {
-            var object = try self.interpretExpression(values.object);
-            defer object.deinit(self.allocator);
+            return try self.propertyAssignment(values.object, values.name, values.value, values.name.lexeme);
+        },
 
-            var value = try self.interpretExpression(values.value);
-            errdefer value.deinit(self.allocator);
+        .DynamicPropertyAccess => |values| {
+            var name = try self.interpretExpression(values.name);
+            defer name.deinit(self.allocator);
 
-            if (!object.isClassInstance()) {
-                if (!object.isClassType()) {
-                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only assign properties on class instances or class types. Accessing {s} on value {s}.", .{ values.name.lexeme, object.typeNameString() });
-                    return InterpreterError.RuntimeError;
-                }
-                var classType = object.referenceClassType();
-                defer _ = classType.deinit(self.allocator);
-
-                try classType.unsafePtr().setStatic(values.name, value, self);
-                if (self.runtimeError != null) return InterpreterError.RuntimeError;
-
-                return value;
+            if (!name.isString()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Property name must be a string", .{});
+                return InterpreterError.RuntimeError;
             }
 
-            var instance = object.referenceClassInstance();
-            defer _ = instance.deinit(self.allocator);
+            return try self.propertyAccess(values.object, values.startToken, name.asString());
+        },
+        .DynamicPropertyAssignment => |values| {
+            var name = try self.interpretExpression(values.name);
+            defer name.deinit(self.allocator);
 
-            try instance.unsafePtr().set(values.name, value, self);
-            if (self.runtimeError != null) return InterpreterError.RuntimeError;
+            if (!name.isString()) {
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Property name must be a string", .{});
+                return InterpreterError.RuntimeError;
+            }
 
-            return value;
+            return try self.propertyAssignment(values.object, values.startToken, values.value, name.asString());
         },
     }
+}
+
+fn propertyAccess(self: *ModuleInterpreter, object: *const Expression, startToken: Token, lexeme: []const u8) !VariableValue {
+    var objectValue = try self.interpretExpression(object);
+    defer objectValue.deinit(self.allocator);
+
+    if (!objectValue.isClassInstance()) {
+        if (!objectValue.isClassType()) {
+            if (!objectValue.isModuleType()) {
+                self.runtimeError = RuntimeError.tokenError(self, startToken, "Can only access properties on class instances, class types, and modules. Accessing {s} on value type {s}.", .{ lexeme, objectValue.typeNameString() });
+                return InterpreterError.RuntimeError;
+            }
+            return try objectValue.asModuleType().accessExport(startToken, lexeme, self);
+        }
+        var classType = objectValue.referenceClassType();
+        defer _ = classType.deinit(self.allocator);
+        return try classType.ptr().getStatic(startToken, lexeme, self);
+    }
+
+    var instance = objectValue.referenceClassInstance();
+    defer _ = instance.deinit(self.allocator);
+    return try instance.ptr().get(startToken, lexeme, instance, self);
+}
+
+fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, startToken: Token, value: *const Expression, lexeme: []const u8) !VariableValue {
+    var objectValue = try self.interpretExpression(object);
+    defer objectValue.deinit(self.allocator);
+
+    var valueValue = try self.interpretExpression(value);
+    errdefer valueValue.deinit(self.allocator);
+
+    if (!objectValue.isClassInstance()) {
+        if (!objectValue.isClassType()) {
+            self.runtimeError = RuntimeError.tokenError(self, startToken, "Can only assign properties on class instances or class types. Accessing {s} on value {s}.", .{ lexeme, objectValue.typeNameString() });
+            return InterpreterError.RuntimeError;
+        }
+        var classType = objectValue.referenceClassType();
+        defer _ = classType.deinit(self.allocator);
+
+        try classType.unsafePtr().setStatic(startToken, lexeme, valueValue, self);
+        if (self.runtimeError != null) return InterpreterError.RuntimeError;
+
+        return valueValue;
+    }
+
+    var instance = objectValue.referenceClassInstance();
+    defer _ = instance.deinit(self.allocator);
+
+    try instance.unsafePtr().set(startToken, lexeme, valueValue, self);
+    if (self.runtimeError != null) return InterpreterError.RuntimeError;
+
+    return valueValue;
 }

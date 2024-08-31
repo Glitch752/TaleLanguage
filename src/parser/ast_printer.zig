@@ -181,5 +181,19 @@ pub fn printExpression(self: *const ASTPrinter, expression: *const Expression) a
             std.debug.print(".{s} = ", .{values.name.lexeme});
             try self.printExpression(values.value);
         },
+
+        .DynamicPropertyAccess => |values| {
+            try self.printExpression(values.object);
+            std.debug.print("[", .{});
+            try self.printExpression(values.name);
+            std.debug.print("]", .{});
+        },
+        .DynamicPropertyAssignment => |values| {
+            try self.printExpression(values.object);
+            std.debug.print("[", .{});
+            try self.printExpression(values.name);
+            std.debug.print("] = ", .{});
+            try self.printExpression(values.value);
+        },
     }
 }

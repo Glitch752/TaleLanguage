@@ -47,7 +47,38 @@ var globalId: u32 = 0;
 
 pub const Expression = struct {
     id: u32,
-    value: union(enum) { Grouping: struct { expression: *const Expression }, Literal: struct { value: TokenLiteral }, Binary: struct { left: *const Expression, operator: Token, right: *const Expression }, Unary: struct { operator: Token, right: *const Expression }, Logical: struct { left: *const Expression, operator: Token, right: *const Expression }, Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression }, FunctionCall: struct { callee: *const Expression, startToken: Token, arguments: std.ArrayListUnmanaged(*const Expression) }, Function: FunctionExpression, Class: ClassExpression, This: Token, Super: struct { superToken: Token, method: ?Token }, VariableAccess: struct { name: Token }, VariableAssignment: struct { name: Token, value: *const Expression }, PropertyAccess: struct { object: *const Expression, name: Token }, PropertyAssignment: struct { object: *const Expression, name: Token, value: *const Expression } },
+    value: union(enum) {
+        Grouping: struct { expression: *const Expression },
+        Literal: struct { value: TokenLiteral },
+        Binary: struct { left: *const Expression, operator: Token, right: *const Expression },
+        Unary: struct { operator: Token, right: *const Expression },
+        Logical: struct { left: *const Expression, operator: Token, right: *const Expression },
+        Bitwise: struct { left: *const Expression, operator: Token, right: *const Expression },
+        FunctionCall: struct {
+            callee: *const Expression,
+            startToken: Token,
+            arguments: std.ArrayListUnmanaged(*const Expression),
+        },
+        Function: FunctionExpression,
+        Class: ClassExpression,
+        This: Token,
+        Super: struct { superToken: Token, method: ?Token },
+        VariableAccess: struct { name: Token },
+        VariableAssignment: struct { name: Token, value: *const Expression },
+        PropertyAccess: struct { object: *const Expression, name: Token },
+        PropertyAssignment: struct { object: *const Expression, name: Token, value: *const Expression },
+        DynamicPropertyAccess: struct {
+            object: *const Expression,
+            name: *const Expression,
+            startToken: Token,
+        },
+        DynamicPropertyAssignment: struct {
+            object: *const Expression,
+            name: *const Expression,
+            value: *const Expression,
+            startToken: Token,
+        },
+    },
 
     pub fn uninit(self: *const Expression, allocator: std.mem.Allocator) void {
         switch (self.*.value) {
@@ -79,6 +110,16 @@ pub const Expression = struct {
             .PropertyAccess => |data| data.object.uninit(allocator),
             .PropertyAssignment => |data| {
                 data.object.uninit(allocator);
+                data.value.uninit(allocator);
+            },
+
+            .DynamicPropertyAccess => |data| {
+                data.object.uninit(allocator);
+                data.name.uninit(allocator);
+            },
+            .DynamicPropertyAssignment => |data| {
+                data.object.uninit(allocator);
+                data.name.uninit(allocator);
                 data.value.uninit(allocator);
             },
 
@@ -183,6 +224,28 @@ pub const Expression = struct {
         const alloc = try allocator.create(Expression);
         globalId = globalId + 1;
         alloc.* = .{ .id = globalId, .value = .{ .PropertyAssignment = .{ .object = object, .name = name, .value = value } } };
+        return alloc;
+    }
+
+    pub fn dynamicPropertyAccess(allocator: std.mem.Allocator, object: *const Expression, name: *const Expression, startToken: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .DynamicPropertyAccess = .{
+            .object = object,
+            .name = name,
+            .startToken = startToken,
+        } } };
+        return alloc;
+    }
+    pub fn dynamicPropertyAssignment(allocator: std.mem.Allocator, object: *const Expression, name: *const Expression, value: *const Expression, startToken: Token) !*Expression {
+        const alloc = try allocator.create(Expression);
+        globalId = globalId + 1;
+        alloc.* = .{ .id = globalId, .value = .{ .DynamicPropertyAssignment = .{
+            .object = object,
+            .name = name,
+            .value = value,
+            .startToken = startToken,
+        } } };
         return alloc;
     }
 };

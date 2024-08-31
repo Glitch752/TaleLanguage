@@ -249,6 +249,16 @@ fn resolveExpression(self: *Resolver, expression: *const Expression) anyerror!vo
             try self.resolveExpression(values.object);
             try self.resolveExpression(values.value);
         },
+
+        .DynamicPropertyAccess => |values| {
+            try self.resolveExpression(values.object);
+            try self.resolveExpression(values.name);
+        },
+        .DynamicPropertyAssignment => |values| {
+            try self.resolveExpression(values.object);
+            try self.resolveExpression(values.name);
+            try self.resolveExpression(values.value);
+        },
     }
 }
 

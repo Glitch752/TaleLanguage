@@ -1,0 +1,33 @@
+let Std = import('std');
+
+let TestClass = class {
+    constructor(param) {
+        Std.println("TestClass constructor");
+        let self = this;
+        self.number = param;
+    }
+
+    printNumber() {
+        Std.println(this.number);
+    }
+
+    addNumber(addend) {
+        this.number = this.number + addend;
+    }
+};
+
+let ClassCopy = TestClass;
+
+let test = TestClass(5);
+test["number"] = 3;
+
+Std.println(test["number"]);
+
+test.printNumber(); // 5
+test.addNumber(10);
+test.printNumber(); // 15
+
+let key = "test";
+test[key] = 20;
+test.printNumber(); // 20
+Std.println(test[key]);

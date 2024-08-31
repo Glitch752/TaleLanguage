@@ -70,36 +70,36 @@ pub const ClassInstance = struct {
         return std.fmt.allocPrint(allocator, "<instance <class>>", .{});
     }
 
-    pub fn get(self: *const ClassInstance, name: Token, selfReference: ClassInstanceReference, interpreter: *ModuleInterpreter) !VariableValue {
+    pub fn get(self: *const ClassInstance, startToken: Token, lexeme: []const u8, selfReference: ClassInstanceReference, interpreter: *ModuleInterpreter) !VariableValue {
         const classType = self.classType.ptr();
-        const method = classType.getInstanceMethod(name.lexeme);
+        const method = classType.getInstanceMethod(lexeme);
         if (method != null) {
             return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference.strongClone()));
         }
 
-        const property = self.fieldValues.get(name.lexeme);
+        const property = self.fieldValues.get(lexeme);
         if (property != null) {
             return property.?.takeReference(interpreter.allocator);
         }
 
-        interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No proprety or method '{s}' found.", .{name.lexeme});
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "No proprety or method '{s}' found.", .{lexeme});
         return InterpreterError.RuntimeError;
     }
 
-    pub fn set(self: *ClassInstance, name: Token, value: VariableValue, interpreter: *ModuleInterpreter) !void {
-        if (self.classType.ptr().instanceMethods.contains(name.lexeme)) {
-            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to method '{s}'.", .{name.lexeme});
+    pub fn set(self: *ClassInstance, startToken: Token, lexeme: []const u8, value: VariableValue, interpreter: *ModuleInterpreter) !void {
+        if (self.classType.ptr().instanceMethods.contains(lexeme)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Cannot assign to method '{s}'.", .{lexeme});
             return InterpreterError.RuntimeError;
         }
 
-        if (self.fieldValues.contains(name.lexeme)) {
-            const pointer = self.fieldValues.getPtr(name.lexeme);
+        if (self.fieldValues.contains(lexeme)) {
+            const pointer = self.fieldValues.getPtr(lexeme);
             pointer.?.*.deinit(interpreter.allocator);
             pointer.?.* = value;
             return;
         }
 
-        const duplicatedName = try interpreter.allocator.dupe(u8, name.lexeme);
+        const duplicatedName = try interpreter.allocator.dupe(u8, lexeme);
         try self.fieldValues.put(interpreter.allocator, duplicatedName, value);
     }
 };
@@ -196,33 +196,33 @@ pub const ClassType = struct {
         self.parentEnvironment.unreference(allocator);
     }
 
-    pub fn getStatic(self: *const ClassType, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
-        const method = self.getStaticMethod(name.lexeme);
+    pub fn getStatic(self: *const ClassType, startToken: Token, lexeme: []const u8, interpreter: *ModuleInterpreter) !VariableValue {
+        const method = self.getStaticMethod(lexeme);
         if (method != null) {
             return VariableValue.newFunctionReference(method.?.function.takeReference());
         }
 
-        const property = self.staticFieldValues.get(name.lexeme);
+        const property = self.staticFieldValues.get(lexeme);
         if (property != null) {
             return property.?.takeReference(interpreter.allocator);
         }
 
-        interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "No static proprety or method '{s}' found.", .{name.lexeme});
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "No static proprety or method '{s}' found.", .{lexeme});
         return InterpreterError.RuntimeError;
     }
 
-    pub fn setStatic(self: *ClassType, name: Token, value: VariableValue, interpreter: *ModuleInterpreter) !void {
-        if (self.staticMethods.contains(name.lexeme)) {
-            interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Cannot assign to static method '{s}'.", .{name.lexeme});
+    pub fn setStatic(self: *ClassType, startToken: Token, lexeme: []const u8, value: VariableValue, interpreter: *ModuleInterpreter) !void {
+        if (self.staticMethods.contains(lexeme)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Cannot assign to static method '{s}'.", .{lexeme});
             return InterpreterError.RuntimeError;
         }
 
-        if (self.staticFieldValues.contains(name.lexeme)) {
-            self.staticFieldValues.getPtr(name.lexeme).?.* = value;
+        if (self.staticFieldValues.contains(lexeme)) {
+            self.staticFieldValues.getPtr(lexeme).?.* = value;
             return;
         }
 
-        const duplicatedName = try interpreter.allocator.dupe(u8, name.lexeme);
+        const duplicatedName = try interpreter.allocator.dupe(u8, lexeme);
         try self.staticFieldValues.put(interpreter.allocator, duplicatedName, value);
     }
 

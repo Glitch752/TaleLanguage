@@ -73,6 +73,7 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         entry.value_ptr.deinit(allocator);
+        allocator.free(entry.key_ptr.*);
     }
     self.values.deinit(self.allocator);
 
@@ -83,7 +84,8 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
-    const previousValue = try self.values.fetchPut(self.allocator, name, value);
+    const duplicatedName = try self.allocator.dupe(u8, name);
+    const previousValue = try self.values.fetchPut(self.allocator, duplicatedName, value);
 
     if (previousValue != null) {
         std.debug.assert(interpreter != null); // Tried to define a variable that already exists when the interpreter is not available.
@@ -110,11 +112,21 @@ pub fn assign(self: *Environment, name: Token, value: VariableValue, interpreter
     pointer.?.* = value;
 }
 
+/// The interpreter is only used for error handling.
 pub fn getSelf(self: *Environment, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
     const entry = self.values.get(name.lexeme);
     if (entry != null) return entry.?;
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Tried to access {s}, which is undefined.", .{name.lexeme});
+    return InterpreterError.RuntimeError;
+}
+
+/// The interpreter is only used for error handling.
+pub fn getLexemeSelf(self: *Environment, lexeme: []const u8, startToken: Token, interpreter: *ModuleInterpreter) !VariableValue {
+    const entry = self.values.get(lexeme);
+    if (entry != null) return entry.?;
+
+    interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Tried to access value that is not defined.", .{});
     return InterpreterError.RuntimeError;
 }
 
@@ -147,18 +159,6 @@ pub fn getLexemeAtDepth(self: *Environment, lexeme: []const u8, errorToken: Toke
 
     interpreter.runtimeError = RuntimeError.tokenError(interpreter, errorToken, "Tried to access {s} at depth {d}, which is undefined.", .{ lexeme, depth });
     return InterpreterError.RuntimeError;
-}
-
-/// For debugging purposes only
-pub fn getLexemeDebug(self: *Environment, lexeme: []const u8) VariableValue {
-    const entry = self.values.get(lexeme);
-    if (entry != null) return entry.?;
-
-    if (self.parent != null) {
-        return self.parent.?.getLexemeDebug(lexeme);
-    }
-
-    std.debug.panic("Tried to access {s}, which is undefined.", .{lexeme});
 }
 
 pub fn lexemeExistsAtDepth(self: *Environment, lexeme: []const u8, depth: u32) bool {

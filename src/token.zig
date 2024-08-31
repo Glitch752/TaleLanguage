@@ -6,6 +6,8 @@ pub const TokenType = enum {
     CloseParen, // )
     OpenCurly, // {
     CloseCurly, // }
+    OpenSquare, // [
+    CloseSquare, // ]
     Semicolon, // ;
 
     LessThan,
@@ -174,6 +176,8 @@ pub const Token = struct {
         .{ ")", TokenType.CloseParen },
         .{ "{", TokenType.OpenCurly },
         .{ "}", TokenType.CloseCurly },
+        .{ "[", TokenType.OpenSquare },
+        .{ "]", TokenType.CloseSquare },
 
         .{ "<", TokenType.LessThan },
         .{ "<=", TokenType.LessThanEqual },

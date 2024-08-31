@@ -409,7 +409,13 @@ fn consumeAssignment(self: *Parser) anyerror!*Expression {
                 self.allocator.destroy(expression); // Don't uninit the entire tree, just the single node
                 return Expression.propertyAssignment(self.allocator, access.object, access.name, value);
             },
-            else => {},
+            .DynamicPropertyAccess => |access| {
+                self.allocator.destroy(expression); // Don't uninit the entire tree, just the single node
+                return Expression.dynamicPropertyAssignment(self.allocator, access.object, access.name, value, access.startToken);
+            },
+            else => {
+                value.uninit(self.allocator);
+            },
         }
 
         const err = ParseError.consumeFailed(self, "Invalid assignment target", equals);
@@ -593,6 +599,11 @@ fn consumeFunctionCall(self: *Parser) anyerror!*Expression {
             expression = try self.finishFunctionCall(expression);
         } else if (self.matchToken(TokenType.Dot)) {
             expression = try self.consumePropertyAccess(expression);
+        } else if (self.matchToken(TokenType.OpenSquare)) {
+            const startToken = self.peekPrevious();
+            const index = try self.consumeExpression();
+            _ = try self.consume(TokenType.CloseSquare, "Expected ']' after dynamic property access index");
+            expression = try Expression.dynamicPropertyAccess(self.allocator, expression, index, startToken);
         } else {
             break;
         }

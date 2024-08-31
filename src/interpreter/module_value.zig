@@ -79,23 +79,23 @@ pub const Module = union(enum) {
     fn getRootEnvironment(self: *const Module) *Environment {
         return &self.CodeModule.moduleInterpreter.rootEnvironment;
     }
-    fn isExported(self: *const Module, name: Token) bool {
-        return self.CodeModule.moduleInterpreter.exportedValues.contains(name.lexeme);
+    fn isExported(self: *const Module, name: []const u8) bool {
+        return self.CodeModule.moduleInterpreter.exportedValues.contains(name);
     }
     /// The interpreter is only used for error handling.
-    pub fn accessExport(self: *const Module, name: Token, interpreter: *ModuleInterpreter) !VariableValue {
+    pub fn accessExport(self: *const Module, startToken: Token, name: []const u8, interpreter: *ModuleInterpreter) !VariableValue {
         switch (self.*) {
             .CodeModule => {
                 if (!self.isExported(name)) {
-                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Module does not export {s}.", .{name.lexeme});
+                    interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Module does not export value.", .{});
                     return InterpreterError.RuntimeError;
                 }
-                return (try self.getRootEnvironment().getSelf(name, interpreter)).takeReference(interpreter.allocator);
+                return (try self.getRootEnvironment().getLexemeSelf(name, startToken, interpreter)).takeReference(interpreter.allocator);
             },
             .NativeModule => {
-                const entry = self.NativeModule.exports.get(name.lexeme);
+                const entry = self.NativeModule.exports.get(name);
                 if (entry != null) return entry.?;
-                interpreter.runtimeError = RuntimeError.tokenError(interpreter, name, "Native module does not export {s}.", .{name.lexeme});
+                interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Native module does not export value.", .{});
                 return InterpreterError.RuntimeError;
             },
         }
