@@ -1,0 +1,38 @@
+export let TEST_NAME = "Standard library: random submodule";
+export let EXPECTED_ASSERTIONS = 44;
+
+let std = import("std");
+
+export let run = function(assert) {
+    let random = std.random;
+    
+    let i = 0;
+    while(i < 20) {
+        let r = random.normalized();
+        assert(r >= 0.0);
+        assert(r < 1.0);
+        i = i + 1;
+    }
+
+    let lastResult = null;
+    let seed = 20;
+
+    i = 0;
+    while(i < 5) {
+        random.seed(seed);
+
+        let r = 0;
+        let j = 0;
+        while(j < 10) {
+            r = r + random.normalized();
+            j = j + 1;
+        }
+
+        if (lastResult != null) {
+            assert(r == lastResult);
+        }
+        lastResult = r;
+
+        i = i + 1;
+    }
+};

@@ -1,4 +1,4 @@
-export let TEST_NAME = "Trig functions";
+export let TEST_NAME = "Standard library: Trig functions";
 export let EXPECTED_ASSERTIONS = 29;
 
 export let run = function(assert) {

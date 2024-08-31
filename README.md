@@ -239,6 +239,8 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
     - [X] `substring` function: `Std.print(Std.substring("Hello, world!", 0, 5));`
     - [X] `intChar` function: `Std.print(Std.intChar("A"));` (Converts a single-character string to its ASCII value)
     - [X] `charInt` function: `Std.print(Std.charInt(65));` (Converts an ASCII value to a single-character string)
+    - [X] `parseInt` function: `Std.print(Std.parseInt("5"));` (Converts a string to an integer in base 10)
+    - [X] `parseFloat` function: `Std.print(Std.parseFloat("5.5"));` (Converts a string to a float in base 10)
   - [X] `clock` function: `Std.print(Std.clock());` (Returns a calendar timestamp, in milliseconds, relative to UTC 1970-01-01)
   - [X] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
   - [X] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)

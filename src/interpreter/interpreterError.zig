@@ -55,12 +55,8 @@ pub const RuntimeError = struct {
         };
         defer self.allocator.free(errorMessage);
 
-        prettyError(errorMessage) catch {
-            return;
-        };
-        errorContext(self.originalBuffer, self.filePath, self.token.position, self.token.lexeme.len, self.allocator) catch {
-            return;
-        };
+        prettyError(errorMessage) catch return;
+        errorContext(self.originalBuffer, self.filePath, self.token.position, self.token.lexeme.len, self.allocator) catch return;
     }
 };
 

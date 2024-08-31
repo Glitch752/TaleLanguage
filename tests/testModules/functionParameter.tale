@@ -1,7 +1,7 @@
 export let TEST_NAME = "Functions as a parameter (higher-order functions)";
 export let EXPECTED_ASSERTIONS = 5;
 
-let Array = import("./classDynamicFieldAccess").Array;
+let Array = import("classes/classDynamicFieldAccess").Array;
 let MappableArray = class extending Array {
     map(f) {
         let result = MappableArray();

@@ -1,0 +1,41 @@
+export let TEST_NAME = "Example task: roman numeral to integer";
+export let EXPECTED_ASSERTIONS = 8;
+
+let Map = class{};
+let numeralValue = Map();
+numeralValue.I = 1;
+numeralValue.V = 5;
+numeralValue.X = 10;
+numeralValue.L = 50;
+numeralValue.C = 100;
+numeralValue.D = 500;
+numeralValue.M = 1000;
+
+let std = import("std");
+let romanToInteger = function(roman) {
+    let result = 0;
+    let prev = 0;
+    let i = 0;
+    while (i < std.length(roman)) {
+        let current = numeralValue[roman[i]];
+        if (current <= prev) {
+            result = result + current;
+        } else {
+            result = result + current - 2 * prev;
+        }
+        prev = current;
+        i = i + 1;
+    }
+    return result;
+};
+
+export let run = function(assert) {
+    assert(romanToInteger("III") == 3);
+    assert(romanToInteger("IV") == 4);
+    assert(romanToInteger("IX") == 9);
+    assert(romanToInteger("LVIII") == 58);
+    assert(romanToInteger("MCMXCIV") == 1994);
+    assert(romanToInteger("MMXXI") == 2021);
+    assert(romanToInteger("MMXXII") == 2022);
+    assert(romanToInteger("MMXXIII") == 2023);
+};

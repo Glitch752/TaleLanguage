@@ -1,4 +1,4 @@
-export let TEST_NAME = "Simple standard library number values and functions";
+export let TEST_NAME = "Standard library: number values and functions";
 export let EXPECTED_ASSERTIONS = 22;
 
 export let run = function(assert) {

@@ -1,5 +1,5 @@
-export let TEST_NAME = "Strings";
-export let EXPECTED_ASSERTIONS = 26;
+export let TEST_NAME = "Standard library: String manipulation";
+export let EXPECTED_ASSERTIONS = 36;
 
 export let run = function(assert) {
     let std = import("std");
@@ -33,4 +33,16 @@ export let run = function(assert) {
     assert(std.charInt(0) == "\x00");
     assert(std.charInt(127) == "\x7f");
     assert(std.charInt(255) == "\xff");
+
+    assert(std.parseInt("123") == 123);
+    assert(std.parseInt("123.45") == 123);
+    assert(std.parseInt("-0123") == -123);
+    assert(std.parseInt("0") == 0);
+    assert(std.parseInt("-101010") == -101010);
+
+    assert(std.parseFloat("123") == 123);
+    assert(std.parseFloat("123.45") == 123.45);
+    assert(std.parseFloat("-123") == -123);
+    assert(std.parseFloat("0") == 0);
+    assert(std.parseFloat("-01.123") == -1.123);
 };

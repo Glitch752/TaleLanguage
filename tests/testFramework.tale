@@ -45,11 +45,6 @@ let test = function(name) {
 };
 
 test("functionCall");
-test("numbers");
-test("trig");
-test("exponentials");
-test("strings");
-test("clock");
 test("null");
 test("binaryOperations");
 test("unaryOperations");
@@ -57,16 +52,28 @@ test("logicalOperations");
 test("bitwiseOperations");
 test("loops");
 test("conditionals");
-test("simpleClasses");
-test("classStatic");
-test("classInheritance");
 test("imports/a");
-test("classDynamicFieldAccess");
 test("nestedFunctions");
 test("functionParameter");
 
+test("classes/simpleClasses");
+test("classes/classStatic");
+test("classes/classInheritance");
+test("classes/classDynamicFieldAccess");
+
+test("stdlib/numbers");
+test("stdlib/trig");
+test("stdlib/exponentials");
+test("stdlib/strings");
+test("stdlib/clock");
+test("stdlib/random");
+
 test("exampleTasks/palindromeNumber");
 test("exampleTasks/sort");
+test("exampleTasks/hammingWeight");
+test("exampleTasks/romanToInteger");
+test("exampleTasks/stringArithmetic");
+test("exampleTasks/brainfuck");
 
 if (failedTests > 0) {
     std.println("\n\x1b[1;31m" + std.string(failedAssertions) + " of the " + std.string(totalAssertions) + " assertions across " + std.string(totalTests) + " tests failed. " + std.string(failedTests) + " tests had failures.\x1b[0m");

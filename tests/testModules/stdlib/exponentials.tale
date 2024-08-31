@@ -1,4 +1,4 @@
-export let TEST_NAME = "Exponentials";
+export let TEST_NAME = "Standard library: Exponentials";
 export let EXPECTED_ASSERTIONS = 20;
 
 export let run = function(assert) {

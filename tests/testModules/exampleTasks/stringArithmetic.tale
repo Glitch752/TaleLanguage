@@ -1,0 +1,72 @@
+export let TEST_NAME = "Example task: string arithmetic";
+export let EXPECTED_ASSERTIONS = 11;
+
+let std = import("std");
+
+let digitNumber = function(digit) {
+    return std.intChar(digit) - std.intChar("0");
+};
+
+let add = function(aString, bString) {
+    let result = "";
+    let carry = 0;
+    let i = 0;
+    while (i < std.max(std.length(aString), std.length(bString))) {
+        let a = 0;
+        if (i < std.length(aString)) {
+            a = digitNumber(aString[std.length(aString) - i - 1]);
+        }
+        let b = 0;
+        if (i < std.length(bString)) {
+            b = digitNumber(bString[std.length(bString) - i - 1]);
+        }
+        let sum = a + b + carry;
+        result = std.string(sum % 10) + result;
+        carry = std.floor(sum / 10);
+        i = i + 1;
+    }
+
+    if (carry != 0) {
+        result = std.string(carry) + result;
+    }
+
+    return result;
+};
+
+let multiply = function(aString, bString) {
+    let result = "0";
+    let i = 0;
+    while (i < std.length(bString)) {
+        let digit = digitNumber(bString[std.length(bString) - i - 1]);
+        let product = "";
+        let j = 0;
+        while (j < digit) {
+            product = add(product, aString);
+            j = j + 1;
+        }
+        let zeros = "";
+        let k = 0;
+        while (k < i) {
+            zeros = zeros + "0";
+            k = k + 1;
+        }
+        result = add(result, product + zeros);
+        i = i + 1;
+    }
+    return result;
+};
+
+export let run = function(assert) {
+    assert(add("123", "456") == "579");
+    assert(add("123", "4567") == "4690");
+    assert(add("1234", "567") == "1801");
+    assert(add("1234", "5678") == "6912");
+    assert(add("999", "1") == "1000");
+    assert(add("999", "999") == "1998");
+    
+    assert(multiply("123", "456") == "56088");
+    assert(multiply("123", "4567") == "561741");
+    assert(multiply("1234", "567") == "699678");
+    assert(multiply("1234", "5678") == "7006652");
+    assert(multiply("999", "1") == "999");
+};

@@ -1,4 +1,4 @@
-export let TEST_NAME = "Class static values and methods";
+export let TEST_NAME = "Classes: static values and methods";
 export let EXPECTED_ASSERTIONS = 6;
 
 let A = class {

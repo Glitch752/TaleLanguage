@@ -1,4 +1,4 @@
-export let TEST_NAME = "Clock";
+export let TEST_NAME = "Standard library: Clock";
 export let EXPECTED_ASSERTIONS = 2;
 
 export let run = function(assert) {

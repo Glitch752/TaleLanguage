@@ -1,0 +1,98 @@
+export let TEST_NAME = "Example task: brainfuck interpreter";
+export let EXPECTED_ASSERTIONS = 40;
+
+// We don't implement user input in this interpreter; only output.
+
+let std = import("std");
+let Memory = class {
+    constructor() {
+        this.length = 0;
+        this.pointer = 0;
+    }
+    get() {
+        if(this.pointer >= this.length) {
+            return 0;
+        }
+        return this[std.string(index)];
+    }
+    set(value) {
+        if(this.pointer >= this.length) {
+            let i = this.length;
+            while(i <= this.pointer) {
+                this[std.string(i)] = 0;
+            }
+        }
+        this[std.string(this.pointer)] = value;
+    }
+    increment() {
+        let next = this.get() + 1;
+        if(next > 255) next = 0;
+        this.set(next);
+    }
+    decrement() {
+        let next = this.get() - 1;
+        if(next < 0) next = 255;
+        this.set(next);
+    }
+    forward() {
+        this.pointer = this.pointer + 1;
+    }
+    backward() {
+        this.pointer = this.pointer - 1;
+    }
+};
+
+let interpret = function(program) {
+    let output = "";
+    let memory = Memory();
+
+    let i = 0;
+    while(i < std.length(program)) {
+        let command = program[i];
+
+        if(command == ">") {
+            memory.forward();
+        } else if(command == "<") {
+            memory.backward();
+        } else if(command == "+") {
+            memory.increment();
+        } else if(command == "-") {
+            memory.decrement();
+        } else if(command == ",") {
+            // We don't implement user input in this interpreter; only output.
+        } else if(command == ".") {
+            output = output + std.charInt(memory.get());
+        } else if(command == "[") {
+            if(memory.get() == 0) {
+                let depth = 1;
+                while(depth > 0) {
+                    i = i + 1;
+                    if(program[i] == "[") depth = depth + 1;
+                    else if(program[i] == "]") depth = depth - 1;
+
+                    if(i >= std.length(program)) return output;
+                }
+            }
+        } else if(command == "]") {
+            if(memory.get() != 0) {
+                let depth = 1;
+                while(depth > 0) {
+                    i = i - 1;
+                    if(program[i] == "[") depth = depth - 1;
+                    else if(program[i] == "]") depth = depth + 1;
+
+                    if(i < 0) return output;
+                }
+            }
+        }
+
+        i = i + 1;
+    }
+
+    return output;
+};
+
+export let run = function(assert) {
+    let quine = "->++>+++>+>+>+++>>>>>>>>>>>>>>>>>>>>+>+>++>+++>++>>+++>+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>+>+>>+++>>+++>>>>>+++>+>>>>>>>>>++>+++>+++>+>>+++>>>+++>+>++>+++>>>+>+>++>+++>+>+>>+++>>>>>>>+>+>>>+>+>++>+++>+++>+>>+++>>>+++>+>++>+++>++>>+>+>++>+++>+>+>>+++>>>>>+++>+>>>>>++>+++>+++>+>>+++>>>+++>+>+++>+>>+++>>+++>>++[[>>+[>]++>++[<]<-]>+[>]<+<+++[<]<+]>+[>]++++>++[[<++++++++++++++++>-]<+++++++++.<]";
+    std.print(interpret(quine));
+};

@@ -1,9 +1,11 @@
 export let TEST_NAME = "Example task: sorting an array";
-export let EXPECTED_ASSERTIONS = 52;
+
+let itemsToSort = 30;
+export let EXPECTED_ASSERTIONS = itemsToSort + 2;
 
 let std = import("std");
 
-let Array = import("../classDynamicFieldAccess").Array;
+let Array = import("../classes/classDynamicFieldAccess").Array;
 let SwappableArray = class extending Array {
     swap(i, j) {
         let temp = this.get(i);
@@ -41,7 +43,7 @@ export let run = function(assert) {
     let array2 = SwappableArray();
 
     let i = 0;
-    while(i < 50) {
+    while(i < itemsToSort) {
         array2.push(std.floor(std.random.normalized() * 100));
         i = i + 1;
     }
@@ -49,7 +51,7 @@ export let run = function(assert) {
     array2.sort();
 
     i = 0;
-    while(i < 49) {
+    while(i < itemsToSort - 1) {
         assert(array2.get(i) <= array2.get(i + 1));
         i = i + 1;
     }

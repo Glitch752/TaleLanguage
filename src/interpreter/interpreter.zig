@@ -67,6 +67,8 @@ pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
         .{ .name = "charInt", .value = try VariableValue.nativeFunction(1, &natives.charInt) },
         .{ .name = "length", .value = try VariableValue.nativeFunction(1, &natives.length) },
         .{ .name = "string", .value = try VariableValue.nativeFunction(1, &natives.toString) },
+        .{ .name = "parseInt", .value = try VariableValue.nativeFunction(1, &natives.parseInt) },
+        .{ .name = "parseFloat", .value = try VariableValue.nativeFunction(1, &natives.parseFloat) },
 
         .{ .name = "clock", .value = try VariableValue.nativeFunction(0, &natives.clock) },
         .{ .name = "panic", .value = try VariableValue.nativeFunction(1, &natives.panic) },

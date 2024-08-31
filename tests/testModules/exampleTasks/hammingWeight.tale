@@ -1,0 +1,25 @@
+export let TEST_NAME = "Example task: hamming weight";
+export let EXPECTED_ASSERTIONS = 11;
+
+let hammingWeight = function(n) {
+    let count = 0;
+    while (n != 0) {
+        count = count + 1;
+        n = n & (n - 1);
+    }
+    return count;
+};
+
+export let run = function(assert) {
+    assert(hammingWeight(0) == 0);
+    assert(hammingWeight(1) == 1);
+    assert(hammingWeight(2) == 1);
+    assert(hammingWeight(3) == 2);
+    assert(hammingWeight(4) == 1);
+    assert(hammingWeight(5) == 2);
+    assert(hammingWeight(6) == 2);
+    assert(hammingWeight(7) == 3);
+    assert(hammingWeight(8) == 1);
+    assert(hammingWeight(9) == 2);
+    assert(hammingWeight(45959) == 9);
+};

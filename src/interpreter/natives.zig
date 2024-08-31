@@ -384,6 +384,108 @@ pub fn charInt(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variabl
 }
 
 /// Arity: 1
+pub fn parseInt(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+
+    const string = arguments.items[0];
+
+    if (string != .String) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringBytes = string.asString();
+
+    var result: f64 = 0.0;
+    var i: u32 = 0;
+    var isNegative = false;
+
+    if (stringBytes.len > 0 and stringBytes[0] == '-') {
+        isNegative = true;
+        i = 1;
+    }
+
+    while (i < stringBytes.len) {
+        if (stringBytes[i] == '.') {
+            break;
+        }
+        if (stringBytes[i] == '_') {
+            i += 1;
+            continue;
+        }
+
+        const charValue: f64 = @floatFromInt(stringBytes[i] - '0');
+        if (charValue < 0 or charValue > 9) {
+            return NativeError.InvalidOperand;
+        }
+
+        result = result * 10.0 + charValue;
+        i += 1;
+    }
+
+    if (isNegative) {
+        result = -result;
+    }
+
+    return VariableValue.fromNumber(result);
+}
+
+pub fn parseFloat(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+
+    const string = arguments.items[0];
+
+    if (string != .String) {
+        return NativeError.InvalidOperand;
+    }
+
+    const stringBytes = string.asString();
+
+    var result: f64 = 0.0;
+    var i: u32 = 0;
+    var isNegative = false;
+    var hasDecimal = false;
+    var decimalPlace: f64 = 0.1;
+
+    if (stringBytes.len > 0 and stringBytes[0] == '-') {
+        isNegative = true;
+        i = 1;
+    }
+
+    while (i < stringBytes.len) {
+        if (stringBytes[i] == '_') {
+            i += 1;
+            continue;
+        }
+
+        if (stringBytes[i] == '.') {
+            hasDecimal = true;
+            i += 1;
+            continue;
+        }
+
+        const charValue: f64 = @floatFromInt(stringBytes[i] - '0');
+        if (charValue < 0 or charValue > 9) {
+            return NativeError.InvalidOperand;
+        }
+
+        if (hasDecimal) {
+            result += charValue * decimalPlace;
+            decimalPlace /= 10.0;
+        } else {
+            result = result * 10.0 + charValue;
+        }
+
+        i += 1;
+    }
+
+    if (isNegative) {
+        result = -result;
+    }
+
+    return VariableValue.fromNumber(result);
+}
+
+/// Arity: 1
 pub fn length(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
     const string = arguments.items[0];
 

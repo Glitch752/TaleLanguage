@@ -1,4 +1,4 @@
-export let TEST_NAME = "Class dynamic field access";
+export let TEST_NAME = "Classes: dynamic field access";
 export let EXPECTED_ASSERTIONS = 7;
 
 let string = import("std").string;

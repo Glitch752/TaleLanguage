@@ -1,4 +1,4 @@
-export let TEST_NAME = "Simple classes";
+export let TEST_NAME = "Classes: Simple example";
 export let EXPECTED_ASSERTIONS = 5;
 
 let A = class {

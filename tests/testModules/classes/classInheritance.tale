@@ -1,4 +1,4 @@
-export let TEST_NAME = "Class inheritance";
+export let TEST_NAME = "Classes: inheritance";
 export let EXPECTED_ASSERTIONS = 10;
 
 let TestClass = class {
