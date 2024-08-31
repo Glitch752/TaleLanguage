@@ -1,0 +1,35 @@
+export let TEST_NAME = "Class static values and methods";
+export let EXPECTED_ASSERTIONS = 6;
+
+let A = class {
+    constructor() {
+        this.a = 1;
+    }
+    static getA() {
+        return this.a;
+    }
+    static setA(value) {
+        this.a = value;
+    }
+};
+A.a = 1;
+
+let B = class {
+    static getB() {
+        return B.b;
+    }
+};
+B.b = 2;
+
+export let run = function(assert) {
+    assert(A.getA() == 1);
+    A.setA(3);
+    assert(A.getA() == 3);
+    let a = A();
+    assert(a.a == 1);
+    assert(A.a == 3);
+
+    assert(B.getB() == 2);
+    B.b = 4;
+    assert(B.getB() == 4);
+};

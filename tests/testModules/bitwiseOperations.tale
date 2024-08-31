@@ -1,0 +1,16 @@
+export let TEST_NAME = "Bitwise numerical operations";
+export let EXPECTED_ASSERTIONS = 9;
+
+export let run = function(assert) {
+    assert(1 & 1 == 1);
+    assert(1 | 1 == 1);
+    assert(1 ^ 1 == 0);
+    
+    assert(1 & 1 & 1 == 1);
+    assert(1 | 1 | 1 == 1);
+    assert(1 ^ 1 ^ 1 == 1);
+    
+    assert(29 & 15 == 13);
+    assert(29 | 15 == 31);
+    assert(29 ^ 15 == 18);
+};

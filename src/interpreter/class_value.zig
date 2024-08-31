@@ -26,13 +26,15 @@ pub const ClassInstance = struct {
         const allocatedEnvironment = try interpreter.allocator.create(Environment);
         var classTypeParent = classType.ptr().parentEnvironment;
         allocatedEnvironment.* = classTypeParent.createChild(classTypeParent);
-        errdefer allocatedEnvironment.exit(interpreter);
 
-        var value = try ClassInstanceReference.init(.{
+        var value = ClassInstanceReference.init(.{
             .classType = classType.strongClone(),
             .environment = allocatedEnvironment,
             .fieldValues = std.StringHashMapUnmanaged(VariableValue){},
-        }, interpreter.allocator);
+        }, interpreter.allocator) catch |err| {
+            allocatedEnvironment.exit(interpreter);
+            return err;
+        };
         errdefer _ = value.deinit(interpreter.allocator);
 
         try allocatedEnvironment.define("this", VariableValue.weakClassInstanceReference(value.weakClone()), interpreter);

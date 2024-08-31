@@ -1,0 +1,14 @@
+let a = import("./a");
+
+export let CONSTANT_VALUE = "Lorem ipsum";
+
+let A = class {
+    constructor() { this.a = 1; }
+    getStatic() { return A.property; }
+};
+A.property = 10;
+export let instance = A();
+
+export let get = function() {
+    return a.get() + 1;
+};

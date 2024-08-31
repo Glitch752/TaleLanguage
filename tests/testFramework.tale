@@ -1,6 +1,6 @@
 let std = import("std");
 
-let anyTestsFailed = false;
+let failedTests = 0;
 let totalTests = 0;
 let totalAssertions = 0;
 let failedAssertions = 0;
@@ -29,13 +29,13 @@ let test = function(name) {
 
     if (anyAssertionsFailed) {
         std.println("\x1b[1;31m! Test '" + testName + "' failed: Some assertions failed\x1b[0m");
-        anyTestsFailed = true;
+        failedTests = failedTests + 1;
         return;
     }
 
     if (assertionsRun != expectedAssertions) {
         std.println("\x1b[1;31m! Test '" + testName + "' failed: Expected " + std.string(expectedAssertions) + " assertions, but ran " + std.string(assertionsRun) + "\x1b[0m");
-        anyTestsFailed = true;
+        failedTests = failedTests + 1;
         return;
     }
 
@@ -54,9 +54,16 @@ test("null");
 test("binaryOperations");
 test("unaryOperations");
 test("logicalOperations");
+test("bitwiseOperations");
+test("loops");
+test("conditionals");
+test("simpleClasses");
+test("classStatic");
+test("classInheritance");
+test("imports/a");
 
-if (anyTestsFailed) {
-    std.println("\n\x1b[1;31m" + std.string(failedAssertions) + " of the " + std.string(totalAssertions) + " assertions across " + std.string(totalTests) + " tests failed\x1b[0m");
+if (failedTests > 0) {
+    std.println("\n\x1b[1;31m" + std.string(failedAssertions) + " of the " + std.string(totalAssertions) + " assertions across " + std.string(totalTests) + " tests failed. " + std.string(failedTests) + " tests had failures.\x1b[0m");
 } else {
     std.println("\n\x1b[1;32mAll " + std.string(totalTests) + " tests with " + std.string(totalAssertions) + " assertions passed!\x1b[0m");
 }

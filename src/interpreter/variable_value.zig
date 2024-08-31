@@ -136,7 +136,7 @@ pub const VariableValue = union(enum) {
     }
 
     pub fn isClassType(self: VariableValue) bool {
-        return self == .ClassType;
+        return self == .ClassType or (self == .WeakReference and self.WeakReference == .ClassType);
     }
     pub fn asClassType(self: VariableValue) ClassTypeReference {
         return self.ClassType.ClassType;
@@ -265,6 +265,21 @@ pub const VariableValue = union(enum) {
             .ClassInstance => |value| return value.ptr().toString(allocator),
             .WeakReference => |value| return value.toString(allocator),
             .Module => |module| return try std.fmt.allocPrint(allocator, "<module {s}>", .{module.getPath()}),
+        }
+    }
+
+    /// Returns the value's type as a static string (that doesn't need to be freed) for debugging and visualization purposes.
+    pub fn typeNameString(self: VariableValue) []const u8 {
+        switch (self) {
+            .Number => return "Number",
+            .String => return "String",
+            .Boolean => return "Boolean",
+            .Null => return "Null",
+            .Function => return "Function",
+            .ClassType => return "ClassType",
+            .ClassInstance => return "ClassInstance",
+            .WeakReference => return "WeakReference",
+            .Module => return "Module",
         }
     }
 };

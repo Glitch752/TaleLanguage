@@ -1,0 +1,40 @@
+export let TEST_NAME = "Simple classes";
+export let EXPECTED_ASSERTIONS = 5;
+
+let A = class {
+    constructor() {
+        this.a = 1;
+    }
+};
+
+let B = class {
+    constructor(bValue) {
+        this.b = bValue;
+        this.originalB = bValue;
+    }
+};
+let AlsoB = B;
+
+let makeC = function() {
+    return class {
+        constructor(cValue) {
+            this.c = cValue;
+        }
+    };
+};
+let C = makeC();
+
+export let run = function(assert) {
+    let a = A();
+    assert(a.a == 1);
+
+    let b = AlsoB(4);
+    b.b = 3;
+    assert(b.originalB == 4);
+    assert(b.b == 3);
+    b.c = 4;
+    assert(b.c == 4);
+
+    let c = C(5);
+    assert(c.c == 5);
+};

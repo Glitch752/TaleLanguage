@@ -1,0 +1,17 @@
+export let TEST_NAME = "Imports";
+export let EXPECTED_ASSERTIONS = 5;
+
+export let run = function(assert) {
+    let a = import("./a");
+    let b = import("./b");
+    
+    assert(a.get() == 1);
+    assert(b.get() == 2);
+    assert(b.CONSTANT_VALUE == "Lorem ipsum");
+    assert(b.instance.a == 1);
+    assert(b.instance.getStatic() == 10);
+};
+
+export let get = function() {
+    return 1;
+};

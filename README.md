@@ -59,12 +59,12 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
 - [X] First-class functions
 - [X] C-derived syntax
 - [X] Automatic reference counting
-- [X] Simple primatives: Booleans, doubles, strings, functions, and null (I'm not sure if arrays or classes should go here)
+- [X] Simple primatives: booleans, numbers, strings, functions, class types, class instances, modules (used for importing other files), and null.
 - [X] Simple operators (no overloading):
   - [X] Arithmetic: `+`, `-`, `*`, `/`, `%` (modulo has the same precedence as multiplication and division)
   - [X] Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
   - [X] Logical: `!`, `&&`, `||`
-    - [X] Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0, and null is falsy
+    - [X] Truthiness: booleans are obvious, strings are truthy if they are not empty, numbers are truthy if they are not 0 or nan, and null is falsy
   - [X] Bitwise: `&`, `|`, `^`
     - We take the Javascript approach to bitwise operators: convert their operands to 32-bit signed integers before performing the operation
   - [X] Grouping: `()`
@@ -88,6 +88,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
     - The `constructor` method is called when the class is instantiated
   - [X] Instantiation: `let p = Point(5, 3);`
   - [X] Field access: `p.x`, `p.z = 5;` (creates a new field)
+    - [ ] Dynamic field access: `p["x"]` (I'm debating whether this is a good idea since it's not very type-safe, but it's a common feature in dynamic languages)
   - [X] Single inheritance: `let Point3D = class extending Point { constructor(x, y, z) { super.constructor(x, y); this.z = z; } }`
     - Constructors are inherited just like any other method
   - [X] Method access: `p.method()` (Just another function)

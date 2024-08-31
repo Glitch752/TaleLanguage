@@ -370,7 +370,7 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             defer callee.deinit(self.allocator);
 
             if (!callee.isCallable()) {
-                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and class types", .{});
+                self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only call functions and class types; tried to call {s}", .{callee.typeNameString()});
                 return InterpreterError.RuntimeError;
             }
 
@@ -508,12 +508,13 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             if (!object.isClassInstance()) {
                 if (!object.isClassType()) {
                     if (!object.isModuleType()) {
-                        self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances, types, and modules.", .{});
+                        self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances, class types, and modules. Accessing {s} on value {s}.", .{ values.name.lexeme, object.typeNameString() });
                         return InterpreterError.RuntimeError;
                     }
                     return try object.asModuleType().accessExport(values.name, self);
                 }
-                var classType = object.asClassType();
+                var classType = object.referenceClassType();
+                defer _ = classType.deinit(self.allocator);
                 return try classType.ptr().getStatic(values.name, self);
             }
 
@@ -530,10 +531,12 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
 
             if (!object.isClassInstance()) {
                 if (!object.isClassType()) {
-                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only access properties on class instances or types", .{});
+                    self.runtimeError = RuntimeError.tokenError(self, values.name, "Can only assign properties on class instances or class types. Accessing {s} on value {s}.", .{ values.name.lexeme, object.typeNameString() });
                     return InterpreterError.RuntimeError;
                 }
-                var classType = object.asClassType();
+                var classType = object.referenceClassType();
+                defer _ = classType.deinit(self.allocator);
+
                 try classType.unsafePtr().setStatic(values.name, value, self);
                 if (self.runtimeError != null) return InterpreterError.RuntimeError;
 

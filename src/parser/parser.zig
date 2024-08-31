@@ -268,6 +268,12 @@ fn consumeWhileStatement(self: *Parser) anyerror!*Statement {
 
 fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
     var statements = std.ArrayList(*Statement).init(self.allocator);
+    errdefer {
+        for (statements.items) |statement| {
+            statement.uninit(self.allocator);
+        }
+        statements.deinit();
+    }
 
     while (!(self.peek().type == TokenType.CloseCurly) and !self.isAtEnd()) {
         const statement = self.consumeDeclarationAndSynchronize(false) orelse continue;
@@ -281,10 +287,13 @@ fn consumeBlockStatement(self: *Parser) anyerror!*Statement {
 
 fn consumeLetStatement(self: *Parser, exported: bool) anyerror!*Statement {
     const name = try self.consume(TokenType.Identifier, "Expected variable name");
+    errdefer name.deinit(self.allocator);
+
     const initializer = if (self.matchToken(TokenType.Assign))
         try self.consumeExpression()
     else
         try Expression.literal(self.allocator, TokenLiteral.Null);
+    errdefer initializer.uninit(self.allocator);
 
     _ = try self.consume(TokenType.Semicolon, "Expected ';' after a variable declaration.");
 

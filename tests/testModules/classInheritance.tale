@@ -1,0 +1,47 @@
+export let TEST_NAME = "Class inheritance";
+export let EXPECTED_ASSERTIONS = 10;
+
+let TestClass = class {
+    static a() {
+        return TestClass.val;
+    }
+
+    static run(assert, times) {
+        if(times == 0) {
+            return -1;
+        }
+        assert(this.run(assert, times - 1) == times - 2);
+        return times - 1;
+    }
+};
+TestClass.val = 1;
+
+let TestClass2 = class extending TestClass {
+    static b() {
+        return 2;
+    }
+};
+
+TestClass.tc2 = TestClass2;
+
+// This is pretty cursed syntax. It shows that the extending keyword actually takes an expression, not just a class name.
+let TestClass3 = class extending class extending TestClass.tc2 {} {
+    static c() {
+        return super.b() + 2;
+    }
+};
+
+export let run = function(assert) {
+    assert(TestClass.a() == 1);
+    assert(TestClass2.a() == 1);
+    assert(TestClass2.b() == 2);
+    assert(TestClass3.c() == 4);
+
+    TestClass2.val = 3;
+    assert(TestClass.a() == 1);
+    TestClass.val = 4;
+    assert(TestClass2.a() == 4);
+    assert(TestClass3.a() == 4);
+
+    TestClass.run(assert, 3);
+};

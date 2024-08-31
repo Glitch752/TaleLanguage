@@ -68,6 +68,12 @@ pub fn getAllTokens(self: *Tokenizer) !?[]Token {
             defer self.allocator.free(errorMessage);
             try prettyError(errorMessage);
             try errorContext(self.buffer, self.filePath, self.position - 1, 1, self.allocator);
+
+            for (self.tokens.items) |token| {
+                token.deinit(self.allocator);
+            }
+            self.tokens.deinit();
+
             return null;
         }
     }
@@ -112,6 +118,8 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
         // Next, keywords and identifiers
         if (std.ascii.isAlphabetic(c)) {
             var keyword = try self.allocator.alloc(u8, 1);
+            errdefer self.allocator.free(keyword);
+
             keyword[0] = c;
             var i: u16 = 1;
             while (self.position < self.buffer.len and (std.ascii.isAlphanumeric(self.buffer[self.position]) or self.buffer[self.position] == '_')) {
@@ -160,6 +168,8 @@ fn takeNext(self: *Tokenizer, errorPayload: *TokenizerErrorPayload) !bool {
         // Next, strings
         if (c == '"' or c == '\'') {
             var string = try self.allocator.alloc(u8, 0);
+            errdefer self.allocator.free(string);
+
             var isEscaping = false;
             while (self.buffer[self.position] != c or isEscaping) {
                 if (isEscaping) {

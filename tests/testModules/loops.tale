@@ -1,0 +1,26 @@
+export let TEST_NAME = "Simple loops";
+export let EXPECTED_ASSERTIONS = 20;
+
+export let run = function(assert) {
+    let i = 0;
+    while(i < 10) {
+        assert(i < 10);
+        i = i + 1;
+    }
+
+    let j = 0;
+    while(true) {
+        if(j >= 10) {
+            break;
+        }
+        assert(j < 10);
+        j = j + 1;
+    }
+
+    let k = 0;
+    while(k < 10) {
+        k = k + 1;
+        continue;
+        assert(false);
+    }
+};

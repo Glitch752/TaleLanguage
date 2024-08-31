@@ -1,0 +1,50 @@
+export let TEST_NAME = "Conditionals";
+export let EXPECTED_ASSERTIONS = 6;
+
+export let run = function(assert) {
+    let a = 1;
+    
+    if(false) {
+        assert(false);
+    }
+
+    if(true) {
+        assert(true);
+    }
+
+    if(a == 1) {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    if(a == 2) {
+        assert(false);
+    } else {
+        assert(true);
+    }
+
+    if(a == 1) {
+        assert(true);
+    } else if(a == 2) {
+        assert(false);
+    } else {
+        assert(false);
+    }
+
+    if(a == 2) {
+        assert(false);
+    } else if(a == 1) {
+        assert(true);
+    } else {
+        assert(false);
+    }
+
+    if(a == 2) {
+        assert(false);
+    } else if(a == 3) {
+        assert(false);
+    } else {
+        assert(true);
+    }
+};

@@ -222,7 +222,10 @@ pub fn importString(self: *Interpreter, path: []const u8) NativeError!VariableVa
 pub fn run(self: *Interpreter, source: []const u8, interpreter: *ModuleInterpreter) !bool {
     // LEXING -------------------------------------
     var sourceLexer = lexer.init(self.allocator, interpreter.filePath, source);
-    const tokens = try sourceLexer.getAllTokens() orelse return true;
+    const tokens = try sourceLexer.getAllTokens() orelse {
+        self.allocator.free(source);
+        return true;
+    };
     try self.lexers.append(self.allocator, sourceLexer);
 
     if (self.flags.debugTokens) {
@@ -246,13 +249,19 @@ pub fn run(self: *Interpreter, source: []const u8, interpreter: *ModuleInterpret
 
     // PARSING -------------------------------------
     var sourceParser = try parser.init(tokens, interpreter.filePath, source, self.flags, self.allocator);
-    const program = sourceParser.parse() catch return true;
+    const program = sourceParser.parse() catch {
+        self.allocator.free(source);
+        return true;
+    };
     try self.programs.append(self.allocator, program);
 
     var sourceResolver = resolver.init(interpreter, source, interpreter.filePath);
     defer sourceResolver.deinit();
 
-    sourceResolver.resolveProgram(program) catch return true;
+    sourceResolver.resolveProgram(program) catch {
+        self.allocator.free(source);
+        return true;
+    };
 
     if (self.flags.debugAST) {
         const printer = ASTPrinter.init(self.allocator);

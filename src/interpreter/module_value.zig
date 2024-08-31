@@ -105,11 +105,14 @@ pub const Module = union(enum) {
     pub fn load(interpreter: *Interpreter, path: []const u8) !Module {
         try {
             var moduleInterpreter = try interpreter.allocator.create(ModuleInterpreter);
+            errdefer {
+                moduleInterpreter.deinit();
+                interpreter.allocator.destroy(moduleInterpreter);
+            }
             moduleInterpreter.* = try ModuleInterpreter.init(interpreter.allocator, interpreter, path);
 
             const err = try interpreter.runFile(moduleInterpreter);
             if (err) {
-                moduleInterpreter.deinit();
                 return ModuleError.InterpreterError;
             }
 
