@@ -73,7 +73,6 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
     var iter = self.values.iterator();
     while (iter.next()) |entry| {
         entry.value_ptr.deinit(allocator);
-        allocator.free(entry.key_ptr.*);
     }
     self.values.deinit(self.allocator);
 
@@ -84,8 +83,7 @@ pub fn deinit(self: *Environment, allocator: std.mem.Allocator) void {
 }
 
 pub fn define(self: *Environment, name: []const u8, value: VariableValue, interpreter: ?*ModuleInterpreter) !void {
-    const duplicatedName = try self.allocator.dupe(u8, name);
-    const previousValue = try self.values.fetchPut(self.allocator, duplicatedName, value);
+    const previousValue = try self.values.fetchPut(self.allocator, name, value);
 
     if (previousValue != null) {
         std.debug.assert(interpreter != null); // Tried to define a variable that already exists when the interpreter is not available.

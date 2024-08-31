@@ -70,36 +70,36 @@ pub const ClassInstance = struct {
         return std.fmt.allocPrint(allocator, "<instance <class>>", .{});
     }
 
-    pub fn get(self: *const ClassInstance, startToken: Token, lexeme: []const u8, selfReference: ClassInstanceReference, interpreter: *ModuleInterpreter) !VariableValue {
+    pub fn get(self: *const ClassInstance, startToken: Token, name: []const u8, selfReference: ClassInstanceReference, interpreter: *ModuleInterpreter) !VariableValue {
         const classType = self.classType.ptr();
-        const method = classType.getInstanceMethod(lexeme);
+        const method = classType.getInstanceMethod(name);
         if (method != null) {
             return VariableValue.newFunctionReference(method.?.function.bindToClass(selfReference.strongClone()));
         }
 
-        const property = self.fieldValues.get(lexeme);
+        const property = self.fieldValues.get(name);
         if (property != null) {
             return property.?.takeReference(interpreter.allocator);
         }
 
-        interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "No proprety or method '{s}' found.", .{lexeme});
+        interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "No proprety or method '{s}' found.", .{name});
         return InterpreterError.RuntimeError;
     }
 
-    pub fn set(self: *ClassInstance, startToken: Token, lexeme: []const u8, value: VariableValue, interpreter: *ModuleInterpreter) !void {
-        if (self.classType.ptr().instanceMethods.contains(lexeme)) {
-            interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Cannot assign to method '{s}'.", .{lexeme});
+    pub fn set(self: *ClassInstance, startToken: Token, name: []const u8, value: VariableValue, interpreter: *ModuleInterpreter) !void {
+        if (self.classType.ptr().instanceMethods.contains(name)) {
+            interpreter.runtimeError = RuntimeError.tokenError(interpreter, startToken, "Cannot assign to method '{s}'.", .{name});
             return InterpreterError.RuntimeError;
         }
 
-        if (self.fieldValues.contains(lexeme)) {
-            const pointer = self.fieldValues.getPtr(lexeme);
+        if (self.fieldValues.contains(name)) {
+            const pointer = self.fieldValues.getPtr(name);
             pointer.?.*.deinit(interpreter.allocator);
             pointer.?.* = value;
             return;
         }
 
-        const duplicatedName = try interpreter.allocator.dupe(u8, lexeme);
+        const duplicatedName = try interpreter.allocator.dupe(u8, name); // We need to duplicate the name because it may be dynamically allocated.
         try self.fieldValues.put(interpreter.allocator, duplicatedName, value);
     }
 };
@@ -134,11 +134,10 @@ pub const ClassType = struct {
         var staticMethods = std.StringHashMapUnmanaged(ClassMethod){};
         for (expression.methods.items) |method| {
             const function = try CallableFunction.user(method.function, parentEnvironment, interpreter, allocator);
-            const duplicatedName = try allocator.dupe(u8, method.name.lexeme);
 
             const value = ClassMethod.new(try method.name.clone(allocator), function);
             var map = if (method.static) &staticMethods else &instanceMethods;
-            try map.put(allocator, duplicatedName, value);
+            try map.put(allocator, method.name.lexeme, value);
         }
 
         var super: ?ClassTypeReferencePointer = null;
@@ -168,14 +167,12 @@ pub const ClassType = struct {
         var instanceIterator = self.instanceMethods.iterator();
         while (instanceIterator.next()) |method| {
             method.value_ptr.deinit(allocator);
-            allocator.free(method.key_ptr.*);
         }
         self.instanceMethods.deinit(allocator);
 
         var staticIterator = self.staticMethods.iterator();
         while (staticIterator.next()) |method| {
             method.value_ptr.deinit(allocator);
-            allocator.free(method.key_ptr.*);
         }
         self.staticMethods.deinit(allocator);
 
@@ -222,7 +219,7 @@ pub const ClassType = struct {
             return;
         }
 
-        const duplicatedName = try interpreter.allocator.dupe(u8, lexeme);
+        const duplicatedName = try interpreter.allocator.dupe(u8, lexeme); // We need to duplicate the name because it may be dynamically allocated.
         try self.staticFieldValues.put(interpreter.allocator, duplicatedName, value);
     }
 

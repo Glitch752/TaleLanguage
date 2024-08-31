@@ -73,10 +73,6 @@ pub fn deinit(self: *ModuleInterpreter) void {
     }
     self.oldBuffers.deinit(self.allocator);
 
-    var exportedValueIter = self.exportedValues.iterator();
-    while (exportedValueIter.next()) |entry| {
-        self.allocator.free(entry.key_ptr.*);
-    }
     self.exportedValues.deinit(self.allocator);
 }
 
