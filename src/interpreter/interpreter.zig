@@ -71,6 +71,11 @@ pub fn new(allocator: std.mem.Allocator, flags: ArgsFlags) !Interpreter {
         .{ .name = "clock", .value = try VariableValue.nativeFunction(0, &natives.clock) },
         .{ .name = "panic", .value = try VariableValue.nativeFunction(1, &natives.panic) },
         .{ .name = "assert", .value = try VariableValue.nativeFunction(1, &natives.assert) },
+
+        .{ .name = "random", .value = try Module.makeNativeModule("random", allocator, .{
+            .{ .name = "normalized", .value = try VariableValue.nativeFunction(0, &natives.randomNormalized) },
+            .{ .name = "seed", .value = try VariableValue.nativeFunction(1, &natives.randomSeed) },
+        }) },
     }));
 
     return Interpreter{

@@ -1,4 +1,4 @@
-export let TEST_NAME = "Functions as a parameter (higher order functions)";
+export let TEST_NAME = "Functions as a parameter (higher-order functions)";
 export let EXPECTED_ASSERTIONS = 5;
 
 let Array = import("./classDynamicFieldAccess").Array;

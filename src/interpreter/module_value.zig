@@ -140,6 +140,7 @@ pub const Module = union(enum) {
                     entry.value_ptr.deinit(allocator);
                     if (entry.value_ptr.* == .Module) {
                         entry.value_ptr.Module.deinit(allocator);
+                        allocator.destroy(entry.value_ptr.Module);
                     }
                 }
                 values.exports.deinit(allocator);

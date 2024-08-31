@@ -1,0 +1,29 @@
+export let TEST_NAME = "Example task: palindrome number";
+export let EXPECTED_ASSERTIONS = 8;
+
+let std = import("std");
+let isPalindrome = function(n) {
+    if(n < 0) {
+        return false;
+    }
+
+    let reversed = 0;
+    let temp = n;
+    while (temp > 0) {
+        reversed = reversed * 10 + temp % 10;
+        temp = std.floor(temp / 10);
+    }
+    
+    return n == reversed;
+};
+
+export let run = function(assert) {
+    assert(isPalindrome(121) == true);
+    assert(isPalindrome(123) == false);
+    assert(isPalindrome(1221) == true);
+    assert(isPalindrome(12321) == true);
+    assert(isPalindrome(12345) == false);
+    assert(isPalindrome(934439) == true);
+    assert(isPalindrome(-121) == false);
+    assert(isPalindrome(-123) == false);
+};

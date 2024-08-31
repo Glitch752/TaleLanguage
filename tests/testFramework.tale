@@ -65,6 +65,9 @@ test("classDynamicFieldAccess");
 test("nestedFunctions");
 test("functionParameter");
 
+test("exampleTasks/palindromeNumber");
+test("exampleTasks/sort");
+
 if (failedTests > 0) {
     std.println("\n\x1b[1;31m" + std.string(failedAssertions) + " of the " + std.string(totalAssertions) + " assertions across " + std.string(totalTests) + " tests failed. " + std.string(failedTests) + " tests had failures.\x1b[0m");
 } else {

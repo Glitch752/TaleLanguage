@@ -242,6 +242,9 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] `clock` function: `Std.print(Std.clock());` (Returns a calendar timestamp, in milliseconds, relative to UTC 1970-01-01)
   - [X] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
   - [X] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
+  - [X] `random` submodule:
+    - [X] `random.normalized`: `Std.print(Std.random.normalized());` (Returns a random number [0, 1))
+    - [X] `random.seed`: `Std.random.seed(5);` (Seeds the random number generator, resetting the state)
 
 ### Important note
 Since all memory in the language is reference-counted, reference cycles are possible (and easy to create). I'm considering switching to a garbage collector to avoid this issue, but for now, it's something to be aware of.

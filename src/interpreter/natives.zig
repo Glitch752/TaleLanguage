@@ -436,3 +436,32 @@ pub fn assert(interpreter: *ModuleInterpreter, arguments: std.ArrayList(Variable
 
     return .Null;
 }
+
+var globalRandom: ?std.rand.Random = null;
+
+/// Arity: 0
+pub fn randomNormalized(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = arguments;
+    _ = interpreter;
+
+    if (globalRandom == null) {
+        var prng = std.rand.DefaultPrng.init(@intCast(std.time.milliTimestamp()));
+        globalRandom = prng.random();
+    }
+
+    return VariableValue.fromNumber(globalRandom.?.float(f64));
+}
+
+/// Arity: 1
+pub fn randomSeed(interpreter: *ModuleInterpreter, arguments: std.ArrayList(VariableValue)) NativeError!VariableValue {
+    _ = interpreter;
+    const seed = arguments.items[0];
+
+    if (seed != .Number) {
+        return NativeError.InvalidOperand;
+    }
+
+    var prng = std.rand.DefaultPrng.init(@intFromFloat(seed.asNumber()));
+    globalRandom = prng.random();
+    return .Null;
+}
