@@ -1,59 +1,176 @@
 # Tale, the programming language
-This is a to-be-compiler interpreter for a custom language I made to learn Zig.
+This is a to-be-compiler interpreter for a custom language I made to learn Zig. The language features dynamic typing, first-class functions, object-oriented programming, and a simple standard library. It's powerful enough to build complex programs and abstractions, but high-level enough to be easy to use (with a few small caveats related to my decision to make it reference-counted).
 
-I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/) and [Let's Build a Simple Interpreter](https://ruslanspivak.com/lsbasi-part1/).
+I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/) and [Let's Build a Simple Interpreter](https://ruslanspivak.com/lsbasi-part1/), but I'm not following either of them exactly. The language currently consists of a relatively performant tree-walking interpreter, but I'm hoping to eventually implement a bytecode interpreter and a compiler. I'm also planning to eventually self-host the language.
 
-# Demo of the language
-This isn't a particularly good piece of code: it uses string manipulation hacks to work around the current lack of arrays, as well as temporary global functions I added. However, it demonstrates a relatively complicated program works in Tale--a port of `donut.c`. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays. The code is compacted significantly to fit it in the README, but the original code is in `examples/working/donut.tale`.
+<ol>
+  <li>
+    <a href="#demo-of-the-language">Demo of the language</a>
+    <ul>
+      <li><a href="#higher-order-functions-on-arrays">Higher-order functions on arrays</a></li>
+      <li><a href="#donuttale">Donut.tale</a></li>
+      <li><a href="#and-more">And more!</a></li>
+    </ul>
+  </li>
+  <li><a href="#unit-tests">Unit tests</a></li>
+  <li>
+    <a href="#language-features">Language features</a>
+    <ul>
+      <li><a href="#important-note">Important note</a></li>
+      <li><a href="#considerations-for-the-future">Considerations for the future</a></li>
+    </ul>
+  </li>
+  <li><a href="#running">Running</a></li>
+  <li><a href="#development">Development</a></li>
+  <li><a href="#todo">TODO</a></li>
+  <li>
+    <a href="#random-questions">Random questions</a>
+    <ul>
+      <li><a href="#where-does-the-name-come-from">Where does the name come from?</a></li>
+      <li><a href="#why-object-oriented">Why object-oriented?</a></li>
+      <li><a href="#why-did-you-make-this">Why did you make this?</a></li>
+      <li><a href="#whats-the-goal-of-the-language">What's the goal of the language?</a></li>
+    </ul>
+  </li>
+</ol>
+
+## Demo of the language
+
+### Higher-order functions on arrays
+This is a simple implementation of arrays with higher-order functions. The code is compacted to fit it in the README, but the original code is in `examples/working/higherOrderArrays.tale`.
+
+```js
+let Std = import("std");
+let Object = class {};
+let Array = class {
+  constructor() { this.length = 0; this.inner = Object(); }
+  push(value) {
+    this.inner[Std.string(this.length)] = value; this.length = this.length + 1;
+  }
+  get(index) {
+    if(index < 0 || index >= this.length) return null;
+    return this.inner[Std.string(index)];
+  }
+  print() {
+    Std.print("[");
+    let i = 0; while(i < this.length) {
+      Std.print(this.inner[Std.string(i)]);
+      if(i < this.length - 1) Std.print(", ");
+      i = i + 1;
+    }
+    Std.println("]");
+  }
+};
+let MappableArray = class extending Array {
+  map(f) {
+    let result = MappableArray();
+    let i = 0; while(i < this.length) { result.push(f(this.get(i))); i = i + 1; }
+    return result;
+  }
+  filter(f) {
+    let result = MappableArray();
+    let i = 0; while(i < this.length) {
+      let value = this.get(i);
+      if(f(value)) result.push(value);
+      i = i + 1;
+    }
+    return result;
+  }
+};
+
+let array = MappableArray();
+array.push(1); array.push(2); array.push(3); array.push(10); array.push(15);
+Std.print("Original array: "); array.print();
+let mappedArray = array.map(function(x) { return x * 2 + 1; });
+let filteredArray = array.filter(function(x) { return x % 2 == 0; });
+Std.print("Mapped array: "); mappedArray.print();
+Std.print("Filtered array: "); filteredArray.print();
+```
+
+#### Output
+```plaintext
+Original array: [1, 2, 3, 10, 15]
+Mapped array: [3, 5, 7, 21, 31]
+Filtered array: [2, 10]
+```
+
+### Donut.tale
+This is a port of `donut.c` to Tale. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays; currently, I'm using an empty class instance as a dictionary. The code is compacted to fit it in the README, but the original code is in `examples/working/donut.tale`. On my machine, with optimizations enabled, this runs at about 11 FPS.
 ```js
 let Std = import("std");
 let tmr1 = null; let tmr2 = null; let A = 1; let B = 1;
-let asciiframe = function() {
-    A = A + 0.07; B = B + 0.03;
-    let sinA = Std.sin(A); let cosA = Std.cos(A); let sinB = Std.sin(B); let cosB = Std.cos(B);
-    let output = ""; let zBuffer = "";
-    let k = 0; while(k < 1760) {
-        zBuffer = zBuffer + " ";
-        if(k % 80 == 79) output = output + "\n";
-        else output = output + " ";
-        k = k + 1;
+let Empty = class{};
+while(true) {
+  A = A + 0.07; B = B + 0.03;
+  let sinA = Std.sin(A); let cosA = Std.cos(A); let sinB = Std.sin(B); let cosB = Std.cos(B);
+  let zBuffer = Empty(); let output = "";
+  let k = 0; while(k < 1760) {
+    zBuffer[Std.string(k)] = 0;
+    if(k % 80 == 79) output = output + "\n";
+    else output = output + " ";
+    k = k + 1;
+  }
+  let j = 0;  while(j < 6.28) { // J is theta
+    let jSin = Std.sin(j); let jCos = Std.cos(j);
+    let i = 0; while(i < 6.28) { // I is phi
+      let iSin = Std.sin(i); let iCos = Std.cos(i);
+      let h = jCos + 2;
+      let d = 1 / (iSin * h * sinA + jSin * cosA + 5);
+      let t = iSin * h * cosA - jSin * sinA;
+      let x = Std.floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
+      let y = Std.floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
+      let o = x + 80 * y; let strO = Std.string(o);
+      if(y < 22 && y >= 0 && x >= 0 && d > zBuffer[strO]) {
+        zBuffer[strO] = d;
+        output =
+          Std.substring(output, 0, o) +
+          ".,-~:;=!*#$@"[Std.floor(Std.max(0,
+              8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB)
+          ))] +
+          Std.substring(output, o + 1, Std.length(output));
+      }
+      i = i + 0.02;
     }
-    let j = 0; while(j < 6.28) { // J is theta
-        let jSin = Std.sin(j); let jCos = Std.cos(j);
-        let i = 0; while(i < 6.28) { // I is phi
-            let iSin = Std.sin(i); let iCos = Std.cos(i);
-            let h = jCos + 2; let d = 1 / (iSin * h * sinA + jSin * cosA + 5); let t = iSin * h * cosA - jSin * sinA;
-            let x = Std.floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
-            let y = Std.floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
-            let o = x + 80 * y;
-            let depthChar = Std.substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", Std.floor(d * 100), Std.floor(d * 100) + 1);
-            if(y < 22 && y >= 0 && x >= 0 && x < 79 && Std.intChar(depthChar) > Std.intChar(Std.substring(zBuffer, o, o + 1))) {
-                let N = 8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB);
-                zBuffer = Std.substring(zBuffer, 0, o) + depthChar + Std.substring(zBuffer, o + 1, Std.length(zBuffer));
-                let idx = 0;
-                if(N > 0) idx = N;
-                output = Std.substring(output, 0, o) + Std.substring(".,-~:;=!*#$@", idx, idx + 1) + Std.substring(output, o + 1, Std.length(output));
-            }
-            i = i + 0.02;
-        }
-        j = j + 0.07;
-    }
-    Std.print(output);
-};
-while(true) asciiframe();
+    j = j + 0.07;
+  }
+  Std.print(output);
+}
 ```
 
-There are many other examples of the language in the `examples` directory. The `working` directory contains examples that are known to work, while the `testing` directory contains examples I want to eventually work, am currently working on fixing, or are known not to work. `tests` also contains tests for the language, which display many features of the language.
+#### Output (random frame, but it's animated)
+```plaintext
+                                   @@@@@@@@@@@$
+                              $$$$$$#########$$$$$$
+                            $####**!!!!!!!!!****##$$$$
+                          ####**!!!!!!====!!!!!!**######
+                        *##****!!==;;::::::;;==!*****####
+                       ******!!==;:~-,,,,,--~:;;=!*****##*
+                      !****!!==;:~,.........,-~:;=!!*******
+                      !****!!=;:~-............-~:;=!!******!
+                     ;!****!!=;:~,..        ..,~:;=!!*****!!
+                     =!*****!!!;:-.          .,::==!!*****!=
+                     ;!!******!!==:          -;==!!!*****!!=
+                     :!!!*********!=        ;=!!!********!=;
+                      ;=!***##########*!!*************!*!!;:
+                      :=!!***##$$$$$@@@@$$$$$#####***!!!!=;
+                       :;=!***###$$$@@@@@$$$$$###***!!!==;~
+                        ~;=!*****##$$$$$$$$$###***!!!!=;:,
+                         ,:;=!******#######******!!==;:~
+                           ,~;;==!**!*********!!!=;;~-.
+                              -~::;==========;;;:~-.
+                                 .,--~~~~~~~--,.
+```
 
-# TODO
-- [x] Implement a lexer
-- [X] Implement a parser
-- [X] Implement an interpreter
-  - [X] Tree-walking interpreter
-  - [ ] Bytecode interpreter
-- [ ] Implement a compiler
+### And more!
 
-# The language
+There are many other examples of the language in the `examples` directory. The `working` directory contains examples that are known to work, while the `testing` directory contains examples I want to eventually work, am currently working on fixing, or are known not to work.
+
+## Unit tests
+For even more examples of the language, check out the unit tests under `tests/`.
+The `tests` directory contains tests for language features with a simple testing framework implemented in Tale itself!
+To run the tests, use `taleExecutable tests/testFramework.tale` from the root directory.
+
+## Language features
 The language, Tale, is not very well-defined yet -- I'm mostly experimenting with different ideas. However, here are the characteristics I'm currently implementing:
 - [X] Dynamic typing (for now)
 - [X] First-class functions
@@ -126,7 +243,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
   - [X] `panic` function: `Std.panic("Something went wrong!");` (Throws an irrecoverable error)
   - [X] `assert` function: `Std.assert(5 == 5);` (Panics if the condition is false)
 
-## Important note
+### Important note
 Since all memory in the language is reference-counted, reference cycles are possible (and easy to create). I'm considering switching to a garbage collector to avoid this issue, but for now, it's something to be aware of.
 The following situations are examples of how reference cycles can be created:
 - A class that holds a reference to itself
@@ -134,13 +251,13 @@ The following situations are examples of how reference cycles can be created:
 - A function that has a child function and the child function has more than 1 reference to the parent function (e.g. it's returned, stored in a variable, etc.)
 This is quite limiting, but one of my other goals when making this language was to learn about reference counting, so I hope it's an understandable limitation.
 
-## Considerations for the future
+### Considerations for the future
 - Static typing
 - Should we switch to a garbage collector to avoid reference cycles?
 - How should we handle errors?
 - Should statements be expressions? (E.g. `let x = if (true) { 5 } else { 3 }`)
 
-# Running
+## Running
 I don't currently provide builds since I'm still developing the basic features and things are changing quickly. If you want to run the language as it currently is, you can do the following:
 ```sh
 git clone https://github.com/Glitch752/TaleLanguage/
@@ -150,30 +267,38 @@ zig build --release=fast
 ```
 (And replace `.\examples\working\donut.tale` with the path to your source file)
 
-# Development
+## Development
 
 Tale requires Zig version 0.13.0.
 To run the program, use `zig run .\src\main.zig -freference-trace -- [tale file path]`. I plan to eventually migrate to Zig's build system, but this works well enough for now.
 
-## Random
+### Note
 When developing on Windows and using Powershell, you'll need to run this because Powershell doesn't recognize UTF-8 by default:
 ```powershell
 $OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
 ```
 I couldn't find the proper way to do this, but for now, this works for me.
 
-# Random questions
+## TODO
+- [x] Implement a lexer
+- [X] Implement a parser
+- [X] Implement an interpreter
+  - [X] Tree-walking interpreter
+  - [ ] Bytecode interpreter
+- [ ] Implement a compiler
 
-## Where does the name come from?
+## Random questions
+
+### Where does the name come from?
 A random noun generator. I needed a name and I couldn't think of one ¯\\\_(ツ)_/¯
 
-## Why object-oriented?
+### Why object-oriented?
 It's the most familiar paradigm to me, and since I think it would be interesting to eventually self-host this language, I want to make it as easy as possible to work with.  
 I also believe it can be a very powerful style when used correctly, and it's not that difficult to implement.  
 Another part of it is that I want to learn how object-oriented features are implemented.  
 
-## Why did you make this?
+### Why did you make this?
 I'm making this language because I wanted to learn Zig and I'm interested in compiler design.
 
-## What's the goal of this project?
+### What's the goal of the language?
 To make a programming language that is relatively fast, easy-to-use, memory safe with reference counting, and (eventually) compilable to x86_64.

@@ -5,7 +5,8 @@ let tmr2 = null;
 let A = 1;
 let B = 1;
 
-let asciiframe = function() {
+let Empty = class{};
+while(true) {
     A = A + 0.07;
     B = B + 0.03;
 
@@ -13,18 +14,14 @@ let asciiframe = function() {
     let cosA = Std.cos(A);
     let sinB = Std.sin(B);
     let cosB = Std.cos(B);
-
+    
+    let zBuffer = Empty();
     let output = "";
-    let zBuffer = "";
-
     let k = 0;
     while(k < 1760) {
-        zBuffer = zBuffer + " ";
-        if(k % 80 == 79) {
-            output = output + "\n";
-        } else {
-            output = output + " ";
-        }
+        zBuffer[Std.string(k)] = 0;
+        if(k % 80 == 79) output = output + "\n";
+        else output = output + " ";
         k = k + 1;
     }
 
@@ -44,18 +41,17 @@ let asciiframe = function() {
 
             let x = Std.floor(40 + 30 * d * (iCos * h * cosB - t * sinB));
             let y = Std.floor(12 + 15 * d * (iCos * h * sinB + t * cosB));
-
             let o = x + 80 * y;
+            let strO = Std.string(o);
 
-            let depthChar = Std.substring("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", Std.floor(d * 100), Std.floor(d * 100) + 1);
-            if(y < 22 && y >= 0 && x >= 0 && x < 79 && Std.intChar(depthChar) > Std.intChar(Std.substring(zBuffer, o, o + 1))) {
-                let N = 8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB);
-
-                zBuffer = Std.substring(zBuffer, 0, o) + depthChar + Std.substring(zBuffer, o + 1, Std.length(zBuffer));
-                let idx = 0;
-                if(N > 0) idx = N;
-
-                output = Std.substring(output, 0, o) + Std.substring(".,-~:;=!*#$@", idx, idx + 1) + Std.substring(output, o + 1, Std.length(output));
+            if(y < 22 && y >= 0 && x >= 0 && d > zBuffer[strO]) {
+                zBuffer[strO] = d;
+                output =
+                    Std.substring(output, 0, o) +
+                    ".,-~:;=!*#$@"[Std.floor(Std.max(0,
+                        8 * ((jSin * sinA - iSin * jCos * cosA) * cosB - iSin * jCos * sinA - jSin * cosA - iCos * jCos * sinB)
+                    ))] +
+                    Std.substring(output, o + 1, Std.length(output));
             }
 
             i = i + 0.02;
@@ -64,8 +60,4 @@ let asciiframe = function() {
     }
 
     Std.print(output);
-};
-
-while(true) {
-    asciiframe();
 }

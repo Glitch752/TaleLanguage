@@ -1,0 +1,73 @@
+let Std = import("std");
+let string = Std.string;
+
+let Object = class {};
+let Array = class {
+    constructor() {
+        this.length = 0;
+        this.inner = Object();
+    }
+    push(value) {
+        this.inner[string(this.length)] = value;
+        this.length = this.length + 1;
+    }
+    get(index) {
+        if(index < 0 || index >= this.length) {
+            return null;
+        }
+        return this.inner[string(index)];
+    }
+    print() {
+        Std.print("[");
+        let i = 0;
+        while(i < this.length) {
+            Std.print(this.inner[string(i)]);
+            if(i < this.length - 1) {
+                Std.print(", ");
+            }
+            i = i + 1;
+        }
+        Std.println("]");
+    }
+};
+let MappableArray = class extending Array {
+    map(f) {
+        let result = MappableArray();
+        let i = 0;
+        while(i < this.length) {
+            result.push(f(this.get(i)));
+            i = i + 1;
+        }
+        return result;
+    }
+    filter(f) {
+        let result = MappableArray();
+        let i = 0;
+        while(i < this.length) {
+            let value = this.get(i);
+            if (f(value)) {
+                result.push(value);
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+};
+
+let array = MappableArray();
+array.push(1);
+array.push(2);
+array.push(3);
+array.push(10);
+array.push(15);
+
+Std.print("Original array: ");
+array.print();
+
+let mappedArray = array.map(function(x) { return x * 2 + 1; });
+let filteredArray = array.filter(function(x) { return x % 2 == 0; });
+
+Std.print("Mapped array: ");
+mappedArray.print();
+Std.print("Filtered array: ");
+filteredArray.print();
