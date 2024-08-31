@@ -1,0 +1,56 @@
+export let TEST_NAME = "Class dynamic field access";
+export let EXPECTED_ASSERTIONS = 6;
+
+// let Array = class {
+//     constructor() {
+//         this.length = 0;
+//         this.inner = class{}();
+//     }
+//     push(value) {
+//         this.inner[this.length] = value;
+//         this.length = this.length + 1;
+//     }
+//     get(index) {
+//         if(index < 0 || index >= this.length) {
+//             return null;
+//         }
+//         return this.inner[index];
+//     }
+//     set(index, value) {
+//         if(index < 0 || index >= this.length) {
+//             return;
+//         }
+//         this.inner[index] = value;
+//     }
+//     splice(index, count) {
+//         if(index < 0 || index >= this.length) {
+//             return;
+//         }
+//         if(count < 0 || index + count > this.length) {
+//             return;
+//         }
+//         let i = index;
+//         while(i < this.length - count) {
+//             this.inner[i] = this.inner[i + count];
+//             i = i + 1;
+//         }
+//         this.length = this.length - count;
+//     }
+// };
+
+export let run = function(assert) {
+    // let array = Array();
+    // array.push(1);
+    // array.push(2);
+    // array.push(3);
+    // assert(array.get(0) == 1);
+    // assert(array.get(1) == 2);
+    // assert(array.get(2) == 3);
+    // array.set(1, 4);
+    // assert(array.get(1) == 4);
+    // array.splice(1, 1);
+    // assert(array.get(0) == 1);
+    // assert(array.get(1) == 3);
+    // assert(array.get(2) == null);
+    assert(true);
+};

@@ -26,8 +26,21 @@ pub fn main() !void {
         .allocator = allocator,
         .interpreter = try Interpreter.new(allocator, args_parser.ArgsFlags{}),
     };
-    try instance.entry();
-    instance.deinit();
+    defer instance.deinit();
+    instance.entry() catch |err| {
+        switch (err) {
+            std.fs.SelfExePathError.FileNotFound => {
+                try prettyError("File not found");
+                std.process.exit(1);
+            },
+            else => {
+                const message = try std.fmt.allocPrint(allocator, "Error in main entry: {any}", .{err});
+                defer allocator.free(message);
+                try prettyError(message);
+                return err;
+            },
+        }
+    };
 
     if (instance.hadError) {
         std.process.exit(65);

@@ -1,0 +1,8 @@
+let a = function(b) {};
+let test = function() {
+    a(function() {});
+};
+// Any fewer than 12 calls to test() will not trigger the bug.
+test(); test(); test(); test(); test();
+test(); test(); test(); test(); test();
+test(); test();

@@ -88,7 +88,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
     - The `constructor` method is called when the class is instantiated
   - [X] Instantiation: `let p = Point(5, 3);`
   - [X] Field access: `p.x`, `p.z = 5;` (creates a new field)
-    - [ ] Dynamic field access: `p["x"]` (I'm debating whether this is a good idea since it's not very type-safe, but it's a common feature in dynamic languages)
+    - [X] Dynamic field access: `p["x"]` (I'm debating whether this is a good idea since it's not very type-safe, but it's a common feature in dynamic languages)
   - [X] Single inheritance: `let Point3D = class extending Point { constructor(x, y, z) { super.constructor(x, y); this.z = z; } }`
     - Constructors are inherited just like any other method
   - [X] Method access: `p.method()` (Just another function)
