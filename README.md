@@ -97,7 +97,7 @@ The language, Tale, is not very well-defined yet -- I'm mostly experimenting wit
       - Access: `Point.method()` (No `this` reference)
       - Static and instance methods can have the same name. You cannot call static methods on instances.
     - [X] Fields: `let Point = class {}; Point.x = 5;`
-      - Access: `Point.x`
+      - Access: `Point.x`, `Point["x"]`
 - [X] Imports from other files: `const test = import("test.tale");` (`test` is a module with all the exported values)
   - [X] Exporting values: `export let x = 5;`
   - [X] Exporting any type: `export let Point = class { constructor(x, y) { this.x = x; this.y = y; } }`

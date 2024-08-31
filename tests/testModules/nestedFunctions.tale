@@ -1,0 +1,33 @@
+export let TEST_NAME = "Nested functions";
+export let EXPECTED_ASSERTIONS = 1;
+
+let std = import("std");
+
+export let run = function(assert) {
+    let string = "";
+    let p = function(s) {
+        string = string + s;
+    };
+    
+    let main = function() {
+        let run = function(n) {
+    
+            let printWithSpace = function(n) {
+                p(std.string(n));
+                p(" ");
+            };
+    
+            if (n >= 1) {
+                run(n - 1);
+                run(n - 1);
+                printWithSpace(n);
+            }
+        };
+        
+        run(6);
+    };
+    
+    main();
+
+    assert(string == "1 1 2 1 1 2 3 1 1 2 1 1 2 3 4 1 1 2 1 1 2 3 1 1 2 1 1 2 3 4 5 1 1 2 1 1 2 3 1 1 2 1 1 2 3 4 1 1 2 1 1 2 3 1 1 2 1 1 2 3 4 5 6 ");
+};

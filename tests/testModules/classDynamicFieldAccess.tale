@@ -1,15 +1,10 @@
 export let TEST_NAME = "Class dynamic field access";
-export let EXPECTED_ASSERTIONS = 6;
+export let EXPECTED_ASSERTIONS = 7;
 
 let string = import("std").string;
 
-let Object = class {
-    constructor() {}
-    toString() {
-        return "Object";
-    }
-};
-let Array = class {
+let Object = class {};
+export let Array = class {
     constructor() {
         this.length = 0;
         this.inner = Object();

@@ -507,6 +507,27 @@ pub fn interpretExpression(self: *ModuleInterpreter, expression: *const Expressi
             var name = try self.interpretExpression(values.name);
             defer name.deinit(self.allocator);
 
+            if (name.isNumber()) {
+                // We can index into strings with numbers
+                var objectValue = try self.interpretExpression(values.object);
+                defer objectValue.deinit(self.allocator);
+
+                if (!objectValue.isString()) {
+                    self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Can only index into strings with numbers", .{});
+                    return InterpreterError.RuntimeError;
+                }
+
+                const index: u32 = @intFromFloat(name.asNumber());
+                if (index < 0 or index >= objectValue.asString().len) {
+                    self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Index out of bounds", .{});
+                    return InterpreterError.RuntimeError;
+                }
+
+                const allocatedString = try self.allocator.alloc(u8, 1);
+                allocatedString[0] = objectValue.asString()[index];
+                return VariableValue.fromString(allocatedString, true);
+            }
+
             if (!name.isString()) {
                 self.runtimeError = RuntimeError.tokenError(self, values.startToken, "Property name must be a string", .{});
                 return InterpreterError.RuntimeError;
@@ -574,7 +595,7 @@ fn propertyAssignment(self: *ModuleInterpreter, object: *const Expression, start
     var instance = objectValue.referenceClassInstance();
     defer _ = instance.deinit(self.allocator);
 
-    try instance.unsafePtr().set(startToken, name, valueValue, self);
+    try instance.unsafePtr().set(startToken, name, try valueValue.takeReference(self.allocator), self);
     if (self.runtimeError != null) return InterpreterError.RuntimeError;
 
     return valueValue;

@@ -1,0 +1,48 @@
+export let TEST_NAME = "Functions as a parameter (higher order functions)";
+export let EXPECTED_ASSERTIONS = 5;
+
+let Array = import("./classDynamicFieldAccess").Array;
+let MappableArray = class extending Array {
+    map(f) {
+        let result = MappableArray();
+        let i = 0;
+        while(i < this.length) {
+            result.push(f(this.get(i)));
+            i = i + 1;
+        }
+        return result;
+    }
+    filter(f) {
+        let result = MappableArray();
+        let i = 0;
+        while(i < this.length) {
+            let value = this.get(i);
+            if (f(value)) {
+                result.push(value);
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+};
+
+export let run = function(assert) {
+    let applyFunction = function(f, x) {
+        return f(x);
+    };
+    
+    assert(applyFunction(function(x) { return x + 1; }, 5) == 6);
+
+    let array = MappableArray();
+    array.push(1);
+    array.push(2);
+    array.push(3);
+
+    let mappedArray = array.map(function(x) { return x * 2 + 1; });
+    assert(mappedArray.get(0) == 3);
+    assert(mappedArray.get(1) == 5);
+    assert(mappedArray.get(2) == 7);
+
+    let filteredArray = array.filter(function(x) { return x % 2 == 0; });
+    assert(filteredArray.length == 1);
+};

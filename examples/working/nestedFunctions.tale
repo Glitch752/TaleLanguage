@@ -1,5 +1,3 @@
-// TODO: This example leaks memory like crazy.
-
 let Std = import('std');
 
 let main = function() {
@@ -18,9 +16,7 @@ let main = function() {
         }
     };
     
-    let test = run;
-    
-    test(10);
+    run(10);
 };
 
 main();
