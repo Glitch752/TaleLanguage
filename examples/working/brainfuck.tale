@@ -1,21 +1,14 @@
-export let TEST_NAME = "Example task: brainfuck interpreter";
-export let EXPECTED_ASSERTIONS = 4;
-
-let SKIP_SLOW_ASSERTIONS = true;
-if(SKIP_SLOW_ASSERTIONS) EXPECTED_ASSERTIONS = 2;
-
 // We don't implement user input in this interpreter; only output.
 
 let std = import("std");
+
 let Memory = class {
     constructor() {
         this.length = 0;
         this.pointer = 0;
     }
     get() {
-        if(this.pointer >= this.length) {
-            return 0;
-        }
+        if(this.pointer >= this.length) return 0;
         return this[std.string(this.pointer)];
     }
     set(value) {
@@ -48,30 +41,22 @@ let Memory = class {
 let interpret = function(program) {
     let output = "";
     let memory = Memory();
-
     let i = 0;
+
     while(i < std.length(program)) {
         let command = program[i];
 
-        if(command == ">") {
-            memory.forward();
-        } else if(command == "<") {
-            memory.backward();
-        } else if(command == "+") {
-            memory.increment();
-        } else if(command == "-") {
-            memory.decrement();
-        } else if(command == ",") {
-            // We don't implement user input in this interpreter; only output.
-        } else if(command == ".") {
-            output = output + std.charInt(memory.get());
-        } else if(command == "[") {
+        if(command == ">") memory.forward();
+        else if(command == "<") memory.backward();
+        else if(command == "+") memory.increment();
+        else if(command == "-") memory.decrement();
+        else if(command == ".") output = output + std.charInt(memory.get());
+        else if(command == "[") {
             if(memory.get() == 0) {
                 let depth = 1;
                 while(depth > 0) {
                     i = i + 1;
                     if(i >= std.length(program)) return output;
-
                     if(program[i] == "[") depth = depth + 1;
                     else if(program[i] == "]") depth = depth - 1;
                 }
@@ -82,7 +67,6 @@ let interpret = function(program) {
                 while(depth > 0) {
                     i = i - 1;
                     if(i < 0) return output;
-
                     if(program[i] == "[") depth = depth - 1;
                     else if(program[i] == "]") depth = depth + 1;
                 }
@@ -95,16 +79,4 @@ let interpret = function(program) {
     return output;
 };
 
-export let run = function(assert) {
-    // Print !, second cell is 1
-    assert(interpret(">+<+++++++++++++++++++++++++++++++++.") == "!");
-    // Print brainfuck
-    assert(interpret(">++++[>++++++<-]>-[[<+++++>>+<-]>-]<<[<]>>>>--.<<<-.>>>-.<.<.>---.<<+++.>>>++.<<---.[>]<<.") == "brainfuck\n");
-
-    if(!SKIP_SLOW_ASSERTIONS) {
-        // Print Hello World!
-        assert(interpret("++++++++[>++++[>++>+++>+++>+<<<<-]>+>->+>>+[<]<-]>>.>>---.+++++++..+++.>.<<-.>.+++.------.--------.>+.>++.") == "Hello World!\n");
-        // Print Sierpinski triangle
-        assert(interpret("++++++++[>+>+<<-]>++>>+<[-[>>+<<-]+>>]>+[-<<<[->[+[-]+>++>>>-<<]<[<]>>++++++[<<+++++>>-]+<<++.[-]<<]>.>+[>>]>+]") == "       *\n      * *\n     *   *\n    * * * *\n   *       *\n  * *     * *\n *   *   *   *\n* * * * * * * *\n");
-    }
-};
+std.print(interpret("->++>+++>+>+>+++>>>>>>>>>>>>>>>>>>>>+>+>++>+++>++>>+++>+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>+>+>>+++>>+++>>>>>+++>+>>>>>>>>>++>+++>+++>+>>+++>>>+++>+>++>+++>>>+>+>++>+++>+>+>>+++>>>>>>>+>+>>>+>+>++>+++>+++>+>>+++>>>+++>+>++>+++>++>>+>+>++>+++>+>+>>+++>>>>>+++>+>>>>>++>+++>+++>+>>+++>>>+++>+>+++>+>>+++>>+++>>++[[>>+[>]++>++[<]<-]>+[>]<+<+++[<]<+]>+[>]++++>++[[<++++++++++++++++>-]<+++++++++.<]"));

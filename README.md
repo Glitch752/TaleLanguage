@@ -9,6 +9,7 @@ I've been inspired by [Crafting Interpreters](https://craftinginterpreters.com/)
     <ul>
       <li><a href="#higher-order-functions-on-arrays">Higher-order functions on arrays</a></li>
       <li><a href="#donuttale">Donut.tale</a></li>
+      <li><a href="#brainfuck">Brainfuck</a></li>
       <li><a href="#and-more">And more!</a></li>
     </ul>
   </li>
@@ -159,6 +160,64 @@ while(true) {
                            ,~;;==!**!*********!!!=;;~-.
                               -~::;==========;;;:~-.
                                  .,--~~~~~~~--,.
+```
+
+## Brainfuck
+This is a simple brainfuck interpreter (that doesn't support input) implemented in Tale. The code is compacted to fit it in the README, but the original code is in `examples/working/brainfuck.tale`. 
+```js
+let std = import("std");
+let Memory = class {
+    constructor() { this.length = 0; this.pointer = 0; }
+    get() { if(this.pointer >= this.length) return 0; return this[std.string(this.pointer)]; }
+    set(value) {
+        if(this.pointer >= this.length) while(this.length <= this.pointer) {
+            this[std.string(this.length)] = 0; this.length = this.length + 1;
+        }
+        this[std.string(this.pointer)] = value;
+    }
+    increment() { let next = this.get() + 1; if(next > 255) next = 0; this.set(next); }
+    decrement() { let next = this.get() - 1; if(next < 0) next = 255; this.set(next); }
+    forward() { this.pointer = this.pointer + 1; }
+    backward() { this.pointer = this.pointer - 1; }
+};
+let interpret = function(program) {
+    let output = ""; let memory = Memory();
+    let i = 0; while(i < std.length(program)) {
+        let command = program[i];
+        if(command == ">") memory.forward();
+        else if(command == "<") memory.backward();
+        else if(command == "+") memory.increment();
+        else if(command == "-") memory.decrement();
+        else if(command == ".") output = output + std.charInt(memory.get());
+        else if(command == "[") {
+            if(memory.get() == 0) {
+                let depth = 1; while(depth > 0) {
+                    i = i + 1; if(i >= std.length(program)) return output;
+                    if(program[i] == "[") depth = depth + 1;
+                    else if(program[i] == "]") depth = depth - 1;
+                }
+            }
+        } else if(command == "]") {
+            if(memory.get() != 0) {
+                let depth = 1; while(depth > 0) {
+                    i = i - 1; if(i < 0) return output;
+                    if(program[i] == "[") depth = depth - 1;
+                    else if(program[i] == "]") depth = depth + 1;
+                }
+            }
+        }
+        i = i + 1;
+    }
+
+    return output;
+};
+// A brainfuck quine (program that prints itself); this loops back on itself a ton, so you pretty much need to run the program with ReleaseFast optimization for it to finish in a reasonable amount of time.
+std.print(interpret("->++>+++>+>+>+++>>>>>>>>>>>>>>>>>>>>+>+>++>+++>++>>+++>+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>+>+>>+++>>+++>>>>>+++>+>>>>>>>>>++>+++>+++>+>>+++>>>+++>+>++>+++>>>+>+>++>+++>+>+>>+++>>>>>>>+>+>>>+>+>++>+++>+++>+>>+++>>>+++>+>++>+++>++>>+>+>++>+++>+>+>>+++>>>>>+++>+>>>>>++>+++>+++>+>>+++>>>+++>+>+++>+>>+++>>+++>>++[[>>+[>]++>++[<]<-]>+[>]<+<+++[<]<+]>+[>]++++>++[[<++++++++++++++++>-]<+++++++++.<]"));
+```
+
+#### Output
+```plaintext
+->++>+++>+>+>+++>>>>>>>>>>>>>>>>>>>>+>+>++>+++>++>>+++>+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>+>+>>+++>>+++>>>>>+++>+>>>>>>>>>++>+++>+++>+>>+++>>>+++>+>++>+++>>>+>+>++>+++>+>+>>+++>>>>>>>+>+>>>+>+>++>+++>+++>+>>+++>>>+++>+>++>+++>++>>+>+>++>+++>+>+>>+++>>>>>+++>+>>>>>++>+++>+++>+>>+++>>>+++>+>+++>+>>+++>>+++>>++[[>>+[>]++>++[<]<-]>+[>]<+<+++[<]<+]>+[>]++++>++[[<++++++++++++++++>-]<+++++++++.<]
 ```
 
 ### And more!
