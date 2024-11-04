@@ -3,6 +3,8 @@ const Statement = @import("./statement.zig").Statement;
 
 pub const Program = @This();
 
+// TODO: move file name and contents into this struct?
+
 statements: std.ArrayList(*Statement),
 
 pub fn init(allocator: std.mem.Allocator) Program {

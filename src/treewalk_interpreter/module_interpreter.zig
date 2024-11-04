@@ -9,8 +9,8 @@ const Token = @import("../token.zig").Token;
 const TokenLiteral = @import("../token.zig").TokenLiteral;
 const VariableValue = @import("./variable_value.zig").VariableValue;
 
-const RuntimeError = @import("./interpreterError.zig").RuntimeError;
-const InterpreterError = @import("./interpreterError.zig").InterpreterError;
+const RuntimeError = @import("./interpreter_error.zig").RuntimeError;
+const InterpreterError = @import("./interpreter_error.zig").InterpreterError;
 
 const natives = @import("./natives.zig");
 const NativeError = @import("./natives.zig").NativeError;

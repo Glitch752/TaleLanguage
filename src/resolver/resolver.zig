@@ -3,7 +3,7 @@ const Statement = @import("../parser/statement.zig").Statement;
 const Expression = @import("../parser/expression.zig").Expression;
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const Program = @import("../parser/program.zig").Program;
-const ModuleInterpreter = @import("../interpreter/module_interpreter.zig").ModuleInterpreter;
+const ModuleInterpreter = @import("../treewalk_interpreter/module_interpreter.zig").ModuleInterpreter;
 const Token = @import("../token.zig").Token;
 
 const errorContext = @import("../errors.zig").errorContext;

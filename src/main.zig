@@ -1,8 +1,8 @@
 const std = @import("std");
 
-const ModuleInterpreter = @import("./interpreter/module_interpreter.zig");
-const Module = @import("interpreter/module_value.zig").Module;
-const Interpreter = @import("interpreter/interpreter.zig").Interpreter;
+const ModuleInterpreter = @import("./treewalk_interpreter/module_interpreter.zig");
+const Module = @import("treewalk_interpreter/module_value.zig").Module;
+const Interpreter = @import("treewalk_interpreter/interpreter.zig").Interpreter;
 
 const args_parser = @import("args_parser.zig");
 

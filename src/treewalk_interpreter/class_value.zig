@@ -4,8 +4,8 @@ const Environment = @import("./environment.zig").Environment;
 const ModuleInterpreter = @import("./module_interpreter.zig").ModuleInterpreter;
 const VariableValue = @import("./variable_value.zig").VariableValue;
 
-const RuntimeError = @import("./interpreterError.zig").RuntimeError;
-const InterpreterError = @import("./interpreterError.zig").InterpreterError;
+const RuntimeError = @import("./interpreter_error.zig").RuntimeError;
+const InterpreterError = @import("./interpreter_error.zig").InterpreterError;
 
 const CallableFunction = @import("./callable_value.zig").CallableFunction;
 

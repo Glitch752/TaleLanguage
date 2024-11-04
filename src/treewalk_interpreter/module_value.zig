@@ -7,8 +7,8 @@ const Main = @import("../main.zig");
 const CallableNativeFunction = @import("./callable_value.zig").CallableNativeFunction;
 const Token = @import("../token.zig").Token;
 const VariableValue = @import("./variable_value.zig").VariableValue;
-const RuntimeError = @import("./interpreterError.zig").RuntimeError;
-const InterpreterError = @import("./interpreterError.zig").InterpreterError;
+const RuntimeError = @import("./interpreter_error.zig").RuntimeError;
+const InterpreterError = @import("./interpreter_error.zig").InterpreterError;
 
 pub const ExportedValueSet = std.StringHashMapUnmanaged(u0);
 

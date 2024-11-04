@@ -99,7 +99,7 @@ Filtered array: [2, 10]
 This is a port of `donut.c` to Tale. I'm still iterating on the language grammar, and intend to eventually add constructs like arrays; currently, I'm using an empty class instance as a dictionary. The code is compacted to fit it in the README, but the original code is in `examples/working/donut.tale`. On my machine, with optimizations enabled, this runs at about 11 FPS.
 ```js
 let Std = import("std");
-let tmr1 = null; let tmr2 = null; let A = 1; let B = 1;
+let A = 1; let B = 1;
 let Empty = class{};
 while(true) {
   A = A + 0.07; B = B + 0.03;

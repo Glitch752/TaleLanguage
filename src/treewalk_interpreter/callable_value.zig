@@ -13,8 +13,8 @@ const ClassInstanceReference = @import("./class_value.zig").ClassInstanceReferen
 const FunctionExpression = @import("../parser/expression.zig").FunctionExpression;
 const ClassExpression = @import("../parser/expression.zig").ClassExpression;
 
-const RuntimeError = @import("./interpreterError.zig").RuntimeError;
-const InterpreterError = @import("./interpreterError.zig").InterpreterError;
+const RuntimeError = @import("./interpreter_error.zig").RuntimeError;
+const InterpreterError = @import("./interpreter_error.zig").InterpreterError;
 
 const RCSP = @import("../rcsp.zig");
 

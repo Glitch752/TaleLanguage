@@ -1,7 +1,5 @@
 let Std = import("std");
 
-let tmr1 = null;
-let tmr2 = null;
 let A = 1;
 let B = 1;
 
